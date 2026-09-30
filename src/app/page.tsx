@@ -1,102 +1,160 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { LogicEngine } from '@/lib/LogicEngine';
 
-export default function Home() {
-  const [engine, setEngine] = useState<LogicEngine | null>(null);
-  const [outputState, setOutputState] = useState(false);
-  const [in1, setIn1] = useState(false);
-  const [in2, setIn2] = useState(false);
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  Background,
+  Connection,
+  Node
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
-  // Use a ref to store the engine across renders
-  const engineRef = useRef<LogicEngine | null>(null);
+import { LogicEngine, BlockType } from '@/lib/LogicEngine';
+import Sidebar from '@/components/Sidebar';
+import { InputNode } from '@/components/nodes/InputNode';
+import { OutputNode } from '@/components/nodes/OutputNode';
+import { GateNode } from '@/components/nodes/GateNode';
 
-  useEffect(() => {
-    const le = new LogicEngine();
-    
-    le.addBlock({ id: 'in1', type: 'INPUT', inputs: {}, outputs: { Q: false }, value: false });
-    le.addBlock({ id: 'in2', type: 'INPUT', inputs: {}, outputs: { Q: false }, value: false });
-    le.addBlock({ id: 'and1', type: 'AND', inputs: { A: false, B: false }, outputs: { Q: false } });
-    le.addBlock({ id: 'out1', type: 'OUTPUT', inputs: { A: false }, outputs: { Q: false } });
+const nodeTypes = {
+  inputNode: InputNode,
+  outputNode: OutputNode,
+  gateNode: GateNode,
+};
 
-    le.addConnection({ fromBlockId: 'in1', fromPin: 'Q', toBlockId: 'and1', toPin: 'A' });
-    le.addConnection({ fromBlockId: 'in2', fromPin: 'Q', toBlockId: 'and1', toPin: 'B' });
-    le.addConnection({ fromBlockId: 'and1', fromPin: 'Q', toBlockId: 'out1', toPin: 'A' });
+let id = 0;
+const getId = () => `block_${id++}`;
 
-    engineRef.current = le;
-    setEngine(le);
+function Workspace() {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const engineRef = useRef(new LogicEngine());
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  const syncVisualsFromEngine = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        const block = engineRef.current.blocks.get(n.id);
+        if (!block) return n;
+        
+        if (n.type === 'inputNode') {
+           return { ...n, data: { ...n.data, value: block.value } };
+        }
+        if (n.type === 'outputNode') {
+           return { ...n, data: { ...n.data, value: block.outputs['Q'] } };
+        }
+        return n;
+      })
+    );
+  }, [setNodes]);
+
+  const handleToggle = useCallback((nodeId: string, newValue: boolean) => {
+    engineRef.current.setInput(nodeId, newValue);
+    // tick multiple times to propagate through deep circuits
+    for(let i=0; i<5; i++) engineRef.current.tick(); 
+    syncVisualsFromEngine();
+  }, [syncVisualsFromEngine]);
+
+  const onConnect = useCallback(
+    (params: Connection) => {
+      setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#60a5fa', strokeWidth: 3 } }, eds));
+      
+      if (params.source && params.target && params.sourceHandle && params.targetHandle) {
+         engineRef.current.addConnection({
+            fromBlockId: params.source,
+            fromPin: params.sourceHandle,
+            toBlockId: params.target,
+            toPin: params.targetHandle
+         });
+         for(let i=0; i<5; i++) engineRef.current.tick();
+         syncVisualsFromEngine();
+      }
+    },
+    [setEdges, syncVisualsFromEngine]
+  );
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const handleToggle = (id: string, value: boolean) => {
-    if (!engineRef.current) return;
-    
-    // Update the engine input
-    engineRef.current.setInput(id, value);
-    // Tick twice to propagate signal through the AND gate to the OUTPUT
-    engineRef.current.tick(); 
-    engineRef.current.tick(); 
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData('application/reactflow/type');
+      if (!type || !reactFlowInstance) return;
 
-    // Update React state for UI
-    if (id === 'in1') setIn1(value);
-    if (id === 'in2') setIn2(value);
-    setOutputState(engineRef.current.blocks.get('out1')?.outputs['Q'] ?? false);
-  };
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      
+      const newNodeId = getId();
+      const gateType = event.dataTransfer.getData('application/reactflow/gateType');
 
-  if (!engine) return <div>Loading Simulator...</div>;
+      let engineType: BlockType = 'INPUT';
+      if (type === 'outputNode') engineType = 'OUTPUT';
+      else if (type === 'gateNode') engineType = gateType as BlockType;
+
+      engineRef.current.addBlock({
+         id: newNodeId,
+         type: engineType,
+         inputs: {},
+         outputs: { Q: false },
+         value: false
+      });
+
+      const newNode: Node = {
+        id: newNodeId,
+        type,
+        position,
+        data: { 
+           gateType,
+           onToggle: handleToggle,
+           value: false
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [reactFlowInstance, setNodes, handleToggle]
+  );
 
   return (
-    <main className="min-h-screen p-12 bg-gray-900 text-white flex flex-col items-center font-sans">
-      <h1 className="text-4xl font-bold mb-4 tracking-tight">Automation Hub</h1>
-      <p className="text-gray-400 mb-12">Phase 1: Real-time Logic Execution Engine (PoC)</p>
-      
-      <div className="bg-gray-800 p-12 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col gap-16 border border-gray-700">
-        
-        {/* Input Layer */}
-        <div className="flex justify-around relative">
-          <div className="flex flex-col items-center gap-4 z-10">
-            <span className="font-mono text-gray-400 text-sm tracking-widest">INPUT A</span>
-            <button 
-              onClick={() => handleToggle('in1', !in1)}
-              className={`w-20 h-32 rounded-xl shadow-inner transition-all duration-200 border-2 active:scale-95 flex items-center justify-center font-bold text-xl ${in1 ? 'bg-green-500 border-green-400 text-green-900 shadow-[0_0_30px_rgba(34,197,94,0.3)]' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
-            >
-              {in1 ? 'ON' : 'OFF'}
-            </button>
-          </div>
-
-          <div className="flex flex-col items-center gap-4 z-10">
-            <span className="font-mono text-gray-400 text-sm tracking-widest">INPUT B</span>
-            <button 
-              onClick={() => handleToggle('in2', !in2)}
-              className={`w-20 h-32 rounded-xl shadow-inner transition-all duration-200 border-2 active:scale-95 flex items-center justify-center font-bold text-xl ${in2 ? 'bg-green-500 border-green-400 text-green-900 shadow-[0_0_30px_rgba(34,197,94,0.3)]' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
-            >
-              {in2 ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-
-        {/* Logic Layer */}
-        <div className="flex justify-center relative">
-           <div className="bg-blue-600 px-12 py-6 rounded-xl font-bold tracking-widest shadow-lg text-2xl relative z-10 border-2 border-blue-400 text-white">
-              AND GATE
-           </div>
-        </div>
-
-        {/* Output Layer */}
-        <div className="flex justify-center mt-4">
-          <div className="flex flex-col items-center gap-6">
-            <span className="font-mono text-gray-400 text-sm tracking-widest">OUTPUT</span>
-            <div className={`w-40 h-40 rounded-full transition-all duration-300 border-8 flex items-center justify-center ${
-              outputState 
-                ? 'bg-yellow-400 border-yellow-200 shadow-[0_0_120px_rgba(250,204,21,0.8)] scale-105' 
-                : 'bg-gray-800 border-gray-700 shadow-inner scale-100'
-            }`}>
-              <span className={`font-bold text-2xl ${outputState ? 'text-yellow-900' : 'text-gray-600'}`}>
-                {outputState ? 'ACTIVE' : 'IDLE'}
-              </span>
-            </div>
-          </div>
-        </div>
+    <div className="flex h-screen w-screen overflow-hidden bg-gray-950 font-sans">
+      <Sidebar />
+      <div className="flex-grow h-full relative" ref={reactFlowWrapper}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onInit={setReactFlowInstance}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          nodeTypes={nodeTypes}
+          fitView
+          className="bg-gray-950"
+          colorMode="dark"
+        >
+          <Controls className="bg-gray-800 border-gray-700 fill-white" />
+          <Background color="#374151" gap={16} />
+        </ReactFlow>
       </div>
-    </main>
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ReactFlowProvider>
+      <Workspace />
+    </ReactFlowProvider>
   );
 }
