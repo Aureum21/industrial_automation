@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -19,11 +19,17 @@ import Sidebar from '@/components/Sidebar';
 import { InputNode } from '@/components/nodes/InputNode';
 import { OutputNode } from '@/components/nodes/OutputNode';
 import { GateNode } from '@/components/nodes/GateNode';
+import { LatchNode } from '@/components/nodes/LatchNode';
+import { EdgeNode } from '@/components/nodes/EdgeNode';
+import { TimerNode } from '@/components/nodes/TimerNode';
 
 const nodeTypes = {
   inputNode: InputNode,
   outputNode: OutputNode,
   gateNode: GateNode,
+  latchNode: LatchNode,
+  edgeNode: EdgeNode,
+  timerNode: TimerNode
 };
 
 let id = 0;
@@ -42,23 +48,54 @@ function Workspace() {
         const block = engineRef.current.blocks.get(n.id);
         if (!block) return n;
         
+        let needsUpdate = false;
+        let newValue = false;
+
         if (n.type === 'inputNode') {
-           return { ...n, data: { ...n.data, value: block.value } };
+           newValue = block.value ?? false;
+           if (n.data.value !== newValue) needsUpdate = true;
         }
+        
+        // Sync outputs so LEDs light up
         if (n.type === 'outputNode') {
-           return { ...n, data: { ...n.data, value: block.outputs['Q'] } };
+           newValue = block.outputs['Q'] ?? false;
+           if (n.data.value !== newValue) needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+           return { ...n, data: { ...n.data, value: newValue } };
         }
         return n;
       })
     );
   }, [setNodes]);
 
+  useEffect(() => {
+    // 10 ticks per second for smooth timer and edge trigger behavior
+    const interval = setInterval(() => {
+      engineRef.current.tick();
+      syncVisualsFromEngine();
+    }, 100);
+    return () => clearInterval(interval);
+  }, [syncVisualsFromEngine]);
+
   const handleToggle = useCallback((nodeId: string, newValue: boolean) => {
     engineRef.current.setInput(nodeId, newValue);
-    // tick multiple times to propagate through deep circuits
-    for(let i=0; i<5; i++) engineRef.current.tick(); 
-    syncVisualsFromEngine();
-  }, [syncVisualsFromEngine]);
+  }, []);
+
+  const handleTagChange = useCallback((nodeId: string, newTag: string) => {
+    engineRef.current.setTag(nodeId, newTag);
+    setNodes((nds) => 
+      nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, tag: newTag } } : n)
+    );
+  }, [setNodes]);
+
+  const handleParamChange = useCallback((nodeId: string, paramKey: string, paramVal: any) => {
+    engineRef.current.setParam(nodeId, paramKey, paramVal);
+    setNodes((nds) => 
+      nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, [paramKey]: paramVal } } : n)
+    );
+  }, [setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -71,11 +108,9 @@ function Workspace() {
             toBlockId: params.target,
             toPin: params.targetHandle
          });
-         for(let i=0; i<5; i++) engineRef.current.tick();
-         syncVisualsFromEngine();
       }
     },
-    [setEdges, syncVisualsFromEngine]
+    [setEdges]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -99,14 +134,17 @@ function Workspace() {
 
       let engineType: BlockType = 'INPUT';
       if (type === 'outputNode') engineType = 'OUTPUT';
-      else if (type === 'gateNode') engineType = gateType as BlockType;
+      else if (type === 'gateNode' || type === 'latchNode' || type === 'edgeNode' || type === 'timerNode') {
+          engineType = gateType as BlockType;
+      }
 
       engineRef.current.addBlock({
          id: newNodeId,
          type: engineType,
          inputs: {},
          outputs: { Q: false },
-         value: false
+         value: false,
+         params: type === 'timerNode' ? { duration: 2000 } : {}
       });
 
       const newNode: Node = {
@@ -116,13 +154,17 @@ function Workspace() {
         data: { 
            gateType,
            onToggle: handleToggle,
-           value: false
+           onTagChange: handleTagChange,
+           onParamChange: handleParamChange,
+           value: false,
+           tag: '',
+           duration: 2000
         },
       };
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance, setNodes, handleToggle]
+    [reactFlowInstance, setNodes, handleToggle, handleTagChange, handleParamChange]
   );
 
   return (
