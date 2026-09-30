@@ -8,9 +8,11 @@ export type Connection = {
 export type BlockType = 
   | 'INPUT' | 'OUTPUT' 
   | 'AND' | 'OR' | 'NOT' | 'XOR' | 'NAND' | 'NOR' | 'XNOR'
-  | 'RS_LATCH' 
+  | 'RS_LATCH' | 'PULSE_RELAY'
   | 'R_TRIG' | 'F_TRIG'
-  | 'TON' | 'TOF';
+  | 'TON' | 'TOF' | 'CLOCK'
+  | 'HIGH' | 'LOW'
+  | 'COUNTER';
 
 export interface BlockState {
   id: string;
@@ -20,7 +22,7 @@ export interface BlockState {
   value?: boolean;
   state?: any; 
   tag?: string; 
-  params?: Record<string, any>; // Used for things like Timer duration
+  params?: Record<string, any>; 
 }
 
 export class LogicEngine {
@@ -30,8 +32,14 @@ export class LogicEngine {
 
   addBlock(block: BlockState) {
     if (block.type === 'RS_LATCH') block.state = false;
+    if (block.type === 'PULSE_RELAY') block.state = { q: false, lastA: false };
     if (block.type === 'R_TRIG' || block.type === 'F_TRIG') block.state = false;
     if (block.type === 'TON' || block.type === 'TOF') block.state = { startTime: null };
+    if (block.type === 'CLOCK') block.state = { lastSwitch: Date.now() };
+    if (block.type === 'COUNTER') block.state = { count: 0, lastCU: false, lastCD: false };
+    if (block.type === 'HIGH') block.outputs['Q'] = true;
+    if (block.type === 'LOW') block.outputs['Q'] = false;
+    
     this.blocks.set(block.id, block);
   }
 
@@ -78,6 +86,9 @@ export class LogicEngine {
       const B = block.inputs['B'] ?? false;
       
       switch (block.type) {
+        case 'HIGH': block.outputs['Q'] = true; break;
+        case 'LOW': block.outputs['Q'] = false; break;
+
         case 'AND': block.outputs['Q'] = A && B; break;
         case 'OR': block.outputs['Q'] = A || B; break;
         case 'NOT': block.outputs['Q'] = !A; break;
@@ -86,13 +97,21 @@ export class LogicEngine {
         case 'NOR': block.outputs['Q'] = !(A || B); break;
         case 'XNOR': block.outputs['Q'] = A === B; break;
         
-        case 'RS_LATCH':
+        case 'RS_LATCH': {
           const S = block.inputs['S'] ?? false;
           const R = block.inputs['R'] ?? false;
           if (R) block.state = false;
           else if (S) block.state = true;
           block.outputs['Q'] = block.state;
           break;
+        }
+
+        case 'PULSE_RELAY': {
+          if (A && !block.state.lastA) block.state.q = !block.state.q;
+          block.state.lastA = A;
+          block.outputs['Q'] = block.state.q;
+          break;
+        }
 
         case 'R_TRIG':
           block.outputs['Q'] = A && !block.state;
@@ -136,6 +155,45 @@ export class LogicEngine {
                block.outputs['Q'] = false;
             }
           }
+          break;
+        }
+
+        case 'CLOCK': {
+          const onTime = block.params?.onTime ?? 1000;
+          const offTime = block.params?.offTime ?? 1000;
+          const now = Date.now();
+          
+          if (block.outputs['Q']) {
+            if (now - block.state.lastSwitch >= onTime) {
+              block.outputs['Q'] = false;
+              block.state.lastSwitch = now;
+            }
+          } else {
+            if (now - block.state.lastSwitch >= offTime) {
+              block.outputs['Q'] = true;
+              block.state.lastSwitch = now;
+            }
+          }
+          break;
+        }
+
+        case 'COUNTER': {
+          const CU = block.inputs['CU'] ?? false;
+          const CD = block.inputs['CD'] ?? false;
+          const R = block.inputs['R'] ?? false;
+          const limit = block.params?.limit ?? 5;
+          
+          if (R) {
+            block.state.count = 0;
+          } else {
+            if (CU && !block.state.lastCU) block.state.count++;
+            if (CD && !block.state.lastCD) block.state.count--;
+          }
+          
+          block.state.lastCU = CU;
+          block.state.lastCD = CD;
+          
+          block.outputs['Q'] = block.state.count >= limit;
           break;
         }
 

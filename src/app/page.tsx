@@ -22,6 +22,9 @@ import { GateNode } from '@/components/nodes/GateNode';
 import { LatchNode } from '@/components/nodes/LatchNode';
 import { EdgeNode } from '@/components/nodes/EdgeNode';
 import { TimerNode } from '@/components/nodes/TimerNode';
+import { CounterNode } from '@/components/nodes/CounterNode';
+import { ClockNode } from '@/components/nodes/ClockNode';
+import { ConstantNode } from '@/components/nodes/ConstantNode';
 
 const nodeTypes = {
   inputNode: InputNode,
@@ -29,7 +32,10 @@ const nodeTypes = {
   gateNode: GateNode,
   latchNode: LatchNode,
   edgeNode: EdgeNode,
-  timerNode: TimerNode
+  timerNode: TimerNode,
+  counterNode: CounterNode,
+  clockNode: ClockNode,
+  constantNode: ConstantNode
 };
 
 let id = 0;
@@ -56,7 +62,6 @@ function Workspace() {
            if (n.data.value !== newValue) needsUpdate = true;
         }
         
-        // Sync outputs so LEDs light up
         if (n.type === 'outputNode') {
            newValue = block.outputs['Q'] ?? false;
            if (n.data.value !== newValue) needsUpdate = true;
@@ -71,7 +76,6 @@ function Workspace() {
   }, [setNodes]);
 
   useEffect(() => {
-    // 10 ticks per second for smooth timer and edge trigger behavior
     const interval = setInterval(() => {
       engineRef.current.tick();
       syncVisualsFromEngine();
@@ -134,7 +138,9 @@ function Workspace() {
 
       let engineType: BlockType = 'INPUT';
       if (type === 'outputNode') engineType = 'OUTPUT';
-      else if (type === 'gateNode' || type === 'latchNode' || type === 'edgeNode' || type === 'timerNode') {
+      else if (type === 'gateNode' || type === 'latchNode' || type === 'edgeNode' || 
+               type === 'timerNode' || type === 'counterNode' || type === 'clockNode' || 
+               type === 'constantNode') {
           engineType = gateType as BlockType;
       }
 
@@ -144,7 +150,9 @@ function Workspace() {
          inputs: {},
          outputs: { Q: false },
          value: false,
-         params: type === 'timerNode' ? { duration: 2000 } : {}
+         params: type === 'timerNode' ? { duration: 2000 } : 
+                 type === 'clockNode' ? { onTime: 1000, offTime: 1000 } :
+                 type === 'counterNode' ? { limit: 5 } : {}
       });
 
       const newNode: Node = {
@@ -158,7 +166,10 @@ function Workspace() {
            onParamChange: handleParamChange,
            value: false,
            tag: '',
-           duration: 2000
+           duration: 2000,
+           limit: 5,
+           onTime: 1000,
+           offTime: 1000
         },
       };
 

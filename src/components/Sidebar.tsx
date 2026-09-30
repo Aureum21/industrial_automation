@@ -14,9 +14,13 @@ export default function Sidebar() {
       <h2 className="text-xl font-bold border-b border-gray-700 pb-2 mb-2">Blocks Library</h2>
       
       <div className="flex flex-col gap-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">I/O & Networking</h3>
+        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">I/O & Constants</h3>
         <div className="bg-gray-800 p-2 text-sm rounded border border-gray-600 cursor-grab hover:bg-gray-700 transition flex items-center justify-center" onDragStart={(e) => onDragStart(e, 'inputNode')} draggable>Toggle Switch</div>
-        <div className="bg-gray-800 p-2 text-sm rounded border border-gray-600 cursor-grab hover:bg-gray-700 transition flex items-center justify-center" onDragStart={(e) => onDragStart(e, 'outputNode')} draggable>Output Coil / Light</div>
+        <div className="bg-gray-800 p-2 text-sm rounded border border-gray-600 cursor-grab hover:bg-gray-700 transition flex items-center justify-center" onDragStart={(e) => onDragStart(e, 'outputNode')} draggable>Output Coil</div>
+        <div className="grid grid-cols-2 gap-2 mt-1">
+          <div className="bg-green-900 p-2 text-xs rounded border border-green-600 cursor-grab hover:bg-green-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'constantNode', 'HIGH')} draggable>HIGH (1)</div>
+          <div className="bg-red-900 p-2 text-xs rounded border border-red-600 cursor-grab hover:bg-red-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'constantNode', 'LOW')} draggable>LOW (0)</div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 mt-2">
@@ -29,8 +33,9 @@ export default function Sidebar() {
       </div>
 
       <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Memory / Latches</h3>
-        <div className="bg-purple-900 p-2 text-sm rounded border border-purple-600 cursor-grab hover:bg-purple-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'latchNode', 'RS_LATCH')} draggable>RS Latch (Set/Reset)</div>
+        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Memory & Misc</h3>
+        <div className="bg-purple-900 p-2 text-xs rounded border border-purple-600 cursor-grab hover:bg-purple-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'latchNode', 'RS_LATCH')} draggable>RS Latch (Set/Reset)</div>
+        <div className="bg-purple-900 p-2 text-xs rounded border border-purple-600 cursor-grab hover:bg-purple-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'latchNode', 'PULSE_RELAY')} draggable>Pulse Relay (Toggle)</div>
       </div>
 
       <div className="flex flex-col gap-2 mt-2">
@@ -42,15 +47,13 @@ export default function Sidebar() {
       </div>
       
       <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Timers</h3>
+        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Timers & Counters</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'timerNode', 'TON')} draggable>On-Delay</div>
           <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'timerNode', 'TOF')} draggable>Off-Delay</div>
         </div>
-      </div>
-
-      <div className="mt-8 text-xs text-gray-500 text-center pb-4">
-        Drag blocks onto the canvas to build logic.
+        <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'clockNode', 'CLOCK')} draggable>Async Pulse (Blinker)</div>
+        <div className="bg-pink-900 p-2 text-xs rounded border border-pink-600 cursor-grab hover:bg-pink-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'counterNode', 'COUNTER')} draggable>Up/Down Counter</div>
       </div>
     </aside>
   );
