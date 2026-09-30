@@ -1,60 +1,19 @@
-import React from 'react';
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import { BLOCK_DEFINITIONS, CATEGORIES } from '@/lib/automation/catalog';
+import type { BlockType } from '@/lib/automation/types';
 
-export default function Sidebar() {
-  const onDragStart = (event: React.DragEvent, nodeType: string, gateType?: string) => {
-    event.dataTransfer.setData('application/reactflow/type', nodeType);
-    if (gateType) {
-      event.dataTransfer.setData('application/reactflow/gateType', gateType);
-    }
-    event.dataTransfer.effectAllowed = 'move';
-  };
-
-  return (
-    <aside className="w-64 bg-gray-900 border-r border-gray-700 p-4 flex flex-col gap-4 text-white z-10 shadow-2xl overflow-y-auto">
-      <h2 className="text-xl font-bold border-b border-gray-700 pb-2 mb-2">Blocks Library</h2>
-      
-      <div className="flex flex-col gap-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">I/O & Constants</h3>
-        <div className="bg-gray-800 p-2 text-sm rounded border border-gray-600 cursor-grab hover:bg-gray-700 transition flex items-center justify-center" onDragStart={(e) => onDragStart(e, 'inputNode')} draggable>Toggle Switch</div>
-        <div className="bg-gray-800 p-2 text-sm rounded border border-gray-600 cursor-grab hover:bg-gray-700 transition flex items-center justify-center" onDragStart={(e) => onDragStart(e, 'outputNode')} draggable>Output Coil</div>
-        <div className="grid grid-cols-2 gap-2 mt-1">
-          <div className="bg-green-900 p-2 text-xs rounded border border-green-600 cursor-grab hover:bg-green-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'constantNode', 'HIGH')} draggable>HIGH (1)</div>
-          <div className="bg-red-900 p-2 text-xs rounded border border-red-600 cursor-grab hover:bg-red-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'constantNode', 'LOW')} draggable>LOW (0)</div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Basic Gates</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {['AND', 'OR', 'NOT', 'XOR', 'NAND', 'NOR', 'XNOR'].map(gate => (
-            <div key={gate} className="bg-blue-900 p-2 text-xs rounded border border-blue-600 cursor-grab hover:bg-blue-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'gateNode', gate)} draggable>{gate}</div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Memory & Misc</h3>
-        <div className="bg-purple-900 p-2 text-xs rounded border border-purple-600 cursor-grab hover:bg-purple-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'latchNode', 'RS_LATCH')} draggable>RS Latch (Set/Reset)</div>
-        <div className="bg-purple-900 p-2 text-xs rounded border border-purple-600 cursor-grab hover:bg-purple-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'latchNode', 'PULSE_RELAY')} draggable>Pulse Relay (Toggle)</div>
-      </div>
-
-      <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Edge Triggers</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-orange-900 p-2 text-xs rounded border border-orange-600 cursor-grab hover:bg-orange-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'edgeNode', 'R_TRIG')} draggable>R_TRIG (↑)</div>
-          <div className="bg-orange-900 p-2 text-xs rounded border border-orange-600 cursor-grab hover:bg-orange-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'edgeNode', 'F_TRIG')} draggable>F_TRIG (↓)</div>
-        </div>
-      </div>
-      
-      <div className="flex flex-col gap-2 mt-2">
-        <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mt-2">Timers & Counters</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'timerNode', 'TON')} draggable>On-Delay</div>
-          <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'timerNode', 'TOF')} draggable>Off-Delay</div>
-        </div>
-        <div className="bg-teal-900 p-2 text-xs rounded border border-teal-600 cursor-grab hover:bg-teal-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'clockNode', 'CLOCK')} draggable>Async Pulse (Blinker)</div>
-        <div className="bg-pink-900 p-2 text-xs rounded border border-pink-600 cursor-grab hover:bg-pink-800 transition text-center font-bold" onDragStart={(e) => onDragStart(e, 'counterNode', 'COUNTER')} draggable>Up/Down Counter</div>
-      </div>
-    </aside>
-  );
+export default function Sidebar({ onAdd }: { onAdd: (type: BlockType) => void }) {
+  const [query, setQuery] = useState('');
+  const [showPlanned, setShowPlanned] = useState(false);
+  const filtered = BLOCK_DEFINITIONS.filter(block => (showPlanned || block.status === 'ready') && `${block.name} ${block.type} ${block.description}`.toLowerCase().includes(query.toLowerCase()));
+  return <aside className="lab-sidebar flex w-64 shrink-0 flex-col border-r border-[#233241] bg-[#0e1721]">
+    <div className="border-b border-[#233241] p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Components</h2><span className="font-mono text-[10px] text-slate-400">{BLOCK_DEFINITIONS.filter(b => b.status === 'ready').length} live</span></div><p className="mt-1.5 text-[11px] leading-5 text-slate-500">Click to add, or drag onto the canvas.</p><input type="search" aria-label="Search components" placeholder="Search components…" value={query} onChange={event => setQuery(event.target.value)} className="mt-3 w-full rounded-md border border-[#233241] bg-[#0b1118] px-3 py-2 text-xs outline-none focus:border-[#c4ef72]" /><label className="mt-3 flex items-center gap-2 text-[11px] text-slate-400"><input type="checkbox" checked={showPlanned} onChange={event => setShowPlanned(event.target.checked)} className="accent-[#c4ef72]" />Show future components</label></div>
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">{CATEGORIES.map(category => {
+      const blocks = filtered.filter(block => block.category === category);
+      return blocks.length ? <details key={category} open className="mb-2"><summary className="cursor-pointer py-3 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{category}<span className="float-right font-mono">{blocks.length}</span></summary><div className="space-y-1">{blocks.map(block => <button key={block.type} disabled={block.status !== 'ready'} draggable={block.status === 'ready'} onDragStart={event => { event.dataTransfer.setData('application/fieldnotes-block', block.type); event.dataTransfer.effectAllowed = 'copy'; }} onClick={() => onAdd(block.type)} title={block.description} className="flex w-full items-center gap-3 rounded-md border border-transparent px-2 py-2 text-left transition hover:border-[#344539] hover:bg-[#c4ef72]/5 disabled:cursor-default disabled:opacity-40"><span className={`flex h-7 min-w-8 items-center justify-center rounded border px-1 font-mono text-[10px] ${block.outputs[0]?.kind === 'analog' ? 'border-[#72d9e5]/20 text-[#72d9e5]' : 'border-[#c4ef72]/20 text-[#c4ef72]'}`}>{block.shortName}</span><span className="flex-1 text-[11px] text-slate-300">{block.name}</span>{block.status === 'planned' && <span className="text-[9px] text-slate-500">P{block.phase}</span>}</button>)}</div></details> : null;
+    })}{!filtered.length && <p className="py-6 text-xs text-slate-500">No matching components.</p>}</div>
+    <Link href="/library" className="border-t border-[#233241] px-4 py-3 text-[11px] text-[#c4ef72] hover:bg-white/5">Explore all {BLOCK_DEFINITIONS.length} components ↗</Link>
+  </aside>;
 }

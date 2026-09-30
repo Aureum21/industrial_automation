@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+:root { --background: #0b1118; --foreground: #e5edf5; color-scheme: dark; }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: 'Segoe UI', Arial, Helvetica, sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
 }
+
+* { scrollbar-width: thin; scrollbar-color: #2a3949 transparent; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), select { cursor: pointer; }
+:focus-visible { outline: 2px solid #c4ef72; outline-offset: 3px; }
+::selection { background: #c4ef7238; color: #f4ffe4; }
+.lab-workspace { height: calc(100dvh - 64px); min-height: 550px; }
+.lab-button { border: 1px solid #2a3949; background: #111d29; color: #b4c3d5; border-radius: 5px; padding: 7px 11px; font-size: 11px; white-space: nowrap; transition: background .15s, border-color .15s; }
+.lab-button:hover:not(:disabled) { background: #1b2a39; border-color: #476052; color: #f0f6fc; }
+.lab-button:disabled { opacity: .35; cursor: default; }
+.lab-button.primary { background: #c4ef72; color: #192517; border-color: #c4ef72; font-weight: 650; }
+.lab-button.primary:hover { background: #d2fc88; color: #192517; }
+.lab-button.danger:hover:not(:disabled) { border-color: #cc8181; color: #f9acac; }
+.circuit-node { width: 210px; border: 1px solid #344251; border-radius: 8px; background: #111c28; box-shadow: 0 5px 20px #0003; }
+.circuit-node.is-selected { border-color: #72d9e5; box-shadow: 0 0 0 2px #72d9e526; }
+.circuit-node.is-active { border-color: #91b753; }
+.circuit-node.is-active.is-selected { box-shadow: 0 0 0 2px #72d9e555; }
+.node-field { min-width: 0; border-radius: 3px; border: 1px solid #293b4e; background: #0b141e; padding: 4px 5px; color: #d7e4f2; font-size: 10px; }
+.react-flow__handle.signal-handle { width: 9px; height: 9px; border: 2px solid #101a24; background: #91b753; }
+.react-flow__handle.signal-handle.analog { background: #72d9e5; border-radius: 2px; }
+.react-flow__handle.connectingto { background: #fff; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: #fafaff !important; stroke-width: 3 !important; }
+.react-flow__controls { box-shadow: none !important; border: 1px solid #2a3949; border-radius: 6px; overflow: hidden; }
+.react-flow__controls-button { background: #111d29 !important; fill: #b4c3d5 !important; border-color: #2a3949 !important; }
+.react-flow__minimap { background: #111d29 !important; border: 1px solid #233241; border-radius: 6px; overflow: hidden; }
+.react-flow__attribution { background: #0b1118a0 !important; font-size: 8px !important; }
+.react-flow__attribution a { color: #526476 !important; }
+@media (max-width: 700px) { .lab-sidebar { position: absolute; inset: 0 auto 0 0; z-index: 20; width: 240px; box-shadow: 12px 0 30px #0005; } .react-flow__minimap { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
