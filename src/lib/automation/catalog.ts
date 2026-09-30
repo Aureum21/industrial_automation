@@ -1,0 +1,231 @@
+import type { BlockDefinition, BlockType, ParameterDefinition, PinDefinition, SignalKind } from './types';
+
+export const CATEGORIES = [
+  'Digital I/O', 'Analog I/O', 'Network', 'Logic', 'Timers', 'Counters',
+  'Analog processing', 'Memory & utilities', 'Data & modules',
+];
+
+const READY = new Set<BlockType>([
+  'INPUT', 'OUTPUT', 'HIGH', 'LOW', 'FLAG', 'ANALOG_INPUT', 'ANALOG_OUTPUT',
+  'ANALOG_FLAG', 'ANALOG_CONSTANT', 'AND', 'OR', 'NOT', 'XOR', 'NAND', 'NOR',
+  'XNOR', 'RS_LATCH', 'PULSE_RELAY', 'R_TRIG', 'F_TRIG', 'TON', 'TOF', 'CLOCK',
+  'COUNTER', 'MATH', 'ANALOG_COMPARATOR', 'ANALOG_THRESHOLD', 'ANALOG_AMPLIFIER',
+  'ANALOG_MUX', 'FLOAT_TO_INT', 'INT_TO_FLOAT', 'SCAN_DELAY',
+]);
+
+const pin = (id: string, kind: SignalKind = 'digital', label = id): PinDefinition => ({ id, label, kind });
+const digital = (...ids: string[]) => ids.map((id) => pin(id));
+const analog = (...ids: string[]) => ids.map((id) => pin(id, 'analog'));
+const number = (key: string, label: string, defaultValue: number, extra: Partial<ParameterDefinition> = {}): ParameterDefinition =>
+  ({ key, label, defaultValue, type: 'number', ...extra });
+const milliseconds = (key: string, label: string, defaultValue: number) =>
+  number(key, label, defaultValue, { min: 0, step: 100, unit: 'ms' });
+const text = (key: string, label: string, defaultValue: string): ParameterDefinition =>
+  ({ key, label, defaultValue, type: 'text' });
+const select = (key: string, label: string, defaultValue: string, choices: [string, string][]): ParameterDefinition =>
+  ({ key, label, defaultValue, type: 'select', options: choices.map(([value, optionLabel]) => ({ value, label: optionLabel })) });
+
+type Options = Partial<Pick<BlockDefinition, 'parameters' | 'stateful' | 'source' | 'tagged'>> & { phase?: 2 | 3 | 4 };
+
+function block(
+  type: BlockType, name: string, shortName: string, category: string,
+  description: string, inputs: PinDefinition[], outputs: PinDefinition[], options: Options = {},
+): BlockDefinition {
+  const { phase, ...properties } = options;
+  return {
+    type, name, shortName, category, description, inputs, outputs, parameters: [],
+    status: READY.has(type) ? 'ready' : 'planned', phase: READY.has(type) ? 1 : phase ?? 2,
+    ...properties,
+  };
+}
+
+/** Complete catalog. Planned entries are discoverable but cannot execute until implemented. */
+export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
+  INPUT: block('INPUT', 'Digital input', 'I', 'Digital I/O',
+    'An interactive switch or a receiver for an output with the same tag.', [], digital('Q'), { source: true, tagged: true }),
+  CURSOR_KEY: block('CURSOR_KEY', 'Cursor key', 'KEY', 'Digital I/O',
+    'Planned keyboard direction input for interactive control panels.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [select('key', 'Direction', 'up', [['up', 'Up'], ['down', 'Down'], ['left', 'Left'], ['right', 'Right']])] }),
+  TD_FUNCTION_KEY: block('TD_FUNCTION_KEY', 'Text display function key', 'F-KEY', 'Digital I/O',
+    'Planned function key for a simulated text display; no physical display connection.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [number('key', 'Function key', 1, { min: 1, max: 4, step: 1 })] }),
+  SHIFT_REGISTER_BIT: block('SHIFT_REGISTER_BIT', 'Shift register bit', 'BIT', 'Digital I/O',
+    'Planned reader for one bit in a named shift register.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [text('register', 'Register name', 'SR1'), number('bit', 'Bit index', 0, { min: 0, max: 31, step: 1 })] }),
+  HIGH: block('HIGH', 'Status 1 (high)', '1', 'Digital I/O', 'A constant true signal.', [], digital('Q'), { source: true }),
+  LOW: block('LOW', 'Status 0 (low)', '0', 'Digital I/O', 'A constant false signal.', [], digital('Q'), { source: true }),
+  OUTPUT: block('OUTPUT', 'Digital output', 'Q', 'Digital I/O',
+    'An output indicator that also publishes its state to matching input tags.', digital('A'), digital('Q'), { tagged: true }),
+  OPEN_CONNECTOR: block('OPEN_CONNECTOR', 'Open connector', 'X', 'Digital I/O',
+    'Planned explicit termination for an intentionally unused digital signal.', digital('A'), [], { phase: 2 }),
+  FLAG: block('FLAG', 'Digital flag', 'M', 'Digital I/O',
+    'A named digital signal marker that can publish to matching input tags.', digital('A'), digital('Q'), { tagged: true }),
+
+  ANALOG_INPUT: block('ANALOG_INPUT', 'Analog input', 'AI', 'Analog I/O',
+    'An adjustable numeric input or receiver for an analog output with the same tag.', [], analog('Q'),
+    { source: true, tagged: true, parameters: [number('value', 'Initial value', 0)] }),
+  ANALOG_OUTPUT: block('ANALOG_OUTPUT', 'Analog output', 'AQ', 'Analog I/O',
+    'A numeric output display that publishes to matching analog input tags.', analog('A'), analog('Q'), { tagged: true }),
+  ANALOG_FLAG: block('ANALOG_FLAG', 'Analog flag', 'AM', 'Analog I/O',
+    'A named numeric signal marker that can publish to matching analog input tags.', analog('A'), analog('Q'), { tagged: true }),
+  ANALOG_CONSTANT: block('ANALOG_CONSTANT', 'Analog constant', '#', 'Analog I/O',
+    'A configurable numeric reference for setpoints and calculations.', [], analog('Q'),
+    { source: true, parameters: [number('value', 'Value', 50)] }),
+
+  NETWORK_INPUT: block('NETWORK_INPUT', 'Network input', 'NI', 'Network',
+    'Planned digital input from a named simulation channel; hardware adapters are separate work.', [], digital('Q'),
+    { source: true, phase: 4, parameters: [text('channel', 'Simulation channel', 'digital-1')] }),
+  NETWORK_ANALOG_INPUT: block('NETWORK_ANALOG_INPUT', 'Network analog input', 'NAI', 'Network',
+    'Planned numeric input from a named simulation channel.', [], analog('Q'),
+    { source: true, phase: 4, parameters: [text('channel', 'Simulation channel', 'analog-1')] }),
+  NETWORK_OUTPUT: block('NETWORK_OUTPUT', 'Network output', 'NQ', 'Network',
+    'Planned digital publication to a simulation channel.', digital('A'), digital('Q'),
+    { phase: 4, parameters: [text('channel', 'Simulation channel', 'digital-1')] }),
+  NETWORK_ANALOG_OUTPUT: block('NETWORK_ANALOG_OUTPUT', 'Network analog output', 'NAQ', 'Network',
+    'Planned numeric publication to a simulation channel.', analog('A'), analog('Q'),
+    { phase: 4, parameters: [text('channel', 'Simulation channel', 'analog-1')] }),
+
+  AND: block('AND', 'AND', '&', 'Logic', 'True when both inputs are true.', digital('A', 'B'), digital('Q')),
+  AND_EDGE: block('AND_EDGE', 'AND (edge)', '&↑', 'Logic',
+    'Planned one-scan pulse when the AND result becomes true.', digital('A', 'B'), digital('Q'), { stateful: true, phase: 2 }),
+  NAND: block('NAND', 'NAND', '!&', 'Logic', 'False when both inputs are true.', digital('A', 'B'), digital('Q')),
+  NAND_EDGE: block('NAND_EDGE', 'NAND (edge)', '!&↑', 'Logic',
+    'Planned one-scan pulse when the NAND result becomes true.', digital('A', 'B'), digital('Q'), { stateful: true, phase: 2 }),
+  OR: block('OR', 'OR', '≥1', 'Logic', 'True when either input is true.', digital('A', 'B'), digital('Q')),
+  NOR: block('NOR', 'NOR', '!≥1', 'Logic', 'True when neither input is true.', digital('A', 'B'), digital('Q')),
+  XOR: block('XOR', 'XOR', '=1', 'Logic', 'True when exactly one input is true.', digital('A', 'B'), digital('Q')),
+  XNOR: block('XNOR', 'XNOR', '=', 'Logic', 'True when both inputs have the same state.', digital('A', 'B'), digital('Q')),
+  NOT: block('NOT', 'NOT', '!', 'Logic', 'Inverts a digital signal.', digital('A'), digital('Q')),
+
+  TON: block('TON', 'On-delay', 'TON', 'Timers',
+    'Turns on after A remains true for the duration; resets when A becomes false.', digital('A'), [pin('Q'), pin('ET', 'analog', 'Elapsed')],
+    { stateful: true, parameters: [milliseconds('duration', 'Delay', 2000)] }),
+  TOF: block('TOF', 'Off-delay', 'TOF', 'Timers',
+    'Turns on with A and holds on for the duration after A becomes false.', digital('A'), [pin('Q'), pin('ET', 'analog', 'Elapsed')],
+    { stateful: true, parameters: [milliseconds('duration', 'Delay', 2000)] }),
+  ON_OFF_DELAY: block('ON_OFF_DELAY', 'On/off-delay', 'TON/TOF', 'Timers',
+    'Planned independent delays for switching on and switching off.', digital('A'), [pin('Q'), pin('ET', 'analog', 'Elapsed')],
+    { stateful: true, phase: 2, parameters: [milliseconds('onDelay', 'On delay', 2000), milliseconds('offDelay', 'Off delay', 2000)] }),
+  RETENTIVE_TON: block('RETENTIVE_TON', 'Retentive on-delay', 'TONR', 'Timers',
+    'Planned timer that retains elapsed time when A is false and clears on R.', digital('A', 'R'), [pin('Q'), pin('ET', 'analog', 'Elapsed')],
+    { stateful: true, phase: 2, parameters: [milliseconds('duration', 'Delay', 2000)] }),
+  PULSE_TIMER: block('PULSE_TIMER', 'Wiping relay (pulse output)', 'TP', 'Timers',
+    'Planned pulse lasting up to the configured duration while A is active.', digital('A'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [milliseconds('duration', 'Pulse duration', 1000)] }),
+  EDGE_PULSE_TIMER: block('EDGE_PULSE_TIMER', 'Edge triggered wiping relay', 'TP↑', 'Timers',
+    'Planned timed pulse initiated by a rising input edge.', digital('A', 'R'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [milliseconds('duration', 'Pulse duration', 1000)] }),
+  CLOCK: block('CLOCK', 'Asynchronous pulse generator', 'CLK', 'Timers',
+    'Repeats independently configured on and off intervals while the simulation runs.', [], digital('Q'),
+    { stateful: true, source: true, parameters: [{ ...milliseconds('onTime', 'On time', 1000), min: 1 }, { ...milliseconds('offTime', 'Off time', 1000), min: 1 }] }),
+  RANDOM: block('RANDOM', 'Random generator', 'RND', 'Timers',
+    'Planned seeded random switching delays for repeatable simulations.', digital('A'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [milliseconds('minDelay', 'Minimum delay', 500), milliseconds('maxDelay', 'Maximum delay', 2000), number('seed', 'Random seed', 1, { step: 1 })] }),
+  STAIRWAY_SWITCH: block('STAIRWAY_SWITCH', 'Stairway lighting switch', 'STAIR', 'Timers',
+    'Planned timed lighting control with a warning interval before switch-off.', digital('A'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [milliseconds('duration', 'Lighting duration', 60000), milliseconds('warning', 'Warning interval', 10000)] }),
+  MULTIFUNCTION_SWITCH: block('MULTIFUNCTION_SWITCH', 'Multiple function switch', 'MULTI', 'Timers',
+    'Planned short-press timed operation and long-press maintained operation.', digital('A', 'R'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [milliseconds('duration', 'Timed duration', 60000), milliseconds('holdTime', 'Long press', 1000)] }),
+  WEEKLY_TIMER: block('WEEKLY_TIMER', 'Weekly timer', 'WEEK', 'Timers',
+    'Planned weekday and time schedule using an explicit simulation timezone.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [text('days', 'Weekdays (1–7)', '1,2,3,4,5'), text('startTime', 'Start time', '08:00'), text('endTime', 'End time', '17:00'), text('timezone', 'Timezone', 'UTC')] }),
+  YEARLY_TIMER: block('YEARLY_TIMER', 'Yearly timer', 'YEAR', 'Timers',
+    'Planned recurring calendar date range with explicit timezone handling.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [text('startDate', 'Start (MM-DD)', '01-01'), text('endDate', 'End (MM-DD)', '12-31'), text('timezone', 'Timezone', 'UTC')] }),
+  ASTRONOMICAL_CLOCK: block('ASTRONOMICAL_CLOCK', 'Astronomical clock', 'SUN', 'Timers',
+    'Planned sunrise and sunset schedule using a location and simulation date.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [number('latitude', 'Latitude', 25.2, { min: -90, max: 90 }), number('longitude', 'Longitude', 55.3, { min: -180, max: 180 }), text('timezone', 'Timezone', 'UTC')] }),
+  STOPWATCH: block('STOPWATCH', 'Stopwatch', 'SW', 'Timers',
+    'Planned elapsed-time measurement while enabled, cleared by reset.', digital('A', 'R'), analog('ET'), { stateful: true, phase: 2 }),
+
+  COUNTER: block('COUNTER', 'Up/down counter', 'CTUD', 'Counters',
+    'Counts rising CU/CD edges, resets on R, and signals when CV reaches the limit.', digital('CU', 'CD', 'R'), [pin('Q'), pin('CV', 'analog', 'Count')],
+    { stateful: true, parameters: [number('limit', 'Limit', 5, { min: 0, step: 1 })] }),
+  HOURS_COUNTER: block('HOURS_COUNTER', 'Hours counter', 'HOURS', 'Counters',
+    'Planned operating-time accumulator with reset and a maintenance threshold.', digital('A', 'R'), [pin('Q'), pin('CV', 'analog', 'Hours')],
+    { stateful: true, phase: 2, parameters: [number('limit', 'Maintenance threshold', 100, { min: 0, unit: 'h' })] }),
+  FREQUENCY_TRIGGER: block('FREQUENCY_TRIGGER', 'Threshold trigger', 'FREQ', 'Counters',
+    'Planned pulse-frequency measurement and configurable frequency threshold.', digital('A'), [pin('Q'), pin('CV', 'analog', 'Frequency')],
+    { stateful: true, phase: 2, parameters: [milliseconds('window', 'Measurement window', 1000), number('threshold', 'Threshold', 5, { min: 0, unit: 'Hz' })] }),
+
+  MATH: block('MATH', 'Mathematic instruction', 'MATH', 'Analog processing',
+    'Adds, subtracts, multiplies, or divides numeric inputs A and B.', analog('A', 'B'), analog('Q'),
+    { parameters: [select('operation', 'Operation', 'add', [['add', 'Add'], ['subtract', 'Subtract'], ['multiply', 'Multiply'], ['divide', 'Divide']])] }),
+  ANALOG_COMPARATOR: block('ANALOG_COMPARATOR', 'Analog comparator', 'CMP', 'Analog processing',
+    'Compares two numeric values and returns a digital result.', analog('A', 'B'), digital('Q'),
+    { parameters: [select('operation', 'Comparison', 'gt', [['gt', 'Greater than'], ['gte', 'Greater or equal'], ['lt', 'Less than'], ['lte', 'Less or equal'], ['eq', 'Equal'], ['ne', 'Not equal']])] }),
+  ANALOG_THRESHOLD: block('ANALOG_THRESHOLD', 'Analog threshold trigger', 'A≥', 'Analog processing',
+    'Turns on when the numeric input reaches or exceeds a threshold.', analog('A'), digital('Q'),
+    { parameters: [number('threshold', 'Threshold', 50)] }),
+  ANALOG_AMPLIFIER: block('ANALOG_AMPLIFIER', 'Analog amplifier', 'GAIN', 'Analog processing',
+    'Scales a numeric signal using Q = A × gain + offset.', analog('A'), analog('Q'),
+    { parameters: [number('gain', 'Gain', 1), number('offset', 'Offset', 0)] }),
+  ANALOG_WATCHDOG: block('ANALOG_WATCHDOG', 'Analog watchdog', 'WATCH', 'Analog processing',
+    'Planned deviation monitoring against a captured reference value.', [pin('A', 'analog'), pin('EN')], digital('Q'),
+    { stateful: true, phase: 3, parameters: [number('tolerance', 'Allowed deviation', 5, { min: 0 })] }),
+  ANALOG_DIFFERENTIAL: block('ANALOG_DIFFERENTIAL', 'Analog differential trigger', 'DIFF', 'Analog processing',
+    'Planned digital trigger with separate switching thresholds for hysteresis.', analog('A'), digital('Q'),
+    { stateful: true, phase: 3, parameters: [number('onThreshold', 'On threshold', 60), number('offThreshold', 'Off threshold', 40)] }),
+  ANALOG_MUX: block('ANALOG_MUX', 'Analog MUX', 'MUX', 'Analog processing',
+    'Selects numeric input B when S is true; otherwise selects A.', [pin('A', 'analog'), pin('B', 'analog'), pin('S')], analog('Q')),
+  ANALOG_RAMP: block('ANALOG_RAMP', 'Analog ramp', 'RAMP', 'Analog processing',
+    'Planned rate-limited movement toward an input setpoint.', analog('A'), analog('Q'),
+    { stateful: true, phase: 3, parameters: [number('riseRate', 'Rise rate', 10, { min: 0, unit: '/s' }), number('fallRate', 'Fall rate', 10, { min: 0, unit: '/s' })] }),
+  PI_CONTROLLER: block('PI_CONTROLLER', 'PI controller', 'PI', 'Analog processing',
+    'Planned proportional and integral control with output limits and reset.', [pin('SP', 'analog', 'Setpoint'), pin('PV', 'analog', 'Process value'), pin('R')], analog('Q'),
+    { stateful: true, phase: 3, parameters: [number('kp', 'Proportional gain', 1), number('ki', 'Integral gain', 0.1), number('min', 'Minimum output', 0), number('max', 'Maximum output', 100)] }),
+  PWM: block('PWM', 'Pulse width modulation', 'PWM', 'Analog processing',
+    'Planned digital pulse train with numeric duty cycle from 0 to 100 percent.', [pin('A', 'analog', 'Duty (%)')], digital('Q'),
+    { stateful: true, phase: 3, parameters: [milliseconds('period', 'Period', 1000)] }),
+  ANALOG_FILTER: block('ANALOG_FILTER', 'Analog filter', 'FILTER', 'Analog processing',
+    'Planned time-based smoothing of numeric input samples.', analog('A'), analog('Q'),
+    { stateful: true, phase: 3, parameters: [milliseconds('timeConstant', 'Time constant', 1000)] }),
+  MIN_MAX: block('MIN_MAX', 'Maximum/minimum', 'MIN/MAX', 'Analog processing',
+    'Planned tracking of observed minimum and maximum values until reset.', [pin('A', 'analog'), pin('R')], analog('MIN', 'MAX'), { stateful: true, phase: 3 }),
+  AVERAGE: block('AVERAGE', 'Average value', 'AVG', 'Analog processing',
+    'Planned moving average across a configurable number of scan samples.', analog('A'), analog('Q'),
+    { stateful: true, phase: 3, parameters: [number('samples', 'Sample count', 10, { min: 1, max: 10000, step: 1 })] }),
+
+  RS_LATCH: block('RS_LATCH', 'Latching relay', 'RS', 'Memory & utilities',
+    'Stores a digital state. Reset R takes priority when S and R are both true.', digital('S', 'R'), digital('Q'), { stateful: true }),
+  PULSE_RELAY: block('PULSE_RELAY', 'Pulse relay', 'TOGGLE', 'Memory & utilities',
+    'Toggles its stored state on each rising edge of A.', digital('A'), digital('Q'), { stateful: true }),
+  MESSAGE_TEXT: block('MESSAGE_TEXT', 'Message texts', 'MSG', 'Memory & utilities',
+    'Planned enabled text message for a simulated operator display.', digital('EN'), [pin('TEXT', 'text', 'Message')],
+    { phase: 2, parameters: [text('message', 'Message', 'Machine ready')] }),
+  SOFTKEY: block('SOFTKEY', 'Softkey', 'SOFT', 'Memory & utilities',
+    'Planned configurable button for an operator panel.', [], digital('Q'),
+    { source: true, phase: 2, parameters: [select('mode', 'Button mode', 'momentary', [['momentary', 'Momentary'], ['toggle', 'Toggle']])] }),
+  SHIFT_REGISTER: block('SHIFT_REGISTER', 'Shift register', 'SHIFT', 'Memory & utilities',
+    'Planned bit storage shifted on a clock edge, with direction and reset controls.', digital('D', 'CLK', 'DIR', 'R'), digital('Q'),
+    { stateful: true, phase: 2, parameters: [text('register', 'Register name', 'SR1'), number('length', 'Bit count', 8, { min: 1, max: 32, step: 1 })] }),
+  MATH_ERROR: block('MATH_ERROR', 'Mathematic instruction error detection', 'ERR', 'Memory & utilities',
+    'Planned error monitor linked to a calculation block, including divide-by-zero.', [], digital('Q'),
+    { phase: 3, parameters: [text('targetBlock', 'Calculation block ID', '')] }),
+  FLOAT_TO_INT: block('FLOAT_TO_INT', 'Float/integer converter', 'INT', 'Memory & utilities',
+    'Truncates the fractional part of a numeric input toward zero.', analog('A'), analog('Q')),
+  INT_TO_FLOAT: block('INT_TO_FLOAT', 'Integer/float converter', 'REAL', 'Memory & utilities',
+    'Passes a numeric input through as a simulation number.', analog('A'), analog('Q')),
+  R_TRIG: block('R_TRIG', 'Rising edge trigger', '↑', 'Memory & utilities',
+    'Produces one scan of true when A changes from false to true.', digital('A'), digital('Q'), { stateful: true }),
+  F_TRIG: block('F_TRIG', 'Falling edge trigger', '↓', 'Memory & utilities',
+    'Produces one scan of true when A changes from true to false.', digital('A'), digital('Q'), { stateful: true }),
+  SCAN_DELAY: block('SCAN_DELAY', 'One-scan delay', 'z⁻¹', 'Memory & utilities',
+    'Outputs the previous scan input, providing an explicit memory boundary for feedback.', digital('A'), digital('Q'), { stateful: true }),
+
+  DATA_LOG: block('DATA_LOG', 'Data log', 'LOG', 'Data & modules',
+    'Planned timestamped numeric samples with capture controls and CSV export.', [pin('A', 'analog'), pin('EN'), pin('R')], digital('Q'),
+    { stateful: true, phase: 3, parameters: [milliseconds('interval', 'Sample interval', 1000), number('maxSamples', 'Sample limit', 1000, { min: 1, step: 1 })] }),
+  UDF: block('UDF', 'User-defined function', 'UDF', 'Data & modules',
+    'Planned reusable circuit module with a declared interface; final pins come from the module definition.', [], [],
+    { phase: 4, parameters: [text('module', 'Module identifier', '')] }),
+};
+
+export const BLOCK_DEFINITIONS: BlockDefinition[] = Object.values(BLOCK_CATALOG);
+
+export function getBlockDefinition(type: string): BlockDefinition | undefined {
+  return Object.prototype.hasOwnProperty.call(BLOCK_CATALOG, type)
+    ? BLOCK_CATALOG[type as BlockType]
+    : undefined;
+}
