@@ -1,1 +1,43 @@
 @import "tailwindcss";
+
+:root { --background: #ffffff; --foreground: #111827; }
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+* { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), select { cursor: pointer; }
+:focus-visible { outline: 2px solid #22c55e; outline-offset: 3px; }
+::selection { background: rgba(34, 197, 94, 0.2); color: #064e3b; }
+
+.lab-workspace { height: calc(100dvh - 64px); min-height: 550px; }
+.lab-button { border: 1px solid #d1d5db; background: #ffffff; color: #374151; border-radius: 5px; padding: 7px 11px; font-size: 11px; white-space: nowrap; transition: background .15s, border-color .15s; }
+.lab-button:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; color: #111827; }
+.lab-button:disabled { opacity: .35; cursor: default; }
+.lab-button.primary { background: #22c55e; color: #ffffff; border-color: #22c55e; font-weight: 650; }
+.lab-button.primary:hover { background: #16a34a; color: #ffffff; }
+.lab-button.danger:hover:not(:disabled) { border-color: #fca5a5; color: #dc2626; }
+.circuit-node { width: 210px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+.circuit-node.is-selected { border-color: #06b6d4; box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25); }
+.circuit-node.is-active { border-color: #22c55e; }
+.circuit-node.is-active.is-selected { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4); }
+.node-field { min-width: 0; border-radius: 3px; border: 1px solid #d1d5db; background: #f9fafb; padding: 4px 5px; color: #374151; font-size: 10px; }
+.react-flow__handle.signal-handle { width: 9px; height: 9px; border: 2px solid #ffffff; background: #22c55e; }
+.react-flow__handle.signal-handle.analog { background: #06b6d4; border-radius: 2px; }
+.react-flow__handle.connectingto { background: #000; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: #111827 !important; stroke-width: 3 !important; }
+.react-flow__controls { box-shadow: none !important; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; }
+.react-flow__controls-button { background: #ffffff !important; fill: #6b7280 !important; border-color: #d1d5db !important; }
+.react-flow__minimap { background: #ffffff !important; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+.react-flow__attribution { background: rgba(255,255,255,0.7) !important; font-size: 8px !important; }
+.react-flow__attribution a { color: #9ca3af !important; }
+@media (max-width: 700px) { .lab-sidebar { position: absolute; inset: 0 auto 0 0; z-index: 20; width: 240px; box-shadow: 12px 0 30px rgba(0,0,0,0.15); } .react-flow__minimap { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
