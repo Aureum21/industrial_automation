@@ -404,6 +404,402 @@ export class LogicEngine {
       case 'ANALOG_MUX': block.outputs.Q = digital('S') ? analog('B') : analog('A'); break;
       case 'FLOAT_TO_INT': block.outputs.Q = Math.trunc(analog('A')); break;
       case 'INT_TO_FLOAT': block.outputs.Q = analog('A'); break;
+      case 'ANALOG_WATCHDOG': {
+        const en = digital('EN');
+        const a = analog('A');
+        if (en && !block.state.lastEN) block.state.reference = a;
+        block.state.lastEN = en;
+        block.outputs.Q = en && Math.abs(a - Number(block.state.reference ?? a)) > parameter('tolerance');
+        break;
+      }
+      case 'ANALOG_DIFFERENTIAL': {
+        const a = analog('A');
+        if (a >= parameter('onThreshold')) block.state.q = true;
+        else if (a < parameter('offThreshold')) block.state.q = false;
+        block.outputs.Q = block.state.q ?? false;
+        break;
+      }
+      case 'ANALOG_RAMP': {
+        const a = analog('A');
+        let current = Number(block.state.current ?? a);
+        if (a > current) current = Math.min(a, current + parameter('riseRate') * (deltaMs / 1000));
+        else if (a < current) current = Math.max(a, current - parameter('fallRate') * (deltaMs / 1000));
+        block.state.current = current;
+        block.outputs.Q = current;
+        break;
+      }
+      case 'PI_CONTROLLER': {
+        const sp = analog('SP');
+        const pv = analog('PV');
+        const reset = digital('R');
+        const error = sp - pv;
+        const p = parameter('kp') * error;
+        let integral = reset ? 0 : Number(block.state.integral ?? 0) + parameter('ki') * error * (deltaMs / 1000);
+        const min = parameter('min');
+        const max = parameter('max');
+        integral = Math.max(min - p, Math.min(max - p, integral));
+        block.state.integral = integral;
+        block.outputs.Q = Math.max(min, Math.min(max, p + integral));
+        break;
+      }
+      case 'PWM': {
+        const a = Math.max(0, Math.min(100, analog('A')));
+        const period = parameter('period');
+        const phase = (Number(block.state.phase ?? 0) + deltaMs) % period;
+        block.state.phase = phase;
+        block.outputs.Q = phase < (a / 100 * period);
+        break;
+      }
+      case 'ANALOG_FILTER': {
+        const a = analog('A');
+        const timeConstant = parameter('timeConstant');
+        const alpha = timeConstant + deltaMs > 0 ? deltaMs / (timeConstant + deltaMs) : 1;
+        const prev = Number(block.state.filtered ?? a);
+        const filtered = alpha * a + (1 - alpha) * prev;
+        block.state.filtered = filtered;
+        block.outputs.Q = filtered;
+        break;
+      }
+      case 'MIN_MAX': {
+        const a = analog('A');
+        const r = digital('R');
+        let minVal = Number(block.state.min ?? a);
+        let maxVal = Number(block.state.max ?? a);
+        if (r || block.state.min === undefined) {
+          minVal = a;
+          maxVal = a;
+        } else {
+          minVal = Math.min(minVal, a);
+          maxVal = Math.max(maxVal, a);
+        }
+        block.state.min = minVal;
+        block.state.max = maxVal;
+        block.outputs.MIN = minVal;
+        block.outputs.MAX = maxVal;
+        break;
+      }
+      case 'AVERAGE': {
+        const a = analog('A');
+        const samplesCount = parameter('samples');
+        const buffer: number[] = ((block.state as any).buffer) ?? [];
+        buffer.push(a);
+        while (buffer.length > samplesCount) buffer.shift();
+        (block.state as any).buffer = buffer;
+        const sum = buffer.reduce((acc, val) => acc + val, 0);
+        block.outputs.Q = buffer.length > 0 ? sum / buffer.length : 0;
+        break;
+      }
+      case 'MATH_ERROR': {
+        const target = block.params.targetBlock as string;
+        block.outputs.Q = target ? this.diagnostics.some(d => d.includes(target)) : false;
+        break;
+      }
+      case 'DATA_LOG': {
+        const a = analog('A');
+        const en = digital('EN');
+        const r = digital('R');
+        const interval = parameter('interval');
+        const maxSamples = parameter('maxSamples');
+        
+        let samples: {t: number, v: number}[] = ((block.state as any).samples) ?? [];
+        if (r) samples = [];
+        
+        if (en) {
+          const lastSample = Number(block.state.lastSample ?? -interval);
+          if (this.timeMs - lastSample >= interval) {
+            samples.push({ t: this.timeMs, v: a });
+            if (samples.length > maxSamples) samples.shift();
+            block.state.lastSample = this.timeMs;
+          }
+        }
+        
+        (block.state as any).samples = samples;
+        block.outputs.Q = en;
+        break;
+      }
+      case 'ON_OFF_DELAY': {
+        let q = block.state.q ?? false;
+        let et = 0;
+        if (A) {
+          block.state.offElapsed = 0;
+          if (!q) {
+            const elapsed = Math.min(parameter('onDelay'), Number(block.state.onElapsed ?? 0) + deltaMs);
+            block.state.onElapsed = elapsed;
+            et = elapsed;
+            if (elapsed >= parameter('onDelay')) q = true;
+          }
+        } else {
+          block.state.onElapsed = 0;
+          if (q) {
+            const elapsed = Math.min(parameter('offDelay'), Number(block.state.offElapsed ?? 0) + deltaMs);
+            block.state.offElapsed = elapsed;
+            et = elapsed;
+            if (elapsed >= parameter('offDelay')) q = false;
+          }
+        }
+        block.state.q = q;
+        block.outputs.Q = q;
+        block.outputs.ET = et;
+        break;
+      }
+      case 'RETENTIVE_TON': {
+        if (digital('R')) {
+          block.state.elapsed = 0;
+        } else if (A) {
+          block.state.elapsed = Math.min(parameter('duration'), Number(block.state.elapsed ?? 0) + deltaMs);
+        }
+        block.outputs.ET = block.state.elapsed ?? 0;
+        block.outputs.Q = Number(block.outputs.ET) >= parameter('duration');
+        break;
+      }
+      case 'PULSE_TIMER': {
+        if (A && !block.state.lastA && !block.state.active) {
+          block.state.active = true;
+          block.state.elapsed = 0;
+        }
+        if (block.state.active) {
+          block.state.elapsed = Math.min(parameter('duration'), Number(block.state.elapsed ?? 0) + deltaMs);
+          if (block.state.elapsed >= parameter('duration')) block.state.active = false;
+        }
+        block.state.lastA = A;
+        block.outputs.Q = block.state.active === true;
+        break;
+      }
+      case 'EDGE_PULSE_TIMER': {
+        if (digital('R')) {
+          block.state.active = false;
+        } else if (A && !block.state.lastA) {
+          block.state.active = true;
+          block.state.elapsed = 0;
+        }
+        if (block.state.active) {
+          block.state.elapsed = Math.min(parameter('duration'), Number(block.state.elapsed ?? 0) + deltaMs);
+          if (block.state.elapsed >= parameter('duration')) block.state.active = false;
+        }
+        block.state.lastA = A;
+        block.outputs.Q = block.state.active === true;
+        break;
+      }
+      case 'RANDOM': {
+        if (!A) {
+          block.state.active = false;
+          block.outputs.Q = false;
+        } else {
+          if (block.state.rng === undefined) {
+            block.state.rng = parameter('seed');
+            block.state.nextSwitch = 0;
+            block.state.elapsed = 0;
+            block.outputs.Q = false;
+          }
+          if (!block.state.active) {
+            block.state.active = true;
+            block.state.elapsed = 0;
+            block.state.nextSwitch = 0;
+          }
+          block.state.elapsed = Number(block.state.elapsed ?? 0) + deltaMs;
+          if (Number(block.state.elapsed) >= Number(block.state.nextSwitch)) {
+            block.outputs.Q = !block.outputs.Q;
+            block.state.elapsed = 0;
+            block.state.rng = (Number(block.state.rng) * 1103515245 + 12345) & 0x7fffffff;
+            const fraction = Number(block.state.rng) / 0x7fffffff;
+            const minD = parameter('minDelay');
+            const maxD = parameter('maxDelay');
+            block.state.nextSwitch = minD + fraction * (maxD - minD);
+          }
+        }
+        break;
+      }
+      case 'STAIRWAY_SWITCH': {
+        if (A && !block.state.lastA) {
+          block.state.remaining = parameter('duration');
+        }
+        if (Number(block.state.remaining ?? 0) > 0) {
+          block.state.remaining = Number(block.state.remaining) - deltaMs;
+          block.outputs.Q = true;
+        } else {
+          block.state.remaining = 0;
+          block.outputs.Q = false;
+        }
+        block.state.lastA = A;
+        break;
+      }
+      case 'MULTIFUNCTION_SWITCH': {
+        if (digital('R')) {
+          block.state.mode = 'idle';
+          block.state.held = 0;
+          block.outputs.Q = false;
+        } else {
+          if (A) {
+            block.state.held = Number(block.state.held ?? 0) + deltaMs;
+            if (block.state.mode !== 'maintained' && block.state.held >= parameter('holdTime')) {
+              block.state.mode = 'maintained';
+            }
+          } else {
+            if (Number(block.state.held ?? 0) > 0 && Number(block.state.held ?? 0) < parameter('holdTime') && block.state.mode !== 'maintained') {
+              block.state.mode = 'timed';
+              block.state.remaining = parameter('duration');
+            }
+            block.state.held = 0;
+            if (block.state.mode === 'maintained') {
+              block.state.mode = 'idle';
+            }
+          }
+          if (block.state.mode === 'timed') {
+            block.state.remaining = Number(block.state.remaining ?? 0) - deltaMs;
+            if (block.state.remaining <= 0) block.state.mode = 'idle';
+          }
+          block.outputs.Q = block.state.mode === 'maintained' || block.state.mode === 'timed';
+        }
+        break;
+      }
+      case 'WEEKLY_TIMER': {
+        const weekMs = 604800000;
+        const dayMs = 86400000;
+        const currentMs = this.timeMs % weekMs;
+        const currentDay = Math.floor(currentMs / dayMs) + 1;
+        const timeOfDay = currentMs % dayMs;
+        const days = String(block.params.days).split(',').map(Number);
+        
+        const parseTime = (timeStr: string) => {
+          const [h, m] = timeStr.split(':').map(Number);
+          return (h * 60 + m) * 60000;
+        };
+        const start = parseTime(String(block.params.startTime));
+        const end = parseTime(String(block.params.endTime));
+        
+        block.outputs.Q = days.includes(currentDay) && timeOfDay >= start && timeOfDay < end;
+        break;
+      }
+      case 'YEARLY_TIMER': {
+        const yearMs = 31536000000;
+        const dayMs = 86400000;
+        const currentMs = this.timeMs % yearMs;
+        const currentDay = Math.floor(currentMs / dayMs);
+        
+        const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const parseDate = (dateStr: string) => {
+          const [m, d] = dateStr.split('-').map(Number);
+          let days = 0;
+          for (let i = 0; i < m - 1; i++) days += daysInMonth[i];
+          return days + d - 1;
+        };
+        const startDay = parseDate(String(block.params.startDate));
+        const endDay = parseDate(String(block.params.endDate));
+        
+        if (startDay <= endDay) {
+          block.outputs.Q = currentDay >= startDay && currentDay <= endDay;
+        } else {
+          block.outputs.Q = currentDay >= startDay || currentDay <= endDay;
+        }
+        break;
+      }
+      case 'STOPWATCH': {
+        if (digital('R')) {
+          block.state.elapsed = 0;
+        } else if (A) {
+          block.state.elapsed = Number(block.state.elapsed ?? 0) + deltaMs;
+        }
+        block.outputs.ET = block.state.elapsed ?? 0;
+        break;
+      }
+      case 'AND_EDGE': {
+        const result = A && B;
+        block.outputs.Q = result && !block.state.lastResult;
+        block.state.lastResult = result;
+        break;
+      }
+      case 'NAND_EDGE': {
+        const result = !(A && B);
+        block.outputs.Q = result && !block.state.lastResult;
+        block.state.lastResult = result;
+        break;
+      }
+      case 'CURSOR_KEY':
+      case 'TD_FUNCTION_KEY':
+      case 'SHIFT_REGISTER_BIT':
+        block.outputs.Q = block.value ?? false;
+        break;
+      case 'OPEN_CONNECTOR':
+        break;
+      case 'MESSAGE_TEXT':
+        block.outputs.TEXT = digital('EN') ? (block.params.message as string) : '';
+        break;
+      case 'SOFTKEY':
+        if (block.params.mode === 'toggle') {
+          const val = block.value ?? false;
+          if (val && !block.state.lastValue) {
+            block.state.q = !(block.state.q ?? false);
+          }
+          block.state.lastValue = val;
+          block.outputs.Q = block.state.q ?? false;
+        } else {
+          block.outputs.Q = block.value ?? false;
+        }
+        break;
+      case 'SHIFT_REGISTER': {
+        const clk = digital('CLK');
+        let bits = (block.state.bits as number) ?? 0;
+        const length = parameter('length') || 8;
+        if (clk && !block.state.lastClk) {
+          const dir = digital('DIR');
+          const d = digital('D');
+          if (dir) {
+            bits = ((bits << 1) | (d ? 1 : 0)) & ((1 << length) - 1);
+          } else {
+            bits = (bits >>> 1) | (d ? (1 << (length - 1)) : 0);
+          }
+        }
+        block.state.lastClk = clk;
+        if (digital('R')) {
+          bits = 0;
+        }
+        block.state.bits = bits;
+        
+        const dir = digital('DIR');
+        block.outputs.Q = dir ? ((bits & (1 << (length - 1))) !== 0) : ((bits & 1) !== 0);
+        break;
+      }
+      case 'HOURS_COUNTER': {
+        if (digital('R')) {
+          block.state.elapsed = 0;
+        } else if (A) {
+          block.state.elapsed = (Number(block.state.elapsed) || 0) + deltaMs;
+        }
+        const cv = (Number(block.state.elapsed) || 0) / 3600000;
+        block.outputs.CV = cv;
+        block.outputs.Q = cv >= parameter('limit');
+        break;
+      }
+      case 'FREQUENCY_TRIGGER': {
+        const edges: number[] = ((block.state as any).edges) ?? [];
+        if (A && !block.state.lastA) {
+          edges.push(this.timeMs);
+        }
+        block.state.lastA = A;
+        
+        const windowMs = parameter('window');
+        const threshold = parameter('threshold');
+        const cutoff = this.timeMs - windowMs;
+        
+        while (edges.length > 0 && edges[0] < cutoff) {
+          edges.shift();
+        }
+        (block.state as any).edges = edges;
+        
+        const cv = edges.length / (windowMs / 1000);
+        block.outputs.CV = cv;
+        block.outputs.Q = cv >= threshold;
+        break;
+      }
+      case 'ASTRONOMICAL_CLOCK': {
+        const lat = parameter('latitude') || 0;
+        const msInDay = 24 * 60 * 60 * 1000;
+        const currentHour = ((this.timeMs % msInDay) / msInDay) * 24;
+        const sunrise = 6 - (lat / 15);
+        const sunset = 18 + (lat / 15);
+        block.outputs.Q = currentHour >= sunrise && currentHour < sunset;
+        break;
+      }
       case 'SCAN_DELAY': break;
       default: throw new Error(`Simulation is not implemented for ${block.type}.`);
     }

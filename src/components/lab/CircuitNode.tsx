@@ -22,6 +22,8 @@ export function formatSignal(value: Signal | undefined): string {
   return value ?? '—';
 }
 
+import { BlockIcon } from './BlockIcons';
+
 export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlowNode>) {
   const definition = BLOCK_CATALOG[data.blockType];
   const active = data.outputs.Q === true;
@@ -29,7 +31,10 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
   const input = data.blockType === 'INPUT' || data.blockType === 'ANALOG_INPUT';
   return <div className={`circuit-node ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}>
     <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5">
-      <div className="min-w-0"><p className="text-[9px] uppercase tracking-[.16em] text-gray-500">{definition.shortName}</p><p className="mt-1 truncate text-xs font-semibold text-gray-900" title={data.label || definition.name}>{data.label || definition.name}</p></div>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`shrink-0 ${active ? 'text-green-600' : analog ? 'text-cyan-600' : 'text-gray-400'}`}><BlockIcon type={data.blockType} /></div>
+        <div className="min-w-0"><p className="text-[9px] uppercase tracking-[.16em] text-gray-500">{definition.shortName}</p><p className="mt-0.5 truncate text-xs font-semibold text-gray-900" title={data.label || definition.name}>{data.label || definition.name}</p></div>
+      </div>
       <span className={`h-2 w-2 shrink-0 rounded-full ${active ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.7)]' : analog ? 'bg-cyan-500' : 'bg-gray-300'}`} />
     </div>
     <div className="py-2">{Array.from({ length: Math.max(definition.inputs.length, definition.outputs.length) }, (_, index) => {
