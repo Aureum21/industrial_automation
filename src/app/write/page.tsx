@@ -44,7 +44,7 @@ export default function WritePage() {
             <div key={block.id} className="relative group flex items-start gap-4">
               
               {/* The [+] Button Toolbar */}
-              <div className="relative pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="relative pt-1 opacity-70 hover:opacity-100 transition-opacity">
                 <button 
                   onMouseEnter={() => setShowTooltip(true)}
                   onMouseLeave={() => setShowTooltip(false)}
