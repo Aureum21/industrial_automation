@@ -100,13 +100,22 @@ export class LogicEngine {
     this.refresh();
   }
 
-  setInput(id: string, value: Signal): void {
+  setInput(id: string, value: Signal, propagate = true): void {
     const block = this.requireBlock(id);
-    if (!readers.has(block.type)) throw new Error('Only input blocks accept manual input values.');
-    const kind = BLOCK_CATALOG[block.type].outputs[0].kind;
-    if (!isSignal(value, kind)) throw new Error(`This input requires a finite ${kind} value.`);
+    if (!readers.has(block.type) && !block.type.includes('CONSTANT') && block.type !== 'FLAG') {
+      throw new Error('Only inputs and constants accept manual input values.');
+    }
+    const kind = BLOCK_CATALOG[block.type]?.outputs[0]?.kind;
+    if (kind && !isSignal(value, kind)) throw new Error(`This input requires a finite ${kind} value.`);
     block.value = value;
-    this.refresh();
+    
+    if (propagate) {
+      this.refresh();
+    } else {
+      // Just update this specific block's outputs so the UI shows the new value
+      this.readInputs(block);
+      this.evaluate(block, 0, false);
+    }
   }
 
   setTag(id: string, tag: string): void {
@@ -128,7 +137,6 @@ export class LogicEngine {
     this.validateParameter(BLOCK_CATALOG[block.type], key, value);
     block.params[key] = value;
     if (block.type === 'ANALOG_INPUT' && key === 'value') block.value = value;
-    this.refresh();
   }
 
   tick(deltaMs = 100): void {

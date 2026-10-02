@@ -55,7 +55,7 @@ function Workspace() {
     catch (error) { setNotice(error instanceof Error ? error.message : 'That change could not be applied.'); }
   }, [sync]);
 
-  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value)), [engine, mutate]);
+  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, running)), [engine, mutate, running]);
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
@@ -217,7 +217,7 @@ function Workspace() {
             <Background color="#e5e7eb" gap={24} size={1} /><Controls /><MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
         ) : mode === 'hmi' ? (
-          <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} />
+          <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} running={running} />
         ) : (
           <textarea
             value={dslCode}

@@ -7,9 +7,10 @@ interface HmiCanvasProps {
   setWidgets: React.Dispatch<React.SetStateAction<HmiWidget[]>>;
   engine: LogicEngine;
   sync: () => void;
+  running: boolean;
 }
 
-export default function HmiCanvas({ widgets, setWidgets, engine, sync }: HmiCanvasProps) {
+export default function HmiCanvas({ widgets, setWidgets, engine, sync, running }: HmiCanvasProps) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export default function HmiCanvas({ widgets, setWidgets, engine, sync }: HmiCanv
     if (!tag) return;
     const block = Array.from(engine.blocks.values()).find((b) => b.tag === tag);
     if (block && (block.type.includes('INPUT') || block.type.includes('CONSTANT') || block.type === 'FLAG')) {
-      engine.setInput(block.id, value);
+      engine.setInput(block.id, value, running);
       sync();
     }
   };
@@ -85,6 +86,7 @@ export default function HmiCanvas({ widgets, setWidgets, engine, sync }: HmiCanv
         onPointerLeave={() => setDragging(null)}
       >
         {widgets.map(w => {
+          const blockExists = Array.from(engine.blocks.values()).some((b) => b.tag === w.tag);
           const val = getTagValue(w.tag);
           const isSelected = selected === w.id;
           const label = String(w.options?.label || w.tag || 'Widget');
@@ -100,6 +102,9 @@ export default function HmiCanvas({ widgets, setWidgets, engine, sync }: HmiCanv
               style={{ left: w.x, top: w.y, minWidth: 120 }}
               onPointerDown={(e) => { e.stopPropagation(); setSelected(w.id); setDragging(w.id); }}
             >
+              {!blockExists && (
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full text-white flex items-center justify-center text-xs font-bold shadow animate-pulse" title="Tag not found in logic engine">!</div>
+              )}
               <div className="text-[11px] font-bold text-gray-700 w-full text-center truncate px-1 pb-1 border-b border-gray-100">{label}</div>
               
               <div className="py-2 px-1 flex flex-col items-center justify-center min-h-[60px] w-full">
