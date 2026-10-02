@@ -81,9 +81,9 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
                     <span className="text-xs font-mono font-bold truncate" style={{ color: trace.color }}>{trace.tag}</span>
                   </div>
                   <div className="flex-1 relative">
-                    <svg className="w-full h-full" preserveAspectRatio="none">
+                    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       {/* Grid */}
-                      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,4" />
+                      <line x1="0" y1="50" x2="100" y2="50" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,4" vectorEffect="non-scaling-stroke" />
                       
                       {/* Trace */}
                       <TracePath history={history} blockId={trace.id} minTime={minTime} maxTime={maxTime} isAnalog={trace.isAnalog} color={trace.color} scrubTime={scrubTime} />
@@ -161,7 +161,7 @@ function TracePath({ history, blockId, minTime, maxTime, isAnalog, color, scrubT
     return (
       <>
         <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-        {pointX >= 0 && <circle cx={`${pointX}%`} cy={`${pointY}%`} r="3" fill="white" stroke={color} strokeWidth="1.5" />}
+        {pointX >= 0 && <circle cx={pointX} cy={pointY} r="3" fill="white" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
       </>
     );
   } else {
@@ -194,7 +194,7 @@ function TracePath({ history, blockId, minTime, maxTime, isAnalog, color, scrubT
     return (
       <>
         <path d={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        {pointX >= 0 && <circle cx={`${pointX}%`} cy={`${pointY}%`} r="3" fill="white" stroke={color} strokeWidth="2" />}
+        {pointX >= 0 && <circle cx={pointX} cy={pointY} r="3" fill="white" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />}
       </>
     );
   }
