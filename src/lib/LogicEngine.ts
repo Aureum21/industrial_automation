@@ -205,7 +205,7 @@ export class LogicEngine {
     block.inputs = Object.fromEntries(definition.inputs.map(pin => [pin.id, defaultSignal(pin.kind)]));
     block.outputs = Object.fromEntries(definition.outputs.map(pin => [pin.id, defaultSignal(pin.kind)]));
     block.state = {};
-    if (readers.has(block.type) && block.value === undefined) {
+    if (readers.has(block.type)) {
       block.value = block.type === 'ANALOG_INPUT' ? Number(block.params.value) : false;
     }
     if (block.type === 'COUNTER') block.outputs.Q = 0 >= Number(block.params.limit);
