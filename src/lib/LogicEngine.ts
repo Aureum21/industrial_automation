@@ -167,7 +167,7 @@ export class LogicEngine {
       outputs[block.id] = { ...block.outputs };
     }
     this.history.push({ timeMs: this.timeMs, outputs });
-    if (this.history.length > 300) this.history.shift(); // Keep last 30 seconds (at 100ms ticks)
+    if (this.history.length > 3000) this.history.shift(); // Keep last 5 minutes (at 100ms ticks)
   }
 
   reset(): void {

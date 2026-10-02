@@ -9,6 +9,7 @@ interface OscilloscopeProps {
 
 export default function Oscilloscope({ engine, onScrub, scrubTime }: OscilloscopeProps) {
   const [collapsed, setCollapsed] = useState(true);
+  const [timeWindow, setTimeWindow] = useState(30000);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Find all tagged blocks to trace
@@ -23,9 +24,8 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
   }, [engine.blocks]);
 
   const history = engine.history;
-  const timeWindow = 30000; // 30 seconds
   const latestTime = history.length > 0 ? history[history.length - 1].timeMs : 0;
-  const maxTime = Math.max(30000, latestTime);
+  const maxTime = Math.max(timeWindow, latestTime);
   const minTime = Math.max(0, latestTime - timeWindow);
 
   const handlePointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -51,7 +51,18 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
       <div className="flex justify-between items-center bg-white px-4 py-1 border-b border-gray-200">
         <div className="text-xs font-bold text-gray-700 flex items-center gap-4">
           <span>LOGIC ANALYZER</span>
-          <span className="text-gray-400 font-mono font-medium">{traces.length} Traces (30s buffer)</span>
+          <span className="text-gray-400 font-mono font-medium">{traces.length} Traces</span>
+          <select 
+            className="text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 font-mono focus:ring-0 cursor-pointer px-1 py-0.5 outline-none hover:bg-gray-100"
+            value={timeWindow}
+            onChange={(e) => setTimeWindow(Number(e.target.value))}
+          >
+            <option value={10000}>10s window</option>
+            <option value={30000}>30s window</option>
+            <option value={60000}>60s window</option>
+            <option value={120000}>2m window</option>
+            <option value={300000}>5m window</option>
+          </select>
         </div>
         <button onClick={() => setCollapsed(true)} className="text-gray-400 hover:text-gray-800">▼</button>
       </div>
