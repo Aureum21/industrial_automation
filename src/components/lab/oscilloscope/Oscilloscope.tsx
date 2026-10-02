@@ -1,6 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import type { LogicEngine } from '@/lib/LogicEngine';
-
 
 interface OscilloscopeProps {
   engine: LogicEngine;
@@ -9,7 +8,7 @@ interface OscilloscopeProps {
 }
 
 export default function Oscilloscope({ engine, onScrub, scrubTime }: OscilloscopeProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Find all tagged blocks to trace
@@ -18,14 +17,28 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
     return tagged.map(b => ({
       id: b.id,
       tag: b.tag!,
-      color: b.type.includes('ANALOG') ? '#3b82f6' : '#22c55e',
+      color: b.type.includes('ANALOG') ? '#3b82f6' : '#16a34a',
       isAnalog: b.type.includes('ANALOG') || typeof (b.outputs.Q ?? b.outputs.CV ?? b.outputs.RPM) === 'number'
     }));
   }, [engine.blocks]);
 
+  const history = engine.history;
+  const timeWindow = 30000; // 30 seconds
+  const latestTime = history.length > 0 ? history[history.length - 1].timeMs : 0;
+  const maxTime = Math.max(30000, latestTime);
+  const minTime = Math.max(0, latestTime - timeWindow);
+
+  const handlePointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onScrub || history.length === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const time = minTime + percent * (maxTime - minTime);
+    onScrub(time);
+  }, [minTime, maxTime, onScrub, history.length]);
+
   if (collapsed) {
     return (
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-1 flex justify-center z-50">
+      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-1 flex justify-center z-50 shadow-sm">
         <button onClick={() => setCollapsed(false)} className="text-xs font-bold text-gray-500 hover:text-gray-800 uppercase tracking-widest">
           ▲ Open Logic Analyzer
         </button>
@@ -33,79 +46,80 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
     );
   }
 
-  const history = engine.history;
-  const timeWindow = 30000; // 30 seconds
-  const latestTime = history.length > 0 ? history[history.length - 1].timeMs : 0;
-  const minTime = Math.max(0, latestTime - timeWindow);
-
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 h-64 flex flex-col z-50 shadow-2xl">
-      <div className="flex justify-between items-center bg-gray-800 px-4 py-1 border-b border-gray-700">
-        <div className="text-xs font-bold text-gray-300 flex items-center gap-4">
+    <div className="absolute bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-300 h-64 flex flex-col z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
+      <div className="flex justify-between items-center bg-white px-4 py-1 border-b border-gray-200">
+        <div className="text-xs font-bold text-gray-700 flex items-center gap-4">
           <span>LOGIC ANALYZER</span>
-          <span className="text-gray-500 font-mono">{traces.length} Traces (30s buffer)</span>
+          <span className="text-gray-400 font-mono font-medium">{traces.length} Traces (30s buffer)</span>
         </div>
-        <button onClick={() => setCollapsed(true)} className="text-gray-400 hover:text-white">▼</button>
+        <button onClick={() => setCollapsed(true)} className="text-gray-400 hover:text-gray-800">▼</button>
       </div>
       
-      <div className="flex-1 relative overflow-hidden flex flex-col" ref={containerRef}>
+      <div className="flex-1 relative flex flex-col" ref={containerRef}>
         {traces.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
             Add Tags to your blocks to monitor them in the logic analyzer.
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col relative select-none">
             {traces.map(trace => {
               return (
-                <div key={trace.id} className="h-12 border-b border-gray-800 flex relative group">
-                  <div className="w-32 shrink-0 bg-gray-800 border-r border-gray-700 flex items-center px-2 z-10">
-                    <span className="text-xs font-mono font-bold text-gray-300 truncate" style={{ color: trace.color }}>{trace.tag}</span>
+                <div key={trace.id} className="h-12 border-b border-gray-200 flex relative group">
+                  <div className="w-32 shrink-0 bg-white border-r border-gray-200 flex items-center px-2 z-10 shadow-sm">
+                    <span className="text-xs font-mono font-bold truncate" style={{ color: trace.color }}>{trace.tag}</span>
                   </div>
                   <div className="flex-1 relative">
                     <svg className="w-full h-full" preserveAspectRatio="none">
                       {/* Grid */}
-                      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#374151" strokeWidth="1" strokeDasharray="2,4" />
+                      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,4" />
                       
                       {/* Trace */}
-                      <TracePath history={history} blockId={trace.id} minTime={minTime} maxTime={Math.max(30000, latestTime)} isAnalog={trace.isAnalog} color={trace.color} />
+                      <TracePath history={history} blockId={trace.id} minTime={minTime} maxTime={maxTime} isAnalog={trace.isAnalog} color={trace.color} scrubTime={scrubTime} />
                     </svg>
                   </div>
                 </div>
               );
             })}
+            
+            {/* Playhead Interactive Overlay */}
+            {history.length > 0 && onScrub && (
+              <div 
+                className="absolute inset-y-0 right-0 left-32 cursor-ew-resize z-20 group"
+                onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handlePointer(e); }}
+                onPointerMove={(e) => { if (e.buttons > 0) handlePointer(e); }}
+                onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onScrub(null); }}
+                onLostPointerCapture={() => onScrub(null)}
+              >
+                {scrubTime !== null && scrubTime !== undefined && (
+                  <div 
+                    className="absolute top-0 bottom-0 w-px bg-blue-500 pointer-events-none before:absolute before:left-1/2 before:-translate-x-1/2 before:top-0 before:border-[5px] before:border-transparent before:border-t-blue-500"
+                    style={{ left: `${((scrubTime - minTime) / (maxTime - minTime)) * 100}%` }}
+                  />
+                )}
+              </div>
+            )}
           </div>
-        )}
-        
-        {/* Scrubber overlay */}
-        {history.length > 0 && onScrub && (
-          <input 
-            type="range" 
-            className="absolute bottom-0 left-32 right-0 opacity-0 group-hover:opacity-100 cursor-ew-resize h-full z-20"
-            min={minTime} 
-            max={Math.max(30000, latestTime)}
-            value={scrubTime ?? Math.max(30000, latestTime)}
-            onChange={e => onScrub(Number(e.target.value))}
-            onMouseUp={() => onScrub(null)}
-            onMouseLeave={() => onScrub(null)}
-          />
         )}
       </div>
     </div>
   );
 }
 
-function TracePath({ history, blockId, minTime, maxTime, isAnalog, color }: { history: import('@/lib/automation/types').EngineSnapshot[], blockId: string, minTime: number, maxTime: number, isAnalog: boolean, color: string }) {
+function TracePath({ history, blockId, minTime, maxTime, isAnalog, color, scrubTime }: { history: import('@/lib/automation/types').EngineSnapshot[], blockId: string, minTime: number, maxTime: number, isAnalog: boolean, color: string, scrubTime?: number | null }) {
   if (history.length === 0) return null;
   
   const widthMs = maxTime - minTime;
   if (widthMs <= 0) return null;
 
   let path = '';
+  let pointX = -1;
+  let pointY = -1;
   
   if (isAnalog) {
     // Find min and max for scaling
     let vMin = 0;
-    let vMax = 100; // Default
+    let vMax = 100;
     let hasData = false;
     for (const snap of history) {
       const val = snap.outputs[blockId]?.Q ?? snap.outputs[blockId]?.CV ?? snap.outputs[blockId]?.RPM;
@@ -120,13 +134,25 @@ function TracePath({ history, blockId, minTime, maxTime, isAnalog, color }: { hi
     history.forEach((snap, i) => {
       const x = ((snap.timeMs - minTime) / widthMs) * 100;
       const val = snap.outputs[blockId]?.Q ?? snap.outputs[blockId]?.CV ?? snap.outputs[blockId]?.RPM ?? 0;
-      const y = 100 - (((Number(val) - vMin) / (vMax - vMin)) * 80 + 10); // Leave 10% padding
+      const y = 100 - (((Number(val) - vMin) / (vMax - vMin)) * 80 + 10);
       
       if (i === 0) path += `M ${x} ${y} `;
       else path += `L ${x} ${y} `;
     });
+
+    if (scrubTime !== null && scrubTime !== undefined) {
+      const snap = history.find(h => h.timeMs >= scrubTime) || history[history.length - 1];
+      const val = snap.outputs[blockId]?.Q ?? snap.outputs[blockId]?.CV ?? snap.outputs[blockId]?.RPM ?? 0;
+      pointY = 100 - (((Number(val) - vMin) / (vMax - vMin)) * 80 + 10);
+      pointX = ((scrubTime - minTime) / widthMs) * 100;
+    }
     
-    return <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />;
+    return (
+      <>
+        <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        {pointX >= 0 && <circle cx={`${pointX}%`} cy={`${pointY}%`} r="3" fill="white" stroke={color} strokeWidth="1.5" />}
+      </>
+    );
   } else {
     // Draw digital square wave
     let lastY = -1;
@@ -140,13 +166,25 @@ function TracePath({ history, blockId, minTime, maxTime, isAnalog, color }: { hi
         lastY = y;
       } else {
         if (y !== lastY) {
-          path += `L ${x} ${lastY} `; // Draw vertical line to step
+          path += `L ${x} ${lastY} `;
         }
         path += `L ${x} ${y} `;
         lastY = y;
       }
     });
+
+    if (scrubTime !== null && scrubTime !== undefined) {
+      const snap = history.find(h => h.timeMs >= scrubTime) || history[history.length - 1];
+      const val = snap.outputs[blockId]?.Q === true;
+      pointY = val ? 20 : 80;
+      pointX = ((scrubTime - minTime) / widthMs) * 100;
+    }
     
-    return <path d={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
+    return (
+      <>
+        <path d={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        {pointX >= 0 && <circle cx={`${pointX}%`} cy={`${pointY}%`} r="3" fill="white" stroke={color} strokeWidth="2" />}
+      </>
+    );
   }
 }
