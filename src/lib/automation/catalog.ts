@@ -19,7 +19,8 @@ const READY = new Set<BlockType>([
   'PULSE_TIMER', 'EDGE_PULSE_TIMER', 'RANDOM', 'STAIRWAY_SWITCH',
   'MULTIFUNCTION_SWITCH', 'WEEKLY_TIMER', 'YEARLY_TIMER', 'STOPWATCH',
   'SERVO_AXIS', 'DC_MOTOR', 'KINEMATICS_2D', 'INV_KINEMATICS_2D',
-  'PID_CONTROLLER', 'TRANSFER_FUNCTION', 'SIGNAL_GENERATOR', 'MATH_EXPRESSION'
+  'PID_CONTROLLER', 'TRANSFER_FUNCTION', 'SIGNAL_GENERATOR', 'MATH_EXPRESSION',
+  'NC_INPUT'
 ]);
 
 const pin = (id: string, kind: SignalKind = 'digital', label = id): PinDefinition => ({ id, label, kind });
@@ -50,8 +51,10 @@ function block(
 
 /** Complete catalog. Planned entries are discoverable but cannot execute until implemented. */
 export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
-  INPUT: block('INPUT', 'Digital input', 'I', 'Digital I/O',
-    'An interactive switch or a receiver for an output with the same tag.', [], digital('Q'), { source: true, tagged: true }),
+  INPUT: block('INPUT', 'Digital Input (Make / NO)', 'I', 'Digital I/O',
+    'A Normally Open (NO) interactive switch or a receiver for an output with the same tag.', [], digital('Q'), { source: true, tagged: true }),
+  NC_INPUT: block('NC_INPUT', 'Digital Input (Break / NC)', 'I (NC)', 'Digital I/O',
+    'A Normally Closed (NC) break contact. It outputs true when the switch is NOT pressed.', [], digital('Q'), { source: true, tagged: true }),
   CURSOR_KEY: block('CURSOR_KEY', 'Cursor key', 'KEY', 'Digital I/O',
     'Planned keyboard direction input for interactive control panels.', [], digital('Q'),
     { source: true, phase: 2, parameters: [select('key', 'Direction', 'up', [['up', 'Up'], ['down', 'Down'], ['left', 'Left'], ['right', 'Right']])] }),

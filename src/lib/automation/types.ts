@@ -3,7 +3,7 @@ export type Signal = boolean | number | string;
 export type ParameterValue = number | string | boolean;
 
 export type BlockType =
-  | 'INPUT' | 'CURSOR_KEY' | 'TD_FUNCTION_KEY' | 'SHIFT_REGISTER_BIT'
+  | 'INPUT' | 'NC_INPUT' | 'CURSOR_KEY' | 'TD_FUNCTION_KEY' | 'SHIFT_REGISTER_BIT'
   | 'HIGH' | 'LOW' | 'OUTPUT' | 'OPEN_CONNECTOR' | 'FLAG'
   | 'ANALOG_INPUT' | 'ANALOG_OUTPUT' | 'ANALOG_FLAG' | 'ANALOG_CONSTANT'
   | 'NETWORK_INPUT' | 'NETWORK_ANALOG_INPUT' | 'NETWORK_OUTPUT' | 'NETWORK_ANALOG_OUTPUT'

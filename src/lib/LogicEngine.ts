@@ -7,7 +7,7 @@ import type {
 
 export type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, RuntimeBlock, Signal } from './automation/types.ts';
 
-const readers = new Set(['INPUT', 'ANALOG_INPUT']);
+const readers = new Set(['INPUT', 'NC_INPUT', 'ANALOG_INPUT']);
 const writers = new Set(['OUTPUT', 'FLAG', 'ANALOG_OUTPUT', 'ANALOG_FLAG']);
 const defaultSignal = (kind: SignalKind): Signal => kind === 'analog' ? 0 : kind === 'text' ? '' : false;
 const isSignal = (value: Signal, kind: SignalKind) => kind === 'digital'
@@ -310,9 +310,11 @@ export class LogicEngine {
     const A = digital('A');
     const B = digital('B');
     switch (block.type) {
-      case 'INPUT': case 'ANALOG_INPUT': {
+      case 'INPUT': case 'ANALOG_INPUT': case 'NC_INPUT': {
         const writer = block.tag ? this.tagWriters.get(this.tagKey(block)) : undefined;
-        block.outputs.Q = writer ? writer.outputs.Q : block.value ?? defaultSignal(definition.outputs[0].kind);
+        let val = writer ? writer.outputs.Q : block.value ?? defaultSignal(definition.outputs[0].kind);
+        if (block.type === 'NC_INPUT') val = !val;
+        block.outputs.Q = val;
         break;
       }
       case 'HIGH': block.outputs.Q = true; break;
