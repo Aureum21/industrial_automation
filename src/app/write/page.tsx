@@ -64,17 +64,28 @@ export default function WritePage() {
               {/* Block Content */}
               <div className="flex-grow w-full min-w-0">
                 {block.type === 'text' ? (
-                  <textarea 
-                    placeholder="Tell your story..." 
-                    className="w-full text-xl font-serif text-gray-800 outline-none placeholder:text-gray-300 bg-transparent min-h-[100px] resize-none leading-relaxed"
-                    value={block.content}
-                    onChange={(e) => {
-                      updateText(block.id, e.target.value);
-                      // Auto-resize
-                      e.target.style.height = 'auto';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
-                  />
+                  <div className="relative group/text">
+                    <textarea 
+                      placeholder="Tell your story..." 
+                      className="w-full text-xl font-serif text-gray-800 outline-none placeholder:text-gray-300 bg-transparent min-h-[100px] resize-none leading-relaxed pr-8"
+                      value={block.content}
+                      onChange={(e) => {
+                        updateText(block.id, e.target.value);
+                        // Auto-resize
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                      }}
+                    />
+                    {blocks.length > 1 && (
+                      <button 
+                        onClick={() => removeBlock(block.id)} 
+                        className="absolute right-0 top-2 opacity-0 group-hover/text:opacity-100 text-gray-300 hover:text-red-500 transition-all"
+                        title="Delete text block"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div className={fullscreenBlockId === block.id 
                     ? "fixed inset-0 z-[100] flex flex-col bg-white" 
