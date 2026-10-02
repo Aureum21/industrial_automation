@@ -183,10 +183,6 @@ function Workspace() {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
-        <button className="lab-button" onClick={() => setIsFullscreen(!isFullscreen)}>
-          <svg className="w-4 h-4 mr-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isFullscreen ? "M6 18L18 6M6 6l12 12" : "M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"} /></svg>
-          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-        </button>
         <button className={`lab-button ${mode === 'code' ? 'primary' : ''}`} onClick={toggleMode}>{mode === 'visual' ? 'Code Editor { }' : 'Visual Editor'}</button>
         <button className="lab-button" onClick={save}>Save</button>
         <button className="lab-button" onClick={exportFile}>Export</button>
@@ -196,7 +192,19 @@ function Workspace() {
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
       <div className="flex items-center gap-2"><button className="lab-button" onClick={() => setLibraryOpen(value => !value)} aria-expanded={libraryOpen}>Components</button><button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button><button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button><button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. Input settings are preserved.'); }}>Reset</button><span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span></div>
-      <div className="flex items-center gap-2"><select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select><button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button></div>
+      <div className="flex items-center gap-2">
+        <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
+        <button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button>
+        <button className="lab-button px-2" onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? 'Minimize' : 'Maximize'}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {isFullscreen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
+            )}
+          </svg>
+        </button>
+      </div>
     </div>
     <div className="relative flex min-h-0 flex-1">
       {libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
@@ -216,7 +224,7 @@ function Workspace() {
             className="flex-1 w-full h-full p-6 font-mono text-sm leading-relaxed text-gray-800 bg-gray-50 border-none outline-none resize-none focus:ring-2 focus:ring-inset focus:ring-green-500"
           />
         )}
-        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
+        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
       </div>
     </div>
