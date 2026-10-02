@@ -844,8 +844,8 @@ export class LogicEngine {
         const l1 = parameter('L1');
         const l2 = parameter('L2');
         const distSq = x*x + y*y;
-        let theta2 = Math.acos(Math.max(-1, Math.min(1, (distSq - l1*l1 - l2*l2) / (2 * l1 * l2))));
-        let theta1 = Math.atan2(y, x) - Math.atan2(l2 * Math.sin(theta2), l1 + l2 * Math.cos(theta2));
+        const theta2 = Math.acos(Math.max(-1, Math.min(1, (distSq - l1*l1 - l2*l2) / (2 * l1 * l2))));
+        const theta1 = Math.atan2(y, x) - Math.atan2(l2 * Math.sin(theta2), l1 + l2 * Math.cos(theta2));
         block.outputs.THETA1 = (isNaN(theta1) ? 0 : theta1) * (180 / Math.PI);
         block.outputs.THETA2 = (isNaN(theta2) ? 0 : theta2) * (180 / Math.PI);
         break;
@@ -891,7 +891,7 @@ export class LogicEngine {
       case 'SIGNAL_GENERATOR': {
         const en = digital('EN');
         if (!en) { block.outputs.Q = 0; break; }
-        const type = parameter('type') as string;
+        const type = (block.params.type as string) || 'sine';
         let phase = Number(block.state.phase ?? 0) + (parameter('freq') * deltaMs / 1000);
         phase = phase % 1;
         block.state.phase = phase;
@@ -903,14 +903,14 @@ export class LogicEngine {
         break;
       }
       case 'MATH_EXPRESSION': {
-        const expr = parameter('expr') as string;
+        const expr = (block.params.expr as string) || 'A + B';
         try {
-          if (!block.state.func || block.state.lastExpr !== expr) {
-            block.state.func = new Function('A', 'B', 'C', 'Math', `
+          if (!(block.state as any).func || (block.state as any).lastExpr !== expr) {
+            (block.state as any).func = new Function('A', 'B', 'C', 'Math', `
               const {sin, cos, tan, abs, sqrt, min, max, PI, pow, round} = Math;
               return ${expr};
             `);
-            block.state.lastExpr = expr;
+            (block.state as any).lastExpr = expr;
           }
           block.outputs.Q = (block.state as any).func(analog('A'), analog('B'), analog('C'), Math);
         } catch(e) {
