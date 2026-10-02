@@ -84,6 +84,7 @@ export interface HmiWidget {
 
 export interface CircuitDocument {
   version: 1;
+  format?: 'fbd' | 'ladder';
   name: string;
   blocks: CircuitBlock[];
   connections: CircuitConnection[];

@@ -69,7 +69,8 @@ export function parseCircuitDocument(text: string): CircuitDocument {
     });
   }
 
-  const document: CircuitDocument = { version: 1, name: raw.name.slice(0, 120), blocks, connections, widgets };
+  const format = raw.format === 'ladder' ? 'ladder' : 'fbd';
+  const document: CircuitDocument = { version: 1, format, name: raw.name.slice(0, 120), blocks, connections, widgets };
   const verifier = new LogicEngine();
   verifier.load(document);
   return document;

@@ -29,11 +29,13 @@ function Workspace() {
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(true);
-  const [mode, setMode] = useState<'visual' | 'code' | 'hmi'>('visual');
+  const [mode, setMode] = useState<'visual' | 'ladder' | 'code' | 'hmi'>('visual');
   const [dslCode, setDslCode] = useState('');
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
+  const [format, setFormat] = useState<'fbd' | 'ladder'>('fbd');
+  const [showNewDialog, setShowNewDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
 
@@ -81,6 +83,11 @@ function Workspace() {
     try {
       engine.load(document);
       setRunning(false);
+      const docFormat = document.format || 'fbd';
+      setFormat(docFormat);
+      if (docFormat === 'ladder') setMode('ladder');
+      else if (mode === 'ladder') setMode('visual');
+      
       setNodes(document.blocks.map(makeNode));
       setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
       setWidgets((document.widgets as HmiWidget[]) || []);
@@ -93,7 +100,7 @@ function Workspace() {
       sync();
       requestAnimationFrame(() => { void fitView({ padding: 0.18, duration: 200, maxZoom: 1 }); });
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
-  }, [engine, makeNode, fitView, sync]);
+  }, [engine, makeNode, fitView, sync, mode]);
 
   useEffect(() => {
     // Deferring initialization keeps browser storage out of server rendering.
@@ -181,7 +188,7 @@ function Workspace() {
 
   const selectedCount = nodes.filter(node => node.selected).length + edges.filter(edge => edge.selected).length;
 
-  const changeMode = (newMode: 'visual' | 'code' | 'hmi') => {
+  const changeMode = (newMode: 'visual' | 'ladder' | 'code' | 'hmi') => {
     if (mode === newMode) return;
     if (mode === 'code') {
       try {
@@ -206,14 +213,15 @@ function Workspace() {
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 mr-2">
-          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual</button>
+          {format === 'ladder' && <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'ladder' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('ladder')}>Ladder (LD)</button>}
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'hmi' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'code' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
         </div>
         <button className="lab-button" onClick={save}>Save</button>
         <button className="lab-button" onClick={exportFile}>Export</button>
         <button className="lab-button" onClick={() => fileRef.current?.click()}>Import</button>
-        <button className="lab-button" onClick={() => requestLoad({ version: 1, name: 'Untitled circuit', blocks: [], connections: [] }, 'New circuit ready.')}>New circuit</button>
+        <button className="lab-button" onClick={() => setShowNewDialog(true)}>New circuit</button>
       </div>
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
@@ -226,7 +234,16 @@ function Workspace() {
     <div className="relative flex min-h-0 flex-1">
       {libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
       <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
-        {mode === 'visual' ? (
+        {mode === 'ladder' ? (
+          <div className="flex-1 w-full h-full bg-slate-50 flex items-center justify-center p-8">
+            <div className="max-w-md text-center">
+              <div className="text-4xl mb-4">🪜</div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Ladder Logic Editor (Coming Soon)</h2>
+              <p className="text-gray-500 mb-6">The structured ladder grid is being built. For now, you can switch to the <strong>Visual (FBD)</strong> tab above to view and edit this circuit using function blocks!</p>
+              <button className="lab-button primary" onClick={() => changeMode('visual')}>Switch to FBD</button>
+            </div>
+          </div>
+        ) : mode === 'visual' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
             setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
@@ -251,6 +268,35 @@ function Workspace() {
     <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-white px-4 py-2 text-[10px]"><p role="status" className={diagnostics.length ? 'text-amber-500 font-semibold' : notice.includes('Invalid DSL') ? 'text-red-500 font-semibold' : 'text-gray-500'}>{diagnostics[0] ?? notice}</p><span className="font-mono text-gray-400">{nodes.length} blocks · {edges.length} wires <span className="ml-3 hidden sm:inline">Select + Delete · Green: digital · Cyan: analog</span></span></div>
     <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" aria-label="Import circuit file" onChange={async event => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; try { if (file.size > 2_000_000) throw new Error('Circuit files must be smaller than 2 MB.'); requestLoad(parseCircuitDocument(await file.text()), `Imported ${file.name}.`); } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to read this file.'); } }} />
     {pending && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true" aria-labelledby="replace-title"><div className="max-w-sm rounded-xl border border-green-200 bg-white p-6"><h2 id="replace-title" className="text-lg font-semibold">Replace this circuit?</h2><p className="mt-3 text-sm leading-6 text-gray-500">There are unsaved changes. Save your current circuit or export a copy before replacing it.</p><div className="mt-5 flex flex-wrap gap-2"><button autoFocus className="lab-button" onClick={() => setPending(null)}>Keep editing</button><button className="lab-button" onClick={save}>Save current</button><button className="lab-button primary" onClick={() => load(pending.document, pending.label)}>Replace</button></div></div></div>}
+    {showNewDialog && (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true">
+        <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+          <h2 className="text-lg font-semibold mb-2">Create New Project</h2>
+          <p className="text-sm text-gray-500 mb-6">Choose how you want to build your logic. Ladder logic supports one-way conversion to FBD.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <button 
+              className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50 transition"
+              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [], connections: [] }, 'New Ladder circuit ready.'); }}
+            >
+              <div className="text-2xl mb-2">🪜</div>
+              <div className="font-semibold text-gray-800">Ladder Logic</div>
+              <div className="text-xs text-gray-500 mt-2 text-center">Structured grid with contacts and coils</div>
+            </button>
+            <button 
+              className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-green-500 hover:bg-green-50 transition"
+              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'fbd', name: 'Untitled circuit', blocks: [], connections: [] }, 'New FBD circuit ready.'); }}
+            >
+              <div className="text-2xl mb-2">🔌</div>
+              <div className="font-semibold text-gray-800">Function Blocks</div>
+              <div className="text-xs text-gray-500 mt-2 text-center">Free-form graph with logic gates</div>
+            </button>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button className="lab-button" onClick={() => setShowNewDialog(false)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )}
   </main>;
 }
 
