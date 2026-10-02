@@ -25,6 +25,7 @@ export class LogicEngine {
   public connections: CircuitConnection[] = [];
   public timeMs = 0;
   public diagnostics: string[] = [];
+  public history: import('./automation/types.ts').EngineSnapshot[] = [];
 
   private order: string[] = [];
   private incoming = new Map<string, CircuitConnection[]>();
@@ -157,10 +158,21 @@ export class LogicEngine {
         block.state.previous = block.inputs.A;
       }
     }
+    this.recordSnapshot();
+  }
+
+  private recordSnapshot(): void {
+    const outputs: Record<string, Record<string, Signal>> = {};
+    for (const block of this.blocks.values()) {
+      outputs[block.id] = { ...block.outputs };
+    }
+    this.history.push({ timeMs: this.timeMs, outputs });
+    if (this.history.length > 300) this.history.shift(); // Keep last 30 seconds (at 100ms ticks)
   }
 
   reset(): void {
     this.timeMs = 0;
+    this.history = [];
     this.diagnostics = [];
     for (const block of this.blocks.values()) this.initialize(block);
     this.refresh();

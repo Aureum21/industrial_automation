@@ -90,6 +90,11 @@ export interface CircuitDocument {
   widgets?: HmiWidget[];
 }
 
+export interface EngineSnapshot {
+  timeMs: number;
+  outputs: Record<string, Record<string, Signal>>;
+}
+
 export interface RuntimeBlock extends CircuitBlock {
   inputs: Record<string, Signal>;
   outputs: Record<string, Signal>;

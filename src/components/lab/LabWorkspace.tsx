@@ -13,6 +13,7 @@ import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, Param
 import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
+import Oscilloscope from './oscilloscope/Oscilloscope';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -32,16 +33,25 @@ function Workspace() {
   const [dslCode, setDslCode] = useState('');
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
+  const [timeScrub, setTimeScrub] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
 
-  const sync = useCallback(() => {
+  const sync = useCallback((scrubTime: number | null = null) => {
+    let getOutputs = (id: string) => engine.blocks.get(id)?.outputs;
+    if (scrubTime !== null && engine.history.length > 0) {
+      const snapshot = engine.history.find(h => h.timeMs >= scrubTime) ?? engine.history[engine.history.length - 1];
+      if (snapshot) getOutputs = (id: string) => snapshot.outputs[id];
+    }
+    
     setNodes(previous => previous.map(node => {
       const block = engine.blocks.get(node.id);
-      return block ? { ...node, data: { ...node.data, outputs: { ...block.outputs }, inputValue: block.value ?? false, tag: block.tag ?? '', params: { ...block.params } } } : node;
+      const outputs = getOutputs(node.id);
+      return block ? { ...node, data: { ...node.data, outputs: { ...(outputs || block.outputs) }, inputValue: block.value ?? false, tag: block.tag ?? '', params: { ...block.params } } } : node;
     }));
     setEdges(previous => previous.map(edge => {
-      const value = engine.blocks.get(edge.source)?.outputs[edge.sourceHandle ?? 'Q'];
+      const outputs = getOutputs(edge.source);
+      const value = outputs ? outputs[edge.sourceHandle ?? 'Q'] : undefined;
       const active = value === true;
       const analog = typeof value === 'number';
       return { ...edge, animated: active, style: { stroke: active ? '#c4ef72' : analog ? '#72d9e5' : '#4a5c70', strokeWidth: active ? 2.5 : 1.5 } };
@@ -54,6 +64,12 @@ function Workspace() {
     try { operation(); setDirty(true); sync(); }
     catch (error) { setNotice(error instanceof Error ? error.message : 'That change could not be applied.'); }
   }, [sync]);
+
+  const handleScrub = useCallback((time: number | null) => {
+    setTimeScrub(time);
+    if (time !== null && running) setRunning(false);
+    sync(time);
+  }, [running, sync]);
 
   const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, running)), [engine, mutate, running]);
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
@@ -229,6 +245,7 @@ function Workspace() {
         )}
         {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
+        <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} />
       </div>
     </div>
     <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-white px-4 py-2 text-[10px]"><p role="status" className={diagnostics.length ? 'text-amber-500 font-semibold' : notice.includes('Invalid DSL') ? 'text-red-500 font-semibold' : 'text-gray-500'}>{diagnostics[0] ?? notice}</p><span className="font-mono text-gray-400">{nodes.length} blocks · {edges.length} wires <span className="ml-3 hidden sm:inline">Select + Delete · Green: digital · Cyan: analog</span></span></div>
