@@ -2,7 +2,7 @@ import type { BlockDefinition, BlockType, ParameterDefinition, PinDefinition, Si
 
 export const CATEGORIES = [
   'Digital I/O', 'Analog I/O', 'Network', 'Logic', 'Timers', 'Counters',
-  'Analog processing', 'Memory & utilities', 'Data & modules',
+  'Analog processing', 'Mechatronics', 'Memory & utilities', 'Data & modules',
 ];
 
 const READY = new Set<BlockType>([
@@ -15,7 +15,11 @@ const READY = new Set<BlockType>([
   'ANALOG_FILTER', 'MIN_MAX', 'AVERAGE', 'MATH_ERROR', 'DATA_LOG',
   'AND_EDGE', 'NAND_EDGE', 'CURSOR_KEY', 'TD_FUNCTION_KEY', 'SHIFT_REGISTER_BIT',
   'OPEN_CONNECTOR', 'MESSAGE_TEXT', 'SOFTKEY', 'SHIFT_REGISTER', 'HOURS_COUNTER',
-  'FREQUENCY_TRIGGER', 'ASTRONOMICAL_CLOCK'
+  'FREQUENCY_TRIGGER', 'ASTRONOMICAL_CLOCK', 'ON_OFF_DELAY', 'RETENTIVE_TON',
+  'PULSE_TIMER', 'EDGE_PULSE_TIMER', 'RANDOM', 'STAIRWAY_SWITCH',
+  'MULTIFUNCTION_SWITCH', 'WEEKLY_TIMER', 'YEARLY_TIMER', 'STOPWATCH',
+  'SERVO_AXIS', 'DC_MOTOR', 'KINEMATICS_2D', 'INV_KINEMATICS_2D',
+  'PID_CONTROLLER', 'TRANSFER_FUNCTION', 'SIGNAL_GENERATOR', 'MATH_EXPRESSION'
 ]);
 
 const pin = (id: string, kind: SignalKind = 'digital', label = id): PinDefinition => ({ id, label, kind });
@@ -225,6 +229,32 @@ export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
   UDF: block('UDF', 'User-defined function', 'UDF', 'Data & modules',
     'Planned reusable circuit module with a declared interface; final pins come from the module definition.', [], [],
     { phase: 4, parameters: [text('module', 'Module identifier', '')] }),
+
+  // MECHATRONICS & CONTROL SYSTEMS
+  SERVO_AXIS: block('SERVO_AXIS', 'Servo motor axis', 'M', 'Mechatronics',
+    'Simulates a closed-loop servo. Moves Current Angle (Q) toward Target Angle (A) at Speed limit.', analog('A', 'SPEED'), analog('Q'),
+    { stateful: true }),
+  DC_MOTOR: block('DC_MOTOR', 'DC Motor (Physics)', 'DC', 'Mechatronics',
+    'Applies simulated inertia to a voltage input to produce RPM and Position.', analog('V', 'LOAD'), analog('RPM', 'POS'),
+    { stateful: true, parameters: [number('inertia', 'Inertia (kg*m2)', 0.1), number('friction', 'Friction', 0.01)] }),
+  KINEMATICS_2D: block('KINEMATICS_2D', 'Forward Kinematics 2D', 'FWD', 'Mechatronics',
+    'Calculates X/Y tool coordinate from two joint angles.', analog('THETA1', 'THETA2'), analog('X', 'Y'),
+    { parameters: [number('L1', 'Link 1 Length', 100), number('L2', 'Link 2 Length', 100)] }),
+  INV_KINEMATICS_2D: block('INV_KINEMATICS_2D', 'Inverse Kinematics 2D', 'INV', 'Mechatronics',
+    'Calculates required joint angles to reach an X/Y target.', analog('X', 'Y'), analog('THETA1', 'THETA2'),
+    { parameters: [number('L1', 'Link 1 Length', 100), number('L2', 'Link 2 Length', 100)] }),
+  PID_CONTROLLER: block('PID_CONTROLLER', 'PID Controller', 'PID', 'Mechatronics',
+    'Full Proportional-Integral-Derivative control loop.', analog('SP', 'PV', 'EN'), analog('CV'),
+    { stateful: true, parameters: [number('kp', 'Kp (Gain)', 1), number('ki', 'Ki (Integral)', 0.1), number('kd', 'Kd (Derivative)', 0.01), number('min', 'Min Output', -100), number('max', 'Max Output', 100)] }),
+  TRANSFER_FUNCTION: block('TRANSFER_FUNCTION', 'Transfer Function (1st Order)', 'TF', 'Mechatronics',
+    'Simulates physical lag (inertia, heating). 1 / (Ts + 1)', analog('A'), analog('Q'),
+    { stateful: true, parameters: [number('gain', 'System Gain (K)', 1), number('tau', 'Time Constant (T)', 1000)] }),
+  SIGNAL_GENERATOR: block('SIGNAL_GENERATOR', 'Signal Generator', 'SIG', 'Mechatronics',
+    'Generates continuous test waves (Sine, Square, Triangle).', digital('EN'), analog('Q'),
+    { stateful: true, parameters: [text('type', 'Wave (sine, square, tri)', 'sine'), number('freq', 'Frequency (Hz)', 1), number('amp', 'Amplitude', 10), number('offset', 'DC Offset', 0)] }),
+  MATH_EXPRESSION: block('MATH_EXPRESSION', 'Math Expression', 'ƒ(x)', 'Mechatronics',
+    'Evaluates a string math expression (e.g. A * sin(B)).', analog('A', 'B', 'C'), analog('Q'),
+    { parameters: [text('expr', 'Expression', 'A + B')] }),
 };
 
 export const BLOCK_DEFINITIONS: BlockDefinition[] = Object.values(BLOCK_CATALOG);

@@ -17,7 +17,9 @@ export type BlockType =
   | 'PI_CONTROLLER' | 'PWM' | 'ANALOG_FILTER' | 'MIN_MAX' | 'AVERAGE'
   | 'RS_LATCH' | 'PULSE_RELAY' | 'MESSAGE_TEXT' | 'SOFTKEY' | 'SHIFT_REGISTER'
   | 'MATH_ERROR' | 'FLOAT_TO_INT' | 'INT_TO_FLOAT' | 'DATA_LOG' | 'UDF'
-  | 'R_TRIG' | 'F_TRIG' | 'SCAN_DELAY';
+  | 'R_TRIG' | 'F_TRIG' | 'SCAN_DELAY'
+  | 'SERVO_AXIS' | 'DC_MOTOR' | 'KINEMATICS_2D' | 'INV_KINEMATICS_2D'
+  | 'PID_CONTROLLER' | 'TRANSFER_FUNCTION' | 'SIGNAL_GENERATOR' | 'MATH_EXPRESSION';
 
 export interface PinDefinition {
   id: string;

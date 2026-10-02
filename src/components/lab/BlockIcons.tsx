@@ -128,6 +128,31 @@ const icons: Partial<Record<BlockType, () => React.ReactNode>> = {
   SHIFT_REGISTER: () => (
     <svg viewBox="0 0 28 28" className="w-7 h-7"><rect x="4" y="8" width="20" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="8" x2="10" y2="20" stroke="currentColor" strokeWidth="0.8"/><line x1="14" y1="8" x2="14" y2="20" stroke="currentColor" strokeWidth="0.8"/><line x1="18" y1="8" x2="18" y2="20" stroke="currentColor" strokeWidth="0.8"/><path d="M7 22 L14 25 L21 22" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
   ),
+  // ── Mechatronics ──
+  SERVO_AXIS: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><circle cx="14" cy="14" r="8" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M14 10v4l3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><text x="14" y="26" textAnchor="middle" fontSize="6" fontWeight="bold" fill="currentColor">SERVO</text></svg>
+  ),
+  DC_MOTOR: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><circle cx="14" cy="14" r="9" fill="none" stroke="currentColor" strokeWidth="1.5"/><text x="14" y="17.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="currentColor">M</text></svg>
+  ),
+  KINEMATICS_2D: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><path d="M4 24 L14 14 L24 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="14" cy="14" r="2" fill="currentColor"/><circle cx="24" cy="8" r="2" fill="currentColor"/></svg>
+  ),
+  INV_KINEMATICS_2D: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><path d="M4 24 L14 14 L24 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="14" cy="14" r="2" fill="none" stroke="currentColor"/><circle cx="24" cy="8" r="2" fill="none" stroke="currentColor"/></svg>
+  ),
+  PID_CONTROLLER: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><rect x="3" y="6" width="22" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><text x="14" y="18" textAnchor="middle" fontSize="9" fontWeight="bold" fill="currentColor">PID</text></svg>
+  ),
+  TRANSFER_FUNCTION: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><rect x="3" y="6" width="22" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M6 18 Q 10 18, 14 14 T 22 10" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>
+  ),
+  SIGNAL_GENERATOR: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><rect x="3" y="6" width="22" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M5 14 Q 9 6, 14 14 T 23 14" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>
+  ),
+  MATH_EXPRESSION: () => (
+    <svg viewBox="0 0 28 28" className="w-7 h-7"><rect x="3" y="6" width="22" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><text x="14" y="18" textAnchor="middle" fontSize="10" fontStyle="italic" fontWeight="bold" fill="currentColor">ƒ(x)</text></svg>
+  ),
 };
 
 export function BlockIcon({ type }: { type: BlockType }) {

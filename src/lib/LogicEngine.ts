@@ -801,6 +801,124 @@ export class LogicEngine {
         block.outputs.Q = currentHour >= sunrise && currentHour < sunset;
         break;
       }
+      case 'SERVO_AXIS': {
+        const target = analog('A');
+        const speed = analog('SPEED');
+        let current = Number(block.state.current ?? 0);
+        const maxStep = speed * (deltaMs / 1000);
+        if (current < target) current = Math.min(target, current + maxStep);
+        else if (current > target) current = Math.max(target, current - maxStep);
+        block.state.current = current;
+        block.outputs.Q = current;
+        break;
+      }
+      case 'DC_MOTOR': {
+        const voltage = analog('V');
+        const load = analog('LOAD');
+        const inertia = parameter('inertia') || 0.1;
+        const friction = parameter('friction') || 0.01;
+        let rpm = Number(block.state.rpm ?? 0);
+        let pos = Number(block.state.pos ?? 0);
+        const torque = voltage - load - friction * rpm;
+        const alpha = torque / inertia;
+        rpm = rpm + alpha * (deltaMs / 1000);
+        pos = pos + (rpm / 60) * (deltaMs / 1000) * 360;
+        block.state.rpm = rpm;
+        block.state.pos = pos;
+        block.outputs.RPM = rpm;
+        block.outputs.POS = pos;
+        break;
+      }
+      case 'KINEMATICS_2D': {
+        const theta1 = analog('THETA1') * (Math.PI / 180);
+        const theta2 = analog('THETA2') * (Math.PI / 180);
+        const l1 = parameter('L1');
+        const l2 = parameter('L2');
+        block.outputs.X = l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2);
+        block.outputs.Y = l1 * Math.sin(theta1) + l2 * Math.sin(theta1 + theta2);
+        break;
+      }
+      case 'INV_KINEMATICS_2D': {
+        const x = analog('X');
+        const y = analog('Y');
+        const l1 = parameter('L1');
+        const l2 = parameter('L2');
+        const distSq = x*x + y*y;
+        let theta2 = Math.acos(Math.max(-1, Math.min(1, (distSq - l1*l1 - l2*l2) / (2 * l1 * l2))));
+        let theta1 = Math.atan2(y, x) - Math.atan2(l2 * Math.sin(theta2), l1 + l2 * Math.cos(theta2));
+        block.outputs.THETA1 = (isNaN(theta1) ? 0 : theta1) * (180 / Math.PI);
+        block.outputs.THETA2 = (isNaN(theta2) ? 0 : theta2) * (180 / Math.PI);
+        break;
+      }
+      case 'PID_CONTROLLER': {
+        const en = digital('EN');
+        if (!en) {
+          block.state.integral = 0;
+          block.state.lastError = 0;
+          block.outputs.CV = 0;
+          break;
+        }
+        const error = analog('SP') - analog('PV');
+        const dt = deltaMs / 1000;
+        let integral = Number(block.state.integral ?? 0);
+        const lastError = Number(block.state.lastError ?? 0);
+        const p = parameter('kp') * error;
+        const d = parameter('kd') * (dt > 0 ? (error - lastError) / dt : 0);
+        const ki = parameter('ki');
+        const min = parameter('min');
+        const max = parameter('max');
+        let cv = p + (ki * integral) + d;
+        if (cv > max) cv = max;
+        else if (cv < min) cv = min;
+        else integral += error * dt;
+        block.state.integral = integral;
+        block.state.lastError = error;
+        block.outputs.CV = cv;
+        break;
+      }
+      case 'TRANSFER_FUNCTION': {
+        const a = analog('A');
+        const k = parameter('gain');
+        const tau = parameter('tau');
+        const dt = deltaMs;
+        const alpha = tau + dt > 0 ? dt / (tau + dt) : 1;
+        const prev = Number(block.state.filtered ?? 0);
+        const filtered = alpha * (a * k) + (1 - alpha) * prev;
+        block.state.filtered = filtered;
+        block.outputs.Q = filtered;
+        break;
+      }
+      case 'SIGNAL_GENERATOR': {
+        const en = digital('EN');
+        if (!en) { block.outputs.Q = 0; break; }
+        const type = parameter('type') as string;
+        let phase = Number(block.state.phase ?? 0) + (parameter('freq') * deltaMs / 1000);
+        phase = phase % 1;
+        block.state.phase = phase;
+        let out = 0;
+        if (type === 'square') out = phase < 0.5 ? 1 : -1;
+        else if (type === 'tri') out = phase < 0.5 ? (phase * 4 - 1) : (3 - phase * 4);
+        else out = Math.sin(phase * 2 * Math.PI);
+        block.outputs.Q = (out * parameter('amp')) + parameter('offset');
+        break;
+      }
+      case 'MATH_EXPRESSION': {
+        const expr = parameter('expr') as string;
+        try {
+          if (!block.state.func || block.state.lastExpr !== expr) {
+            block.state.func = new Function('A', 'B', 'C', 'Math', `
+              const {sin, cos, tan, abs, sqrt, min, max, PI, pow, round} = Math;
+              return ${expr};
+            `);
+            block.state.lastExpr = expr;
+          }
+          block.outputs.Q = (block.state as any).func(analog('A'), analog('B'), analog('C'), Math);
+        } catch(e) {
+          block.outputs.Q = 0;
+          if (this.timeMs % 1000 === 0) this.diagnostics.push(`Math Expr error: ${e instanceof Error ? e.message : 'Invalid formula'}`);
+        }
+        break;
+      }
       case 'SCAN_DELAY': break;
       default: throw new Error(`Simulation is not implemented for ${block.type}.`);
     }
