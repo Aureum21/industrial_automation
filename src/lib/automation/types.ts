@@ -73,11 +73,21 @@ export interface CircuitConnection {
   toPin: string;
 }
 
+export interface HmiWidget {
+  id: string;
+  type: 'switch' | 'button' | 'light' | 'gauge' | 'slider' | 'bar' | 'value';
+  tag: string;
+  x: number;
+  y: number;
+  options?: Record<string, string | number | boolean>;
+}
+
 export interface CircuitDocument {
   version: 1;
   name: string;
   blocks: CircuitBlock[];
   connections: CircuitConnection[];
+  widgets?: HmiWidget[];
 }
 
 export interface RuntimeBlock extends CircuitBlock {

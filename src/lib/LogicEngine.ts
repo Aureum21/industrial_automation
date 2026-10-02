@@ -171,7 +171,7 @@ export class LogicEngine {
     this.refresh();
   }
 
-  toDocument(name = 'Untitled circuit'): CircuitDocument {
+  toDocument(name = 'Untitled circuit', widgets?: any[]): CircuitDocument {
     return {
       version: 1, name,
       blocks: [...this.blocks.values()].map(block => ({
@@ -182,6 +182,7 @@ export class LogicEngine {
         params: { ...block.params },
       })),
       connections: this.connections.map(connection => ({ ...connection })),
+      ...(widgets ? { widgets } : {})
     };
   }
 

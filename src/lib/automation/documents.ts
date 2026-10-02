@@ -1,6 +1,6 @@
 import { LogicEngine } from '../LogicEngine.ts';
 import { getBlockDefinition } from './catalog.ts';
-import type { BlockType, CircuitBlock, CircuitDocument, ParameterValue } from './types.ts';
+import type { BlockType, CircuitBlock, CircuitDocument, ParameterValue, HmiWidget } from './types.ts';
 
 export const STORAGE_KEY = 'fieldnotes.circuit.v1';
 
@@ -58,7 +58,18 @@ export function parseCircuitDocument(text: string): CircuitDocument {
     return { id: item.id as string, fromBlockId: item.fromBlockId as string, fromPin: item.fromPin as string, toBlockId: item.toBlockId as string, toPin: item.toPin as string };
   });
   if (new Set(blocks.map(b => b.id)).size !== blocks.length || new Set(connections.map(c => c.id)).size !== connections.length) throw new Error('Circuit IDs must be unique.');
-  const document: CircuitDocument = { version: 1, name: raw.name.slice(0, 120), blocks, connections };
+  
+  let widgets;
+  if (Array.isArray(raw.widgets)) {
+    widgets = raw.widgets.map((item: unknown) => {
+      if (!record(item) || typeof item.id !== 'string' || typeof item.type !== 'string' || typeof item.tag !== 'string' || typeof item.x !== 'number' || typeof item.y !== 'number') {
+        throw new Error('A SCADA widget is missing required fields.');
+      }
+      return { id: item.id, type: item.type, tag: item.tag, x: item.x, y: item.y, options: record(item.options) ? item.options : undefined } as unknown as HmiWidget;
+    });
+  }
+
+  const document: CircuitDocument = { version: 1, name: raw.name.slice(0, 120), blocks, connections, widgets };
   const verifier = new LogicEngine();
   verifier.load(document);
   return document;

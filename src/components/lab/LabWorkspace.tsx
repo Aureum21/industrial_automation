@@ -9,10 +9,10 @@ import { createBlock, parseCircuitDocument, STORAGE_KEY } from '@/lib/automation
 import { parseCircuitDSL, stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { applyLayout } from '@/lib/automation/layout';
 import { EXAMPLES, getExample } from '@/lib/automation/examples';
-import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal } from '@/lib/automation/types';
+import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal, HmiWidget } from '@/lib/automation/types';
 import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
-import HmiCanvas, { type HmiWidget } from './HmiCanvas';
+import HmiCanvas from './HmiCanvas';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -67,6 +67,7 @@ function Workspace() {
       setRunning(false);
       setNodes(document.blocks.map(makeNode));
       setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
+      setWidgets((document.widgets as HmiWidget[]) || []);
       setName(document.name);
       setDirty(false);
       setTimeMs(0);
@@ -149,12 +150,12 @@ function Workspace() {
   };
 
   const save = () => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(engine.toDocument(name))); setDirty(false); setNotice('Circuit saved in this browser. Export a file to keep a portable copy.'); }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(engine.toDocument(name, widgets))); setDirty(false); setNotice('Circuit saved in this browser. Export a file to keep a portable copy.'); }
     catch { setNotice('Browser storage is unavailable. Use Export to save a circuit file.'); }
   };
 
   const exportFile = () => {
-    const blob = new Blob([JSON.stringify(engine.toDocument(name), null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(engine.toDocument(name, widgets), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob), anchor = document.createElement('a');
     anchor.href = url; anchor.download = `${name.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'circuit'}.json`; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -168,6 +169,7 @@ function Workspace() {
     if (mode === 'code') {
       try {
         const doc = parseCircuitDSL(dslCode, BLOCK_CATALOG);
+        doc.widgets = widgets; // Preserve widgets since DSL doesn't store them
         applyLayout(doc);
         load(doc, 'Parsed DSL and applied layout.');
       } catch (error) {
