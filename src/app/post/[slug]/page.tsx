@@ -1,7 +1,10 @@
 'use client';
+import { useState } from 'react';
 import LabWorkspace from '@/components/lab/LabWorkspace';
 
 export default function PostPage() {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   return (
     <main className="bg-white min-h-screen text-gray-900 pb-32">
       <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-16">
@@ -36,12 +39,26 @@ export default function PostPage() {
         </div>
 
         {/* Embedded Interactive Simulation */}
-        <div className="my-16 -mx-5 sm:-mx-12 rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+        <div className={isFullscreen 
+          ? "fixed inset-0 z-[100] flex flex-col bg-white" 
+          : "my-16 -mx-5 sm:-mx-12 rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col"
+        }>
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center shrink-0">
              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Interactive Simulation</span>
-             <span className="text-xs text-gray-400">Powered by AutomationHub</span>
+             <div className="flex items-center gap-3">
+               <span className="text-xs text-gray-400 hidden sm:inline">Powered by AutomationHub</span>
+               <button onClick={() => setIsFullscreen(!isFullscreen)} className="text-gray-400 hover:text-gray-700 transition" title={isFullscreen ? 'Minimize' : 'Maximize'}>
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   {isFullscreen ? (
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
+                   ) : (
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
+                   )}
+                 </svg>
+               </button>
+             </div>
           </div>
-          <div className="flex-grow bg-[#0b1118]">
+          <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
             <LabWorkspace />
           </div>
         </div>

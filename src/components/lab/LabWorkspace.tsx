@@ -29,7 +29,6 @@ function Workspace() {
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [mode, setMode] = useState<'visual' | 'code'>('visual');
   const [dslCode, setDslCode] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
@@ -179,7 +178,7 @@ function Workspace() {
     }
   };
 
-  return <main id="main-content" className={`lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 ${isFullscreen ? 'fixed inset-0 z-[100] h-screen w-screen' : 'h-full w-full relative'}`}>
+  return <main id="main-content" className="lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 h-full w-full relative">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
@@ -195,15 +194,6 @@ function Workspace() {
       <div className="flex items-center gap-2">
         <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
         <button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button>
-        <button className="lab-button px-2" onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? 'Minimize' : 'Maximize'}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isFullscreen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
-            )}
-          </svg>
-        </button>
       </div>
     </div>
     <div className="relative flex min-h-0 flex-1">

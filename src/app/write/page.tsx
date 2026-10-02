@@ -11,6 +11,7 @@ type EditorBlock = {
 
 export default function WritePage() {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [fullscreenBlockId, setFullscreenBlockId] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<EditorBlock[]>([
     { id: '1', type: 'text', content: '' }
   ]);
@@ -75,14 +76,28 @@ export default function WritePage() {
                     }}
                   />
                 ) : (
-                  <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col w-[calc(100vw-40px)] sm:w-full -ml-8 sm:ml-0 max-w-[1000px]">
-                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center z-10">
+                  <div className={fullscreenBlockId === block.id 
+                    ? "fixed inset-0 z-[100] flex flex-col bg-white" 
+                    : "relative rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col w-[calc(100vw-40px)] sm:w-full -ml-8 sm:ml-0 max-w-[1000px]"
+                  }>
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center z-10 shrink-0">
                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Interactive Simulation</span>
-                       <button onClick={() => removeBlock(block.id)} className="text-red-500 hover:text-red-700 transition">
-                         <Trash2 size={16} />
-                       </button>
+                       <div className="flex items-center gap-3">
+                         <button onClick={() => setFullscreenBlockId(fullscreenBlockId === block.id ? null : block.id)} className="text-gray-400 hover:text-gray-700 transition" title={fullscreenBlockId === block.id ? 'Minimize' : 'Maximize'}>
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             {fullscreenBlockId === block.id ? (
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
+                             ) : (
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
+                             )}
+                           </svg>
+                         </button>
+                         <button onClick={() => removeBlock(block.id)} className="text-red-500 hover:text-red-700 transition" title="Delete block">
+                           <Trash2 size={16} />
+                         </button>
+                       </div>
                     </div>
-                    <div className="flex-grow bg-[#0b1118] relative w-full h-full">
+                    <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
                       <LabWorkspace />
                     </div>
                   </div>
