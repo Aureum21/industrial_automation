@@ -1,5 +1,4 @@
 'use client';
-import Link from 'next/link';
 import LabWorkspace from '@/components/lab/LabWorkspace';
 
 export default function PostPage() {
@@ -29,7 +28,7 @@ export default function PostPage() {
             When designing a control system for a water treatment facility, one of the most fundamental concepts to master is interlocking logic. We need to ensure that the primary pump cannot start unless the intake valve is fully open, and we need a system to gracefully shut down the pump if the tank level exceeds the high-level limit.
           </p>
           <p>
-            In traditional PLCs, this is often handled with a mix of latches and edge triggers. Let's look at a live interactive example.
+            In traditional PLCs, this is often handled with a mix of latches and edge triggers. Let&apos;s look at a live interactive example.
           </p>
           <p>
             I have embedded the simulation below. Try toggling the <strong>Intake Valve</strong> (Input) and then press the <strong>Start Button</strong> to see how the RS Latch holds the state of the motor.
@@ -49,7 +48,7 @@ export default function PostPage() {
 
         <div className="prose prose-lg prose-gray max-w-none font-serif text-xl leading-relaxed text-gray-800">
           <p>
-            As you can see, once the latch is set, releasing the start button doesn't stop the motor. The only way to stop the process is by triggering the Reset pin, which in our case is wired to the High-Level Sensor or the emergency stop.
+            As you can see, once the latch is set, releasing the start button doesn&apos;t stop the motor. The only way to stop the process is by triggering the Reset pin, which in our case is wired to the High-Level Sensor or the emergency stop.
           </p>
           <p>
             This fundamental pattern—using an RS Latch combined with AND gates for safety interlocks—forms the backbone of almost every industrial automation sequence.

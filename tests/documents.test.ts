@@ -101,7 +101,7 @@ test('select parameters reject choices outside the declared operations', () => {
 test('saved input values must match the declared signal kind', () => {
   assert.throws(() => parse(documentWith([{ ...makeBlock('INPUT'), value: 12 }])), /digital value/);
   assert.throws(() => parse(documentWith([{ ...makeBlock('ANALOG_INPUT'), value: true }])), /analog value/);
-  assert.throws(() => parse(documentWith([{ ...makeBlock('INPUT'), value: 'true' }])), /Input values/);
+  assert.throws(() => parse(documentWith([{ ...makeBlock('INPUT'), value: 'true' }])), /digital value/);
   const source = JSON.stringify(documentWith([{ ...makeBlock('ANALOG_INPUT'), value: 123 }]));
   assert.throws(() => parseCircuitDocument(source.replace('"value":123', '"value":1e400')), /finite numbers/);
 });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BLOCK_CATALOG, getBlockDefinition } from './automation/catalog.ts';
 import type {
   BlockDefinition, CircuitBlock, CircuitConnection, CircuitDocument,

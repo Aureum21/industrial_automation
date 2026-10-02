@@ -51,6 +51,7 @@ Numeric and tag fields apply when focus leaves the field or Enter is pressed. Ti
 | `src/lib/automation/catalog.ts` | Complete inventory and component availability |
 | `src/lib/LogicEngine.ts` | React-independent deterministic simulation and graph validation |
 | `src/lib/automation/documents.ts` | Version 1 parser, bounds and validation, default block factory |
+| `src/lib/automation/dsl.ts` | Catalog-validated circuit DSL parser and deterministic formatter |
 | `src/lib/automation/examples.ts` | Fresh, editable starter circuit factories |
 | `src/lib/automation/testing.ts` | Isolated scenario execution with detailed assertion results |
 | `src/components/lab/` | Canvas lifecycle and generic catalog-driven node rendering |
@@ -58,6 +59,8 @@ Numeric and tag fields apply when focus leaves the field or Enter is pressed. Ti
 | `tests/` | Behavioral regression coverage |
 
 The engine owns circuit/runtime state; React Flow mirrors it for editing and display. All deletion and connection actions update both. Saved files deliberately exclude callbacks, UI selection, and runtime memory. Imports validate in an isolated engine before replacing the live document.
+
+See [the circuit DSL guide](docs/CIRCUIT_DSL.md) for text-based circuit authoring and conversion with `parseCircuitDSL` and `stringifyCircuitDSL`.
 
 ## Scenario testing API
 

@@ -17,8 +17,8 @@ export default function WritePage() {
 
   const addSimulationBlock = (index: number) => {
     const newBlocks = [...blocks];
-    newBlocks.splice(index + 1, 0, { id: Math.random().toString(), type: 'simulation' });
-    newBlocks.splice(index + 2, 0, { id: Math.random().toString(), type: 'text', content: '' });
+    newBlocks.splice(index + 1, 0, { id: crypto.randomUUID(), type: 'simulation' });
+    newBlocks.splice(index + 2, 0, { id: crypto.randomUUID(), type: 'text', content: '' });
     setBlocks(newBlocks);
   };
 

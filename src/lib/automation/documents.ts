@@ -7,11 +7,17 @@ export const STORAGE_KEY = 'fieldnotes.circuit.v1';
 export function createBlock(type: BlockType, id: string, position: CircuitBlock['position']): CircuitBlock {
   const definition = getBlockDefinition(type);
   if (!definition || definition.status !== 'ready') throw new Error('This component is scheduled for a later phase.');
-  return {
+  
+  const block: CircuitBlock = {
     id, type, position,
     params: Object.fromEntries(definition.parameters.map(p => [p.key, p.defaultValue])),
-    value: definition.outputs[0]?.kind === 'analog' ? 0 : false,
   };
+  
+  if (definition.source || type === 'INPUT' || type === 'ANALOG_INPUT') {
+    block.value = definition.outputs[0]?.kind === 'text' ? '' : definition.outputs[0]?.kind === 'analog' ? 0 : false;
+  }
+  
+  return block;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -35,7 +41,7 @@ export function parseCircuitDocument(text: string): CircuitDocument {
     if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) throw new Error('Block positions must be finite numbers.');
     if (item.tag !== undefined && typeof item.tag !== 'string') throw new Error('Tags must be text.');
     if (item.label !== undefined && typeof item.label !== 'string') throw new Error('Labels must be text.');
-    if (item.value !== undefined && typeof item.value !== 'boolean' && (typeof item.value !== 'number' || !Number.isFinite(item.value))) throw new Error('Input values must be booleans or finite numbers.');
+    if (item.value !== undefined && typeof item.value !== 'boolean' && typeof item.value !== 'string' && (typeof item.value !== 'number' || !Number.isFinite(item.value))) throw new Error('Input values must be booleans, strings, or finite numbers.');
     const params: Record<string, ParameterValue> = {};
     for (const p of definition.parameters) {
       const value = item.params[p.key] === undefined ? p.defaultValue : item.params[p.key];
@@ -45,7 +51,7 @@ export function parseCircuitDocument(text: string): CircuitDocument {
       if (p.type === 'boolean' && typeof value !== 'boolean') throw new Error(`Invalid ${p.label}.`);
       params[p.key] = value as ParameterValue;
     }
-    return { id: item.id, type: definition.type, position: { x, y }, params, tag: item.tag as string | undefined, label: item.label as string | undefined, value: item.value as boolean | number | undefined };
+    return { id: item.id, type: definition.type, position: { x, y }, params, tag: item.tag as string | undefined, label: item.label as string | undefined, value: item.value as boolean | number | string | undefined };
   });
   const connections = raw.connections.map((item: unknown) => {
     if (!record(item) || !['id', 'fromBlockId', 'fromPin', 'toBlockId', 'toPin'].every(key => typeof item[key] === 'string' && (item[key] as string).length > 0)) throw new Error('A wire has invalid endpoints.');
