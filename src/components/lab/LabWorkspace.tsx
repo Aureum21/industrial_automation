@@ -12,6 +12,7 @@ import { EXAMPLES, getExample } from '@/lib/automation/examples';
 import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal } from '@/lib/automation/types';
 import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
+import HmiCanvas, { type HmiWidget } from './HmiCanvas';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -27,8 +28,9 @@ function Workspace() {
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(true);
-  const [mode, setMode] = useState<'visual' | 'code'>('visual');
+  const [mode, setMode] = useState<'visual' | 'code' | 'hmi'>('visual');
   const [dslCode, setDslCode] = useState('');
+  const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
@@ -161,28 +163,34 @@ function Workspace() {
 
   const selectedCount = nodes.filter(node => node.selected).length + edges.filter(edge => edge.selected).length;
 
-  const toggleMode = () => {
-    if (mode === 'visual') {
-      const doc = engine.toDocument(name);
-      setDslCode(stringifyCircuitDSL(doc));
-      setMode('code');
-    } else {
+  const changeMode = (newMode: 'visual' | 'code' | 'hmi') => {
+    if (mode === newMode) return;
+    if (mode === 'code') {
       try {
         const doc = parseCircuitDSL(dslCode, BLOCK_CATALOG);
         applyLayout(doc);
         load(doc, 'Parsed DSL and applied layout.');
-        setMode('visual');
       } catch (error) {
         setNotice(error instanceof Error ? error.message : 'Invalid DSL syntax.');
+        return;
       }
     }
+    if (newMode === 'code') {
+      const doc = engine.toDocument(name);
+      setDslCode(stringifyCircuitDSL(doc));
+    }
+    setMode(newMode);
   };
 
   return <main id="main-content" className="lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 h-full w-full relative">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
-        <button className={`lab-button ${mode === 'code' ? 'primary' : ''}`} onClick={toggleMode}>{mode === 'visual' ? 'Code Editor { }' : 'Visual Editor'}</button>
+        <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 mr-2">
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual</button>
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'hmi' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'code' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
+        </div>
         <button className="lab-button" onClick={save}>Save</button>
         <button className="lab-button" onClick={exportFile}>Export</button>
         <button className="lab-button" onClick={() => fileRef.current?.click()}>Import</button>
@@ -206,6 +214,8 @@ function Workspace() {
           })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }}>
             <Background color="#e5e7eb" gap={24} size={1} /><Controls /><MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
+        ) : mode === 'hmi' ? (
+          <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} />
         ) : (
           <textarea
             value={dslCode}
