@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import type { LogicEngine } from '@/lib/LogicEngine';
 
 interface OscilloscopeProps {
@@ -13,15 +13,14 @@ export default function Oscilloscope({ engine, onScrub, scrubTime }: Oscilloscop
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Find all tagged blocks to trace
-  const traces = useMemo(() => {
-    const tagged = Array.from(engine.blocks.values()).filter(b => b.tag);
-    return tagged.map(b => ({
+  const traces = Array.from(engine.blocks.values())
+    .filter(b => b.tag)
+    .map(b => ({
       id: b.id,
       tag: b.tag!,
       color: b.type.includes('ANALOG') ? '#3b82f6' : '#16a34a',
       isAnalog: b.type.includes('ANALOG') || typeof (b.outputs.Q ?? b.outputs.CV ?? b.outputs.RPM) === 'number'
     }));
-  }, [engine.blocks]);
 
   const history = engine.history;
   const latestTime = history.length > 0 ? history[history.length - 1].timeMs : 0;
