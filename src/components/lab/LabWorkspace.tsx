@@ -29,6 +29,7 @@ function Workspace() {
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [mode, setMode] = useState<'visual' | 'code'>('visual');
   const [dslCode, setDslCode] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
@@ -178,10 +179,14 @@ function Workspace() {
     }
   };
 
-  return <main id="main-content" className="lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 h-full w-full">
+  return <main id="main-content" className={`lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 ${isFullscreen ? 'fixed inset-0 z-[100] h-screen w-screen' : 'h-full w-full relative'}`}>
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
+        <button className="lab-button" onClick={() => setIsFullscreen(!isFullscreen)}>
+          <svg className="w-4 h-4 mr-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isFullscreen ? "M6 18L18 6M6 6l12 12" : "M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"} /></svg>
+          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        </button>
         <button className={`lab-button ${mode === 'code' ? 'primary' : ''}`} onClick={toggleMode}>{mode === 'visual' ? 'Code Editor { }' : 'Visual Editor'}</button>
         <button className="lab-button" onClick={save}>Save</button>
         <button className="lab-button" onClick={exportFile}>Export</button>
@@ -195,7 +200,7 @@ function Workspace() {
     </div>
     <div className="relative flex min-h-0 flex-1">
       {libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
-      <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white">
+      <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
         {mode === 'visual' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
@@ -211,7 +216,7 @@ function Workspace() {
             className="flex-1 w-full h-full p-6 font-mono text-sm leading-relaxed text-gray-800 bg-gray-50 border-none outline-none resize-none focus:ring-2 focus:ring-inset focus:ring-green-500"
           />
         )}
-        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
+        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
       </div>
     </div>
