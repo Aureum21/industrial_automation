@@ -91,7 +91,8 @@ function Workspace() {
       load(getExample('start-stop'), 'Starter example loaded. Press Run to explore.');
     }, 0);
     return () => clearTimeout(timer);
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!running) return;

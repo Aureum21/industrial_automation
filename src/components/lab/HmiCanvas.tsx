@@ -16,7 +16,7 @@ export default function HmiCanvas({ widgets, setWidgets, engine, sync, running }
 
   const addWidget = (type: HmiWidget['type']) => {
     const id = crypto.randomUUID();
-    setWidgets([...widgets, { id, type, tag: 'New_Tag', x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 100, options: { label: 'Widget', min: 0, max: 100 } }]);
+    setWidgets([...widgets, { id, type, tag: 'New_Tag', x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 100, options: { min: 0, max: 100 } }]);
     setSelected(id);
   };
 
