@@ -38,6 +38,7 @@ function Workspace() {
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
   const [format, setFormat] = useState<'fbd' | 'ladder'>('fbd');
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
 
@@ -265,7 +266,10 @@ function Workspace() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 mr-2">
           {format === 'ladder' && <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'ladder' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('ladder')}>Ladder (LD)</button>}
-          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => {
+            if (format === 'ladder') setShowConvertDialog(true);
+            else changeMode('visual');
+          }}>Visual (FBD)</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'hmi' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'code' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
         </div>
@@ -278,7 +282,7 @@ function Workspace() {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
       <div className="flex items-center gap-2"><button className="lab-button" onClick={() => setLibraryOpen(value => !value)} aria-expanded={libraryOpen}>Components</button><button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button><button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button><button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button><span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span></div>
       <div className="flex items-center gap-2">
-        <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
+        <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.filter(e => (e.create().format === 'ladder') === (format === 'ladder')).map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
         <button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button>
       </div>
     </div>
@@ -345,6 +349,23 @@ function Workspace() {
           </div>
           <div className="mt-6 flex justify-end">
             <button className="lab-button" onClick={() => setShowNewDialog(false)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )}
+    {showConvertDialog && (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true">
+        <div className="max-w-sm rounded-xl border border-amber-200 bg-white p-6 shadow-xl">
+          <h2 className="text-lg font-semibold mb-2">Convert to FBD?</h2>
+          <p className="text-sm text-gray-500 mb-6">This is a one-way road. Your circuit will be permanently converted to a free-form Function Block Diagram, and you will lose the structured Ladder grid.</p>
+          <div className="flex justify-end gap-2">
+            <button className="lab-button" onClick={() => setShowConvertDialog(false)}>Cancel</button>
+            <button className="lab-button primary" onClick={() => {
+              setShowConvertDialog(false);
+              setFormat('fbd');
+              changeMode('visual');
+              setDirty(true);
+            }}>Convert to FBD</button>
           </div>
         </div>
       </div>
