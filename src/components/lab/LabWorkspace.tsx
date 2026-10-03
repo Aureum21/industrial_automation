@@ -15,6 +15,7 @@ import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
 import Oscilloscope from './oscilloscope/Oscilloscope';
 import LadderEditor from './ladder/LadderEditor';
+import { compileLadderGrid } from '@/lib/automation/ladder';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -80,6 +81,23 @@ function Workspace() {
 
   const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam } }), [engine, onInput, onTag, onParam]);
 
+  const rebuildLadder = useCallback(() => {
+    if (format !== 'ladder') return;
+    const userBlocks = Array.from(engine.blocks.values()).filter(b => !b.id.startsWith('ladder-gen-'));
+    const { generatedNodes, connections } = compileLadderGrid(userBlocks);
+    
+    for (const block of Array.from(engine.blocks.values())) {
+      if (block.id.startsWith('ladder-gen-')) engine.removeBlock(block.id);
+    }
+    engine.connections = [];
+    
+    for (const b of generatedNodes) engine.addBlock(b);
+    for (const c of connections) engine.addConnection(c);
+    
+    setNodes(Array.from(engine.blocks.values()).map(makeNode));
+    setEdges(engine.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
+  }, [format, engine, makeNode]);
+
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
       engine.load(document);
@@ -141,7 +159,13 @@ function Workspace() {
       const canvas = document.querySelector('.react-flow')?.getBoundingClientRect();
       const block = createBlock(type, crypto.randomUUID(), position ?? screenToFlowPosition({ x: (canvas?.left ?? 300) + (canvas?.width ?? 800) / 2 + Math.random() * 60, y: (canvas?.top ?? 160) + (canvas?.height ?? 500) / 2 + Math.random() * 60 }));
       engine.addBlock(block);
-      setNodes(previous => [...previous, makeNode(block)]);
+      
+      if (format === 'ladder') {
+        rebuildLadder();
+      } else {
+        setNodes(previous => [...previous, makeNode(block)]);
+      }
+      
       setNotice(`${getBlockDefinition(type)?.name} added.`);
     });
   };
