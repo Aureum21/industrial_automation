@@ -14,6 +14,7 @@ import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
 import Oscilloscope from './oscilloscope/Oscilloscope';
+import LadderEditor from './ladder/LadderEditor';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -235,14 +236,13 @@ function Workspace() {
       {libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
       <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
         {mode === 'ladder' ? (
-          <div className="flex-1 w-full h-full bg-slate-50 flex items-center justify-center p-8">
-            <div className="max-w-md text-center">
-              <div className="text-4xl mb-4">🪜</div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Ladder Logic Editor (Coming Soon)</h2>
-              <p className="text-gray-500 mb-6">The structured ladder grid is being built. For now, you can switch to the <strong>Visual (FBD)</strong> tab above to view and edit this circuit using function blocks!</p>
-              <button className="lab-button primary" onClick={() => changeMode('visual')}>Switch to FBD</button>
-            </div>
-          </div>
+          <LadderEditor 
+            nodes={nodes} 
+            onDropNode={(type, rung, col) => {
+              const definition = getBlockDefinition(type); 
+              if (definition?.status === 'ready') addBlock(definition.type, { x: col * 150, y: rung * 100 });
+            }} 
+          />
         ) : mode === 'visual' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
