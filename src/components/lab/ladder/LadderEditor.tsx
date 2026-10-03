@@ -4,12 +4,13 @@ import type { CircuitFlowNode } from '../CircuitNode';
 interface LadderEditorProps {
   nodes: CircuitFlowNode[];
   onDropNode: (type: string, rung: number, col: number) => void;
+  onDeleteNode: (id: string) => void;
 }
 
 const COLUMNS = 8;
 const MAX_RUNGS = 20;
 
-function LadderNode({ node }: { node: CircuitFlowNode }) {
+function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () => void }) {
   const type = node.data.blockType;
   const label = node.data.tag || node.data.label;
   const isPowered = node.data.inputValue === true || node.data.outputs?.Q === true; // Highlight if active
@@ -17,22 +18,32 @@ function LadderNode({ node }: { node: CircuitFlowNode }) {
   const borderColor = isPowered ? 'border-green-500' : 'border-gray-800';
   const textColor = isPowered ? 'text-green-600' : 'text-gray-700';
 
+  const DeleteBtn = () => (
+    <button 
+      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      className="absolute -top-2 -right-2 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm cursor-pointer"
+    >
+      ✕
+    </button>
+  );
+
   if (type === 'INPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative">
+      <div className="flex items-center justify-center w-full h-full relative group">
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
           <div className={`w-0.5 h-full ${wireColor}`} />
           <div className={`w-0.5 h-full ${wireColor}`} />
         </div>
         <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+        <DeleteBtn />
       </div>
     );
   }
 
   if (type === 'NC_INPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative">
+      <div className="flex items-center justify-center w-full h-full relative group">
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
           <div className={`w-0.5 h-full ${wireColor}`} />
@@ -40,32 +51,35 @@ function LadderNode({ node }: { node: CircuitFlowNode }) {
           <div className={`w-0.5 h-full ${wireColor}`} />
         </div>
         <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+        <DeleteBtn />
       </div>
     );
   }
 
   if (type === 'OUTPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative">
+      <div className="flex items-center justify-center w-full h-full relative group">
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className={`relative z-10 w-8 h-8 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center`} />
         <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+        <DeleteBtn />
       </div>
     );
   }
 
   // Complex block fallback
   return (
-    <div className="flex items-center justify-center w-full h-full relative px-2">
+    <div className="flex items-center justify-center w-full h-full relative px-2 group">
       <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
       <div className={`relative z-10 bg-white border-2 ${borderColor} rounded p-1 w-full text-center shadow-sm`}>
         <div className={`text-[10px] font-bold truncate ${textColor}`}>{label}</div>
       </div>
+      <DeleteBtn />
     </div>
   );
 }
 
-export default function LadderEditor({ nodes, onDropNode }: LadderEditorProps) {
+export default function LadderEditor({ nodes, onDropNode, onDeleteNode }: LadderEditorProps) {
   // Convert nodes into a lookup grid for easy rendering
   const grid = new Map<string, CircuitFlowNode>();
   for (const node of nodes) {
@@ -125,7 +139,7 @@ export default function LadderEditor({ nodes, onDropNode }: LadderEditorProps) {
                       onDrop={(e) => handleDrop(e, rungIndex, colIndex)}
                     >
                       {node ? (
-                        <LadderNode node={node} />
+                        <LadderNode node={node} onDelete={() => onDeleteNode(node.id)} />
                       ) : (
                         <div className="opacity-0 hover:opacity-100 text-gray-300 text-xl font-light">
                           +

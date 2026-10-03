@@ -198,6 +198,18 @@ function Workspace() {
     setDirty(true); sync(); setNotice('Selection deleted from the circuit.');
   };
 
+  const deleteNode = (id: string) => {
+    engine.removeBlock(id);
+    if (format === 'ladder') {
+      rebuildLadder();
+    } else {
+      setNodes(previous => previous.filter(node => node.id !== id));
+    }
+    setNotice('Block deleted.');
+    setDirty(true);
+    sync();
+  };
+
   const save = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(engine.toDocument(name, widgets))); setDirty(false); setNotice('Circuit saved in this browser. Export a file to keep a portable copy.'); }
     catch { setNotice('Browser storage is unavailable. Use Export to save a circuit file.'); }
@@ -266,6 +278,7 @@ function Workspace() {
               const definition = getBlockDefinition(type); 
               if (definition?.status === 'ready') addBlock(definition.type, { x: col * 150, y: rung * 100 });
             }} 
+            onDeleteNode={deleteNode}
           />
         ) : mode === 'visual' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
