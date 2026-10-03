@@ -9,6 +9,62 @@ interface LadderEditorProps {
 const COLUMNS = 8;
 const MAX_RUNGS = 20;
 
+function LadderNode({ node }: { node: CircuitFlowNode }) {
+  const type = node.data.blockType;
+  const label = node.data.tag || node.data.label;
+  const isPowered = node.data.inputValue === true || node.data.outputs?.Q === true; // Highlight if active
+  const wireColor = isPowered ? 'bg-green-500' : 'bg-gray-800';
+  const borderColor = isPowered ? 'border-green-500' : 'border-gray-800';
+  const textColor = isPowered ? 'text-green-600' : 'text-gray-700';
+
+  if (type === 'INPUT') {
+    return (
+      <div className="flex items-center justify-center w-full h-full relative">
+        <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
+        <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
+          <div className={`w-0.5 h-full ${wireColor}`} />
+          <div className={`w-0.5 h-full ${wireColor}`} />
+        </div>
+        <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+      </div>
+    );
+  }
+
+  if (type === 'NC_INPUT') {
+    return (
+      <div className="flex items-center justify-center w-full h-full relative">
+        <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
+        <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
+          <div className={`w-0.5 h-full ${wireColor}`} />
+          <div className={`absolute left-1/2 top-1/2 w-8 h-0.5 ${wireColor} -translate-x-1/2 -translate-y-1/2 -rotate-45`} />
+          <div className={`w-0.5 h-full ${wireColor}`} />
+        </div>
+        <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+      </div>
+    );
+  }
+
+  if (type === 'OUTPUT') {
+    return (
+      <div className="flex items-center justify-center w-full h-full relative">
+        <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
+        <div className={`relative z-10 w-8 h-8 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center`} />
+        <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
+      </div>
+    );
+  }
+
+  // Complex block fallback
+  return (
+    <div className="flex items-center justify-center w-full h-full relative px-2">
+      <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
+      <div className={`relative z-10 bg-white border-2 ${borderColor} rounded p-1 w-full text-center shadow-sm`}>
+        <div className={`text-[10px] font-bold truncate ${textColor}`}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function LadderEditor({ nodes, onDropNode }: LadderEditorProps) {
   // Convert nodes into a lookup grid for easy rendering
   const grid = new Map<string, CircuitFlowNode>();
@@ -61,17 +117,15 @@ export default function LadderEditor({ nodes, onDropNode }: LadderEditorProps) {
                   return (
                     <div 
                       key={colIndex}
-                      className={`h-16 flex items-center justify-center border-2 border-dashed transition-colors
+                      className={`h-16 flex items-center justify-center transition-colors
                         ${isCoilZone ? 'w-24 ml-auto' : 'w-24'}
-                        ${node ? 'border-transparent' : 'border-transparent group-hover:border-gray-200 hover:bg-gray-50'}`
+                        ${node ? '' : 'border-2 border-dashed border-transparent group-hover:border-gray-200 hover:bg-gray-50'}`
                       }
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, rungIndex, colIndex)}
                     >
                       {node ? (
-                        <div className="bg-white border-2 border-blue-500 rounded p-2 text-xs font-bold text-blue-700 shadow-sm flex flex-col items-center justify-center w-full h-full">
-                          <span className="truncate w-full text-center">{node.data.tag || node.data.label}</span>
-                        </div>
+                        <LadderNode node={node} />
                       ) : (
                         <div className="opacity-0 hover:opacity-100 text-gray-300 text-xl font-light">
                           +
