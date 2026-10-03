@@ -4,6 +4,7 @@ import type { CircuitFlowNode } from '../CircuitNode';
 interface LadderEditorProps {
   nodes: CircuitFlowNode[];
   onDropNode: (type: string, rung: number, col: number) => void;
+  onMoveNode: (id: string, rung: number, col: number) => void;
   onDeleteNode: (id: string) => void;
 }
 
@@ -29,7 +30,7 @@ function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () =>
 
   if (type === 'INPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative group">
+      <div className="flex items-center justify-center w-full h-full relative group cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData('application/fieldnotes-block-id', node.id); e.dataTransfer.effectAllowed = 'move'; }}>
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
           <div className={`w-0.5 h-full ${wireColor}`} />
@@ -43,7 +44,7 @@ function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () =>
 
   if (type === 'NC_INPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative group">
+      <div className="flex items-center justify-center w-full h-full relative group cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData('application/fieldnotes-block-id', node.id); e.dataTransfer.effectAllowed = 'move'; }}>
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
           <div className={`w-0.5 h-full ${wireColor}`} />
@@ -58,7 +59,7 @@ function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () =>
 
   if (type === 'OUTPUT') {
     return (
-      <div className="flex items-center justify-center w-full h-full relative group">
+      <div className="flex items-center justify-center w-full h-full relative group cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData('application/fieldnotes-block-id', node.id); e.dataTransfer.effectAllowed = 'move'; }}>
         <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
         <div className={`relative z-10 w-8 h-8 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center`} />
         <span className={`absolute -top-4 text-[10px] font-bold ${textColor}`}>{label}</span>
@@ -69,7 +70,7 @@ function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () =>
 
   // Complex block fallback
   return (
-    <div className="flex items-center justify-center w-full h-full relative px-2 group">
+    <div className="flex items-center justify-center w-full h-full relative px-2 group cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData('application/fieldnotes-block-id', node.id); e.dataTransfer.effectAllowed = 'move'; }}>
       <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
       <div className={`relative z-10 bg-white border-2 ${borderColor} rounded p-1 w-full text-center shadow-sm`}>
         <div className={`text-[10px] font-bold truncate ${textColor}`}>{label}</div>
@@ -79,7 +80,7 @@ function LadderNode({ node, onDelete }: { node: CircuitFlowNode, onDelete: () =>
   );
 }
 
-export default function LadderEditor({ nodes, onDropNode, onDeleteNode }: LadderEditorProps) {
+export default function LadderEditor({ nodes, onDropNode, onMoveNode, onDeleteNode }: LadderEditorProps) {
   // Convert nodes into a lookup grid for easy rendering
   const grid = new Map<string, CircuitFlowNode>();
   for (const node of nodes) {
@@ -97,8 +98,11 @@ export default function LadderEditor({ nodes, onDropNode, onDeleteNode }: Ladder
   const handleDrop = (e: React.DragEvent, rung: number, col: number) => {
     e.preventDefault();
     const type = e.dataTransfer.getData('application/fieldnotes-block');
+    const id = e.dataTransfer.getData('application/fieldnotes-block-id');
     if (type) {
       onDropNode(type, rung, col);
+    } else if (id) {
+      onMoveNode(id, rung, col);
     }
   };
 

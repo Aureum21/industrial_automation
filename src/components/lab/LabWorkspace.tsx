@@ -210,6 +210,20 @@ function Workspace() {
     sync();
   };
 
+  const moveNode = (id: string, rung: number, col: number) => {
+    const block = engine.blocks.get(id);
+    if (!block) return;
+    block.position = { x: col * 150, y: rung * 100 };
+    if (format === 'ladder') {
+      rebuildLadder();
+    } else {
+      setNodes(previous => previous.map(node => node.id === id ? { ...node, position: block.position } : node));
+    }
+    setNotice('Block moved.');
+    setDirty(true);
+    sync();
+  };
+
   const save = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(engine.toDocument(name, widgets))); setDirty(false); setNotice('Circuit saved in this browser. Export a file to keep a portable copy.'); }
     catch { setNotice('Browser storage is unavailable. Use Export to save a circuit file.'); }
@@ -277,7 +291,8 @@ function Workspace() {
             onDropNode={(type, rung, col) => {
               const definition = getBlockDefinition(type); 
               if (definition?.status === 'ready') addBlock(definition.type, { x: col * 150, y: rung * 100 });
-            }} 
+            }}
+            onMoveNode={moveNode}
             onDeleteNode={deleteNode}
           />
         ) : mode === 'visual' ? (
