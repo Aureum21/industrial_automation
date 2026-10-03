@@ -92,7 +92,11 @@ export default function LadderEditor({ nodes, onDropNode, onMoveNode, onDeleteNo
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+    if (e.dataTransfer.types.includes('application/fieldnotes-block-id')) {
+      e.dataTransfer.dropEffect = 'move';
+    } else {
+      e.dataTransfer.dropEffect = 'copy';
+    }
   };
 
   const handleDrop = (e: React.DragEvent, rung: number, col: number) => {
