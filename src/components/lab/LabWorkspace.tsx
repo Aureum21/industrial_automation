@@ -89,7 +89,7 @@ function Workspace() {
     for (const block of Array.from(engine.blocks.values())) {
       if (block.id.startsWith('ladder-gen-')) engine.removeBlock(block.id);
     }
-    engine.connections = [];
+    engine.clearConnections();
     
     for (const b of generatedNodes) engine.addBlock(b);
     for (const c of connections) engine.addConnection(c);

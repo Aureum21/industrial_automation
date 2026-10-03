@@ -101,6 +101,12 @@ export class LogicEngine {
     this.refresh();
   }
 
+  clearConnections(): void {
+    this.connections = [];
+    this.rebuildGraph();
+    this.refresh();
+  }
+
   setInput(id: string, value: Signal, propagate = true): void {
     const block = this.requireBlock(id);
     if (!readers.has(block.type) && !block.type.includes('CONSTANT') && block.type !== 'FLAG') {
