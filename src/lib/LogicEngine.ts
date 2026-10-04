@@ -332,10 +332,19 @@ export class LogicEngine {
         const writer = block.tag ? this.tagWriters.get(this.tagKey(block)) : undefined;
         let val = writer ? writer.outputs.Q : block.value ?? defaultSignal(definition.outputs[0].kind);
         if (block.type === 'NC_INPUT') val = !val;
+        
+        // In ladder mode, contacts are chained. If pin A is unconnected, A is null.
+        // We assume it's powered if A is unconnected (null !== false).
+        // If it is connected and false, then power is cut off.
+        const powerIn = this.evaluatePin(block, 'A');
+        if (block.type === 'INPUT' || block.type === 'NC_INPUT') {
+          val = (val as boolean) && (powerIn !== false);
+        }
+        
         block.outputs.Q = val;
         break;
       }
-      case 'HIGH': block.outputs.Q = true; break;
+      case 'HIGH': case 'POWER_RAIL': block.outputs.Q = true; break;
       case 'LOW': block.outputs.Q = false; break;
       case 'ANALOG_CONSTANT': block.outputs.Q = parameter('value'); break;
       case 'OUTPUT': case 'FLAG': block.outputs.Q = A; break;

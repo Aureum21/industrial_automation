@@ -14,6 +14,7 @@ export interface CircuitNodeData extends Record<string, unknown> {
   onInput: (id: string, value: Signal) => void;
   onTag: (id: string, tag: string) => void;
   onParam: (id: string, key: string, value: ParameterValue) => void;
+  format?: 'fbd' | 'ladder';
 }
 export type CircuitFlowNode = Node<CircuitNodeData, 'circuit'>;
 export function formatSignal(value: Signal | undefined): string {
@@ -29,6 +30,52 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
   const active = data.outputs.Q === true;
   const analog = definition.outputs[0]?.kind === 'analog';
   const input = data.blockType === 'INPUT' || data.blockType === 'ANALOG_INPUT';
+  
+  if (data.format === 'ladder' && (data.blockType === 'INPUT' || data.blockType === 'NC_INPUT' || data.blockType === 'OUTPUT' || data.blockType === 'POWER_RAIL')) {
+    const type = data.blockType;
+    const label = data.tag || data.label || definition.name;
+    const isPowered = data.outputs?.Q === true;
+    const wireColor = isPowered ? 'bg-green-500' : 'bg-gray-800';
+    const borderColor = isPowered ? 'border-green-500' : 'border-gray-800';
+    const textColor = isPowered ? 'text-green-600' : 'text-gray-700';
+
+    if (type === 'POWER_RAIL') {
+      return (
+        <div className={`flex items-center justify-center relative w-4 h-32 ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`}>
+          <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-600 -translate-x-1/2" />
+          <Handle type="source" id="Q" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 !border-none rounded-none" />
+        </div>
+      );
+    }
+
+    return (
+      <div className={`flex items-center justify-center relative w-16 h-12 ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`}>
+        <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
+        
+        {type === 'OUTPUT' ? (
+          <div className={`relative z-10 w-8 h-8 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center`}>
+             <Handle type="target" id="A" position={Position.Left} className="!w-2 !h-2 !-left-2 !bg-gray-400 !border-none rounded-none" />
+          </div>
+        ) : (
+          <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
+            <div className={`w-0.5 h-full ${wireColor}`} />
+            {type === 'NC_INPUT' && <div className={`absolute left-1/2 top-1/2 w-8 h-0.5 ${wireColor} -translate-x-1/2 -translate-y-1/2 -rotate-45`} />}
+            <div className={`w-0.5 h-full ${wireColor}`} />
+            <Handle type="target" id="A" position={Position.Left} className="!w-2 !h-2 !-left-5 !bg-gray-400 !border-none rounded-none" />
+            <Handle type="source" id="Q" position={Position.Right} className="!w-2 !h-2 !-right-5 !bg-gray-400 !border-none rounded-none" />
+          </div>
+        )}
+        
+        <span className={`absolute -top-4 whitespace-nowrap text-[10px] font-bold ${textColor}`}>{label}</span>
+        
+        {type !== 'OUTPUT' && !data.tag && (
+          <button className="absolute -bottom-6 text-[8px] font-bold uppercase bg-white border border-gray-200 px-1 py-0.5 rounded text-gray-500 shadow-sm" onClick={() => data.onInput(id, !data.inputValue)}>
+            {data.inputValue ? 'Turn OFF' : 'Turn ON'}
+          </button>
+        )}
+      </div>
+    );
+  }
   return <div className={`circuit-node ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}>
     <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5">
       <div className="flex items-center gap-2 min-w-0">

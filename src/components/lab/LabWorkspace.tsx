@@ -14,8 +14,7 @@ import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
 import Oscilloscope from './oscilloscope/Oscilloscope';
-import LadderEditor from './ladder/LadderEditor';
-import { compileLadderGrid } from '@/lib/automation/ladder';
+
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
@@ -80,24 +79,8 @@ function Workspace() {
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
-  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam } }), [engine, onInput, onTag, onParam]);
+  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam, format } }), [engine, onInput, onTag, onParam, format]);
 
-  const rebuildLadder = useCallback(() => {
-    if (format !== 'ladder') return;
-    const userBlocks = Array.from(engine.blocks.values()).filter(b => !b.id.startsWith('ladder-gen-'));
-    const { generatedNodes, connections } = compileLadderGrid(userBlocks);
-    
-    for (const block of Array.from(engine.blocks.values())) {
-      if (block.id.startsWith('ladder-gen-')) engine.removeBlock(block.id);
-    }
-    engine.clearConnections();
-    
-    for (const b of generatedNodes) engine.addBlock(b);
-    for (const c of connections) engine.addConnection(c);
-    
-    setNodes(Array.from(engine.blocks.values()).map(makeNode));
-    setEdges(engine.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
-  }, [format, engine, makeNode]);
 
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
@@ -161,11 +144,7 @@ function Workspace() {
       const block = createBlock(type, crypto.randomUUID(), position ?? screenToFlowPosition({ x: (canvas?.left ?? 300) + (canvas?.width ?? 800) / 2 + Math.random() * 60, y: (canvas?.top ?? 160) + (canvas?.height ?? 500) / 2 + Math.random() * 60 }));
       engine.addBlock(block);
       
-      if (format === 'ladder') {
-        rebuildLadder();
-      } else {
-        setNodes(previous => [...previous, makeNode(block)]);
-      }
+      setNodes(previous => [...previous, makeNode(block)]);
       
       setNotice(`${getBlockDefinition(type)?.name} added.`);
     });
@@ -199,31 +178,7 @@ function Workspace() {
     setDirty(true); sync(); setNotice('Selection deleted from the circuit.');
   };
 
-  const deleteNode = (id: string) => {
-    engine.removeBlock(id);
-    if (format === 'ladder') {
-      rebuildLadder();
-    } else {
-      setNodes(previous => previous.filter(node => node.id !== id));
-    }
-    setNotice('Block deleted.');
-    setDirty(true);
-    sync();
-  };
 
-  const moveNode = (id: string, rung: number, col: number) => {
-    const block = engine.blocks.get(id);
-    if (!block) return;
-    block.position = { x: col * 150, y: rung * 100 };
-    if (format === 'ladder') {
-      rebuildLadder();
-    } else {
-      setNodes(previous => previous.map(node => node.id === id ? { ...node, position: block.position } : node));
-    }
-    setNotice('Block moved.');
-    setDirty(true);
-    sync();
-  };
 
   const save = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(engine.toDocument(name, widgets))); setDirty(false); setNotice('Circuit saved in this browser. Export a file to keep a portable copy.'); }
@@ -289,22 +244,14 @@ function Workspace() {
     <div className="relative flex min-h-0 flex-1">
       {libraryOpen && (mode === 'visual' || mode === 'ladder') && <Sidebar onAdd={addBlock} />}
       <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
-        {mode === 'ladder' ? (
-          <LadderEditor 
-            nodes={nodes} 
-            onDropNode={(type, rung, col) => {
-              const definition = getBlockDefinition(type); 
-              if (definition?.status === 'ready') addBlock(definition.type, { x: col * 150, y: rung * 100 });
-            }}
-            onMoveNode={moveNode}
-            onDeleteNode={deleteNode}
-          />
-        ) : mode === 'visual' ? (
+        {mode === 'visual' || mode === 'ladder' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
             setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
           })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }}>
-            <Background color="#e5e7eb" gap={24} size={1} /><Controls /><MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
+            <Background color="#e5e7eb" gap={24} size={1} variant={mode === 'ladder' ? 'lines' : 'dots'} />
+            <Controls />
+            <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
         ) : mode === 'hmi' ? (
           <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} running={running} />
@@ -316,7 +263,7 @@ function Workspace() {
             className="flex-1 w-full h-full p-6 font-mono text-sm leading-relaxed text-gray-800 bg-gray-50 border-none outline-none resize-none focus:ring-2 focus:ring-inset focus:ring-green-500"
           />
         )}
-        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
+        {(mode === 'visual' || mode === 'ladder') && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
         <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} />
       </div>
