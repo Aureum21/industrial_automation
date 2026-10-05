@@ -81,9 +81,11 @@ export class LogicEngine {
     if (!fromPin) return `Unknown output pin ${connection.fromPin}.`;
     if (!toPin) return `Unknown input pin ${connection.toPin}.`;
     if (fromPin.kind !== toPin.kind) return `Cannot connect a ${fromPin.kind} output to a ${toPin.kind} input.`;
-    if (this.connections.some(edge => edge.toBlockId === connection.toBlockId && edge.toPin === connection.toPin)) return 'This input already has a connection. Remove it before connecting another source.';
-    try { this.buildGraph([...this.connections, connection]); }
-    catch (error) { return error instanceof Error ? error.message : 'Invalid connection.'; }
+    if (target.type !== 'POWER_RAIL' && this.connections.some(edge => edge.toBlockId === connection.toBlockId && edge.toPin === connection.toPin)) return 'This input already has a connection. Remove it before connecting another source.';
+    if (target.type !== 'POWER_RAIL') {
+      try { this.buildGraph([...this.connections, connection]); }
+      catch (error) { return error instanceof Error ? error.message : 'Invalid connection.'; }
+    }
     return null;
   }
 
@@ -265,7 +267,8 @@ export class LogicEngine {
       incoming.set(id, []);
     }
     const depend = (from: string, to: string) => {
-      if (this.requireBlock(to).type === 'SCAN_DELAY') return;
+      const toType = this.requireBlock(to).type;
+      if (toType === 'SCAN_DELAY' || toType === 'POWER_RAIL') return;
       const next = outgoing.get(from)!;
       if (!next.has(to)) {
         next.add(to);

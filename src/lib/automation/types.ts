@@ -53,6 +53,7 @@ export interface BlockDefinition {
   stateful?: boolean;
   source?: boolean;
   tagged?: boolean;
+  hidden?: boolean;
 }
 
 export interface CircuitBlock {

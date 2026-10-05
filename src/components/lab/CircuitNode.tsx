@@ -42,8 +42,10 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
     if (type === 'POWER_RAIL') {
       if (id === 'sys-power-rail') {
         return (
-          <div className="flex items-center justify-center relative w-[3px] h-[5000px] bg-red-600 shadow-[2px_0_4px_rgba(239,68,68,0.3)] pointer-events-none">
-            <Handle type="source" id="Q" position={Position.Right} className="!h-[5000px] !w-4 !-right-2 !top-0 !bg-transparent !border-none !rounded-none pointer-events-auto cursor-crosshair" />
+          <div className="relative w-[6px] h-[5000px]">
+            <div className="absolute inset-0 bg-red-600 rounded-sm shadow-[2px_0_6px_rgba(239,68,68,0.4)]" />
+            <Handle type="source" id="Q" position={Position.Right} className="!h-[5000px] !w-6 !-right-3 !top-0 !bg-transparent !border-none !rounded-none cursor-crosshair" style={{ background: 'transparent' }} />
+            <Handle type="target" id="A" position={Position.Right} className="!h-[5000px] !w-6 !-right-3 !top-0 !bg-transparent !border-none !rounded-none cursor-crosshair" style={{ background: 'transparent' }} />
           </div>
         );
       }
