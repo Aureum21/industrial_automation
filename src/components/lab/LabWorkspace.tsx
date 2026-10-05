@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LogicEngine } from '@/lib/LogicEngine';
 import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
@@ -248,8 +248,9 @@ function Workspace() {
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
             setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
-          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }}>
-            <Background color="#e5e7eb" gap={24} size={1} variant={mode === 'ladder' ? 'lines' : 'dots'} />
+          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }} panOnDrag={mode !== 'ladder'} zoomOnScroll={mode !== 'ladder'} panOnScroll={mode === 'ladder'} zoomOnDoubleClick={mode !== 'ladder'}>
+            <Background color="#e5e7eb" gap={24} size={1} variant={mode === 'ladder' ? BackgroundVariant.Lines : BackgroundVariant.Dots} />
+            {mode === 'ladder' && <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 z-50 shadow-[2px_0_4px_rgba(239,68,68,0.3)]" />}
             <Controls />
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>

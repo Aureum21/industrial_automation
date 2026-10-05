@@ -333,12 +333,12 @@ export class LogicEngine {
         let val = writer ? writer.outputs.Q : block.value ?? defaultSignal(definition.outputs[0].kind);
         if (block.type === 'NC_INPUT') val = !val;
         
-        // In ladder mode, contacts are chained. If pin A is unconnected, A is null.
-        // We assume it's powered if A is unconnected (null !== false).
-        // If it is connected and false, then power is cut off.
-        const powerIn = this.evaluatePin(block, 'A');
+        // In ladder mode, contacts are chained. If pin A is unconnected, we assume it's powered (true).
+        // If it is connected, we use its actual value.
+        const isConnected = this.incoming.get(block.id)?.some(c => c.toPin === 'A');
+        const powerIn = isConnected ? (block.inputs['A'] === true) : true;
         if (block.type === 'INPUT' || block.type === 'NC_INPUT') {
-          val = (val as boolean) && (powerIn !== false);
+          val = (val as boolean) && powerIn;
         }
         
         block.outputs.Q = val;
