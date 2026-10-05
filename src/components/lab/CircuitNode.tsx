@@ -40,6 +40,13 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
     const textColor = isPowered ? 'text-green-600' : 'text-gray-700';
 
     if (type === 'POWER_RAIL') {
+      if (id === 'sys-power-rail') {
+        return (
+          <div className="flex items-center justify-center relative w-[3px] h-[5000px] bg-red-600 shadow-[2px_0_4px_rgba(239,68,68,0.3)] pointer-events-none">
+            <Handle type="source" id="Q" position={Position.Right} className="!h-[5000px] !w-4 !-right-2 !top-0 !bg-transparent !border-none !rounded-none pointer-events-auto cursor-crosshair" />
+          </div>
+        );
+      }
       return (
         <div className={`flex items-center justify-center relative w-4 h-32 ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`}>
           <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-600 -translate-x-1/2" />

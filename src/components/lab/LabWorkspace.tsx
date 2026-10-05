@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ConnectionLineType, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LogicEngine } from '@/lib/LogicEngine';
 import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
@@ -79,20 +79,23 @@ function Workspace() {
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
-  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam, format } }), [engine, onInput, onTag, onParam, format]);
+  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, draggable: block.id !== 'sys-power-rail', selectable: block.id !== 'sys-power-rail', data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam, format } }), [engine, onInput, onTag, onParam, format]);
 
 
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
+      const docFormat = document.format || 'fbd';
+      if (docFormat === 'ladder' && !document.blocks.some(b => b.id === 'sys-power-rail')) {
+        document.blocks.push({ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: -30, y: -2500 }, params: {} });
+      }
       engine.load(document);
       setRunning(false);
-      const docFormat = document.format || 'fbd';
       setFormat(docFormat);
       if (docFormat === 'ladder') setMode('ladder');
       else if (mode === 'ladder') setMode('visual');
       
       setNodes(document.blocks.map(makeNode));
-      setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
+      setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: docFormat === 'ladder' ? 'step' : 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
       setWidgets((document.widgets as HmiWidget[]) || []);
       setName(document.name);
       setDirty(false);
@@ -245,12 +248,11 @@ function Workspace() {
       {libraryOpen && (mode === 'visual' || mode === 'ladder') && <Sidebar onAdd={addBlock} />}
       <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
         {mode === 'visual' || mode === 'ladder' ? (
-          <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
+          <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} connectionLineType={mode === 'ladder' ? ConnectionLineType.Step : ConnectionLineType.Default} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
-            setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
+            setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: mode === 'ladder' ? 'step' : 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
           })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }} panOnDrag={mode !== 'ladder'} zoomOnScroll={mode !== 'ladder'} panOnScroll={mode === 'ladder'} zoomOnDoubleClick={mode !== 'ladder'}>
             <Background color="#e5e7eb" gap={24} size={1} variant={mode === 'ladder' ? BackgroundVariant.Lines : BackgroundVariant.Dots} />
-            {mode === 'ladder' && <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 z-50 shadow-[2px_0_4px_rgba(239,68,68,0.3)]" />}
             <Controls />
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
@@ -280,7 +282,7 @@ function Workspace() {
           <div className="grid grid-cols-2 gap-4">
             <button 
               className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50 transition"
-              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [], connections: [] }, 'New Ladder circuit ready.'); }}
+              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [{ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: -30, y: -2500 }, params: {} }], connections: [] }, 'New Ladder circuit ready.'); }}
             >
               <div className="text-2xl mb-2">🪜</div>
               <div className="font-semibold text-gray-800">Ladder Logic</div>
