@@ -1,41 +1,65 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
 import LabWorkspace from '@/components/lab/LabWorkspace';
+import { BLOG_POSTS } from '@/lib/mockPosts';
+import { parseCircuitDSL } from '@/lib/automation/dsl';
+import { BLOCK_CATALOG } from '@/lib/automation/catalog';
+import { applyLayout } from '@/lib/automation/layout';
+import Link from 'next/link';
 
 export default function PostPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const params = useParams();
+  const slug = params.slug as string;
+  
+  const post = BLOG_POSTS.find(p => p.slug === slug);
+  
+  const document = useMemo(() => {
+    if (!post?.dsl) return undefined;
+    try {
+      const doc = parseCircuitDSL(post.dsl, BLOCK_CATALOG);
+      doc.name = post.title;
+      applyLayout(doc);
+      return doc;
+    } catch (e) {
+      console.error(e);
+      return undefined;
+    }
+  }, [post]);
+
+  if (!post) {
+    return (
+      <main className="bg-white min-h-screen text-gray-900 pb-32 pt-32 flex flex-col items-center">
+        <h1 className="text-4xl font-serif">Post not found</h1>
+        <Link href="/" className="mt-8 text-green-600 hover:underline">Return home</Link>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-white min-h-screen text-gray-900 pb-32">
       <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-16">
         <h1 className="text-4xl sm:text-5xl font-serif font-extrabold tracking-tight mb-8 leading-tight">
-          Building a Water Treatment Simulator
+          {post.title}
         </h1>
         
         <div className="flex items-center gap-4 mb-10 pb-8 border-b border-gray-100">
           <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-500">
-            J
+            {post.author[0]}
           </div>
           <div>
-            <div className="font-medium text-gray-900">John Doe</div>
+            <div className="font-medium text-gray-900">{post.author}</div>
             <div className="text-sm text-gray-500 flex gap-2">
-              <span>12 min read</span>
+              <span>{post.readingTime}</span>
               <span>·</span>
-              <span>Sep 25</span>
+              <span>{post.date}</span>
             </div>
           </div>
         </div>
 
         <div className="prose prose-lg prose-gray max-w-none font-serif text-xl leading-relaxed text-gray-800 mb-12">
-          <p>
-            When designing a control system for a water treatment facility, one of the most fundamental concepts to master is interlocking logic. We need to ensure that the primary pump cannot start unless the intake valve is fully open, and we need a system to gracefully shut down the pump if the tank level exceeds the high-level limit.
-          </p>
-          <p>
-            In traditional PLCs, this is often handled with a mix of latches and edge triggers. Let&apos;s look at a live interactive example.
-          </p>
-          <p>
-            I have embedded the simulation below. Try toggling the <strong>Intake Valve</strong> (Input) and then press the <strong>Start Button</strong> to see how the RS Latch holds the state of the motor.
-          </p>
+          {post.content}
         </div>
 
         {/* Embedded Interactive Simulation */}
@@ -59,18 +83,10 @@ export default function PostPage() {
              </div>
           </div>
           <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
-            <LabWorkspace />
+            <LabWorkspace readOnly document={document} />
           </div>
         </div>
 
-        <div className="prose prose-lg prose-gray max-w-none font-serif text-xl leading-relaxed text-gray-800">
-          <p>
-            As you can see, once the latch is set, releasing the start button doesn&apos;t stop the motor. The only way to stop the process is by triggering the Reset pin, which in our case is wired to the High-Level Sensor or the emergency stop.
-          </p>
-          <p>
-            This fundamental pattern—using an RS Latch combined with AND gates for safety interlocks—forms the backbone of almost every industrial automation sequence.
-          </p>
-        </div>
       </article>
     </main>
   );

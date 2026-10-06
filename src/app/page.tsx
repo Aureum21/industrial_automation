@@ -1,34 +1,7 @@
 import Link from 'next/link';
+import { BLOG_POSTS } from '@/lib/mockPosts';
 
-const articles = [
-  {
-    title: 'The Beauty of PID Tuning',
-    excerpt: 'Understanding Proportional, Integral, and Derivative control loops without the complex math.',
-    author: 'Alex Engineer',
-    date: 'Oct 1',
-    readingTime: '5 min read',
-    tag: 'Control Systems',
-    slug: 'beauty-of-pid'
-  },
-  {
-    title: 'Why Structured Text is replacing FBD in modern factories',
-    excerpt: 'An opinionated dive into the IEC 61131-3 standards and the future of automation programming.',
-    author: 'Sarah Dev',
-    date: 'Sep 28',
-    readingTime: '8 min read',
-    tag: 'Programming',
-    slug: 'st-vs-ladder'
-  },
-  {
-    title: 'Building a Water Treatment Simulator',
-    excerpt: 'Step-by-step tutorial on building a fully functional water treatment logic gate simulator using our built-in tools.',
-    author: 'John Doe',
-    date: 'Sep 25',
-    readingTime: '12 min read',
-    tag: 'Tutorial',
-    slug: 'water-treatment'
-  }
-];
+const articles = BLOG_POSTS;
 
 export default function Home() {
   return (
