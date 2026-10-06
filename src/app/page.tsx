@@ -11,7 +11,7 @@ const articles = [
     slug: 'beauty-of-pid'
   },
   {
-    title: 'Why Structured Text is replacing Ladder Logic in modern factories',
+    title: 'Why Structured Text is replacing FBD in modern factories',
     excerpt: 'An opinionated dive into the IEC 61131-3 standards and the future of automation programming.',
     author: 'Sarah Dev',
     date: 'Sep 28',
@@ -99,7 +99,7 @@ export default function Home() {
           <div className="sticky top-24">
             <h3 className="font-semibold text-gray-900 mb-4">Discover more of what matters to you</h3>
             <div className="flex flex-wrap gap-2 mb-8">
-              {['PLC', 'SCADA', 'Simulink', 'Ladder Logic', 'Automation', 'Robotics', 'HMI'].map(tag => (
+              {['PLC', 'SCADA', 'Simulink', 'FBD', 'Automation', 'Robotics', 'HMI'].map(tag => (
                 <Link key={tag} href={`/tag/${tag}`} className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-full text-sm transition">
                   {tag}
                 </Link>

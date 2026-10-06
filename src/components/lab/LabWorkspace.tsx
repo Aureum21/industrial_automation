@@ -30,16 +30,14 @@ function Workspace() {
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(true);
-  const [mode, setMode] = useState<'visual' | 'ladder' | 'code' | 'hmi'>('visual');
+  const [mode, setMode] = useState<'visual' | 'code' | 'hmi'>('visual');
   const [dslCode, setDslCode] = useState('');
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
-  const [format, setFormat] = useState<'fbd' | 'ladder'>('fbd');
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [showConvertDialog, setShowConvertDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { screenToFlowPosition, fitView, setViewport, getNodes } = useReactFlow<CircuitFlowNode>();
+  const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
 
   const sync = useCallback((scrubTime: number | null = null) => {
     let getOutputs = (id: string) => engine.blocks.get(id)?.outputs;
@@ -79,23 +77,15 @@ function Workspace() {
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
-  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, draggable: block.id !== 'sys-power-rail', selectable: block.id !== 'sys-power-rail', data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam, format } }), [engine, onInput, onTag, onParam, format]);
+  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam } }), [engine, onInput, onTag, onParam]);
 
 
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
-      const docFormat = document.format || 'fbd';
-      if (docFormat === 'ladder' && !document.blocks.some(b => b.id === 'sys-power-rail')) {
-        document.blocks.push({ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: 0, y: -2500 }, params: {} });
-      }
       engine.load(document);
       setRunning(false);
-      setFormat(docFormat);
-      if (docFormat === 'ladder') setMode('ladder');
-      else if (mode === 'ladder') setMode('visual');
-      
       setNodes(document.blocks.map(makeNode));
-      setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: docFormat === 'ladder' ? 'step' : 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
+      setEdges(document.connections.map(wire => ({ id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } })));
       setWidgets((document.widgets as HmiWidget[]) || []);
       setName(document.name);
       setDirty(false);
@@ -104,15 +94,9 @@ function Workspace() {
       setNotice(message);
       setPending(null);
       sync();
-      requestAnimationFrame(() => {
-        if (docFormat === 'ladder') {
-          void setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
-        } else {
-          void fitView({ padding: 0.18, duration: 200, maxZoom: 1 });
-        }
-      });
+      requestAnimationFrame(() => { void fitView({ padding: 0.18, duration: 200, maxZoom: 1 }); });
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
-  }, [engine, makeNode, fitView, setViewport, sync, mode]);
+  }, [engine, makeNode, fitView, sync]);
 
   useEffect(() => {
     // Deferring initialization keeps browser storage out of server rendering.
@@ -204,7 +188,7 @@ function Workspace() {
 
   const selectedCount = nodes.filter(node => node.selected).length + edges.filter(edge => edge.selected).length;
 
-  const changeMode = (newMode: 'visual' | 'ladder' | 'code' | 'hmi') => {
+  const changeMode = (newMode: 'visual' | 'code' | 'hmi') => {
     if (mode === newMode) return;
     if (mode === 'code') {
       try {
@@ -229,11 +213,7 @@ function Workspace() {
       <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 mr-2">
-          {format === 'ladder' && <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'ladder' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('ladder')}>Ladder (LD)</button>}
-          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => {
-            if (format === 'ladder') setShowConvertDialog(true);
-            else changeMode('visual');
-          }}>Visual (FBD)</button>
+          <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'hmi' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
           <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'code' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
         </div>
@@ -246,19 +226,19 @@ function Workspace() {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
       <div className="flex items-center gap-2"><button className="lab-button" onClick={() => setLibraryOpen(value => !value)} aria-expanded={libraryOpen}>Components</button><button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button><button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button><button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button><span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span></div>
       <div className="flex items-center gap-2">
-        <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.filter(e => (e.create().format === 'ladder') === (format === 'ladder')).map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
+        <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>
         <button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button>
       </div>
     </div>
     <div className="relative flex min-h-0 flex-1">
-      {libraryOpen && (mode === 'visual' || mode === 'ladder') && <Sidebar onAdd={addBlock} />}
+      {libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
       <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
-        {mode === 'visual' || mode === 'ladder' ? (
-          <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} connectionLineType={mode === 'ladder' ? ConnectionLineType.Step : ConnectionLineType.Bezier} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
+        {mode === 'visual' ? (
+          <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} connectionLineType={ConnectionLineType.Bezier} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
-            setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: mode === 'ladder' ? 'step' : 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
-          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }} panOnDrag={mode !== 'ladder'} zoomOnScroll={mode !== 'ladder'} panOnScroll={mode === 'ladder'} zoomOnDoubleClick={mode !== 'ladder'}>
-            <Background color="#e5e7eb" gap={24} size={1} variant={mode === 'ladder' ? BackgroundVariant.Lines : BackgroundVariant.Dots} />
+            setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
+          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }}>
+            <Background color="#e5e7eb" gap={24} size={1} variant={BackgroundVariant.Dots} />
             <Controls />
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
@@ -272,7 +252,7 @@ function Workspace() {
             className="flex-1 w-full h-full p-6 font-mono text-sm leading-relaxed text-gray-800 bg-gray-50 border-none outline-none resize-none focus:ring-2 focus:ring-inset focus:ring-green-500"
           />
         )}
-        {(mode === 'visual' || mode === 'ladder') && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
+        {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
         <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} />
       </div>
@@ -284,44 +264,15 @@ function Workspace() {
       <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true">
         <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
           <h2 className="text-lg font-semibold mb-2">Create New Project</h2>
-          <p className="text-sm text-gray-500 mb-6">Choose how you want to build your logic. Ladder logic supports one-way conversion to FBD.</p>
-          <div className="grid grid-cols-2 gap-4">
-            <button 
-              className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50 transition"
-              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [{ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: 0, y: -2500 }, params: {} }], connections: [] }, 'New Ladder circuit ready.'); }}
-            >
-              <div className="text-2xl mb-2">🪜</div>
-              <div className="font-semibold text-gray-800">Ladder Logic</div>
-              <div className="text-xs text-gray-500 mt-2 text-center">Structured grid with contacts and coils</div>
-            </button>
-            <button 
-              className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-green-500 hover:bg-green-50 transition"
-              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'fbd', name: 'Untitled circuit', blocks: [], connections: [] }, 'New FBD circuit ready.'); }}
-            >
-              <div className="text-2xl mb-2">🔌</div>
-              <div className="font-semibold text-gray-800">Function Blocks</div>
-              <div className="text-xs text-gray-500 mt-2 text-center">Free-form graph with logic gates</div>
-            </button>
-          </div>
-          <div className="mt-6 flex justify-end">
+          <p className="text-sm text-gray-500 mb-6">Start a blank workspace to build your logic.</p>
+          <div className="flex justify-end gap-2 mt-6">
             <button className="lab-button" onClick={() => setShowNewDialog(false)}>Cancel</button>
-          </div>
-        </div>
-      </div>
-    )}
-    {showConvertDialog && (
-      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true">
-        <div className="max-w-sm rounded-xl border border-amber-200 bg-white p-6 shadow-xl">
-          <h2 className="text-lg font-semibold mb-2">Convert to FBD?</h2>
-          <p className="text-sm text-gray-500 mb-6">This is a one-way road. Your circuit will be permanently converted to a free-form Function Block Diagram, and you will lose the structured Ladder grid.</p>
-          <div className="flex justify-end gap-2">
-            <button className="lab-button" onClick={() => setShowConvertDialog(false)}>Cancel</button>
-            <button className="lab-button primary" onClick={() => {
-              setShowConvertDialog(false);
-              setFormat('fbd');
-              changeMode('visual');
-              setDirty(true);
-            }}>Convert to FBD</button>
+            <button 
+              className="lab-button primary"
+              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, name: 'Untitled circuit', blocks: [], connections: [] }, 'New circuit ready.'); }}
+            >
+              Create New Circuit
+            </button>
           </div>
         </div>
       </div>

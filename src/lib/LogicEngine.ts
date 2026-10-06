@@ -81,11 +81,9 @@ export class LogicEngine {
     if (!fromPin) return `Unknown output pin ${connection.fromPin}.`;
     if (!toPin) return `Unknown input pin ${connection.toPin}.`;
     if (fromPin.kind !== toPin.kind) return `Cannot connect a ${fromPin.kind} output to a ${toPin.kind} input.`;
-    if (target.type !== 'POWER_RAIL' && this.connections.some(edge => edge.toBlockId === connection.toBlockId && edge.toPin === connection.toPin)) return 'This input already has a connection. Remove it before connecting another source.';
-    if (target.type !== 'POWER_RAIL') {
-      try { this.buildGraph([...this.connections, connection]); }
-      catch (error) { return error instanceof Error ? error.message : 'Invalid connection.'; }
-    }
+    if (this.connections.some(edge => edge.toBlockId === connection.toBlockId && edge.toPin === connection.toPin)) return 'This input already has a connection. Remove it before connecting another source.';
+    try { this.buildGraph([...this.connections, connection]); }
+    catch (error) { return error instanceof Error ? error.message : 'Invalid connection.'; }
     return null;
   }
 
@@ -267,8 +265,7 @@ export class LogicEngine {
       incoming.set(id, []);
     }
     const depend = (from: string, to: string) => {
-      const toType = this.requireBlock(to).type;
-      if (toType === 'SCAN_DELAY' || toType === 'POWER_RAIL') return;
+      if (this.requireBlock(to).type === 'SCAN_DELAY') return;
       const next = outgoing.get(from)!;
       if (!next.has(to)) {
         next.add(to);
@@ -336,18 +333,11 @@ export class LogicEngine {
         let val = writer ? writer.outputs.Q : block.value ?? defaultSignal(definition.outputs[0].kind);
         if (block.type === 'NC_INPUT') val = !val;
         
-        // In ladder mode, contacts are chained. If pin A is unconnected, we assume it's powered (true).
-        // If it is connected, we use its actual value.
-        const isConnected = this.incoming.get(block.id)?.some(c => c.toPin === 'A');
-        const powerIn = isConnected ? (block.inputs['A'] === true) : true;
-        if (block.type === 'INPUT' || block.type === 'NC_INPUT') {
-          val = (val as boolean) && powerIn;
-        }
-        
+
         block.outputs.Q = val;
         break;
       }
-      case 'HIGH': case 'POWER_RAIL': block.outputs.Q = true; break;
+      case 'HIGH': block.outputs.Q = true; break;
       case 'LOW': block.outputs.Q = false; break;
       case 'ANALOG_CONSTANT': block.outputs.Q = parameter('value'); break;
       case 'OUTPUT': case 'FLAG': block.outputs.Q = A; break;

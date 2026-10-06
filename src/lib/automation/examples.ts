@@ -13,21 +13,7 @@ export const EXAMPLES: { id: string; name: string; description: string; create: 
       block('AND', 'interlock', 560, 50, 'Run permitted'), block('OUTPUT', 'motor', 840, 50, 'Motor command'),
     ], connections: [wire('start', 'memory', 'S'), wire('stop', 'memory', 'R'), wire('memory', 'interlock'), wire('permit', 'interlock', 'B'), wire('interlock', 'motor')] }),
   },
-  {
-    id: 'ladder-basic', name: 'Basic Ladder Circuit', description: 'A simple series circuit on a ladder rung.',
-    create: () => ({
-      version: 1, format: 'ladder', name: 'Basic Ladder Circuit', blocks: [
-        block('POWER_RAIL', 'sys-power-rail', 0, -2500, 'System Power Rail'),
-        block('INPUT', 'start', 300, 100, 'Start Button'),
-        block('NC_INPUT', 'stop', 500, 100, 'Stop Button'),
-        block('OUTPUT', 'motor', 800, 100, 'Motor Coil')
-      ], connections: [
-        wire('sys-power-rail', 'start', 'A', 'Q'),
-        wire('start', 'stop', 'A', 'Q'),
-        wire('stop', 'motor', 'A', 'Q')
-      ]
-    }),
-  },
+
   {
     id: 'and', name: 'Two-input AND', description: 'Both switches must be on to energize the output.',
     create: () => ({ version: 1, name: 'Two-input AND', blocks: [block('INPUT', 'a', 0, 0, 'Input A'), block('INPUT', 'b', 0, 220, 'Input B'), block('AND', 'gate', 280, 70, 'Both required'), block('OUTPUT', 'lamp', 560, 70, 'Indicator')], connections: [wire('a', 'gate'), wire('b', 'gate', 'B'), wire('gate', 'lamp')] }),

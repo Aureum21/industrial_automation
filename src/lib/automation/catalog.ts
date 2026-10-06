@@ -6,7 +6,7 @@ export const CATEGORIES = [
 ];
 
 const READY = new Set<BlockType>([
-  'INPUT', 'NC_INPUT', 'POWER_RAIL', 'OUTPUT', 'HIGH', 'LOW', 'FLAG', 'ANALOG_INPUT', 'ANALOG_OUTPUT',
+  'INPUT', 'NC_INPUT', 'OUTPUT', 'HIGH', 'LOW', 'FLAG', 'ANALOG_INPUT', 'ANALOG_OUTPUT',
   'ANALOG_FLAG', 'ANALOG_CONSTANT', 'AND', 'OR', 'NOT', 'XOR', 'NAND', 'NOR',
   'XNOR', 'RS_LATCH', 'PULSE_RELAY', 'R_TRIG', 'F_TRIG', 'TON', 'TOF', 'CLOCK',
   'COUNTER', 'MATH', 'ANALOG_COMPARATOR', 'ANALOG_THRESHOLD', 'ANALOG_AMPLIFIER',
@@ -35,7 +35,7 @@ const text = (key: string, label: string, defaultValue: string): ParameterDefini
 const select = (key: string, label: string, defaultValue: string, choices: [string, string][]): ParameterDefinition =>
   ({ key, label, defaultValue, type: 'select', options: choices.map(([value, optionLabel]) => ({ value, label: optionLabel })) });
 
-type Options = Partial<Pick<BlockDefinition, 'parameters' | 'stateful' | 'source' | 'tagged' | 'hidden'>> & { phase?: 2 | 3 | 4 };
+type Options = Partial<Pick<BlockDefinition, 'parameters' | 'stateful' | 'source' | 'tagged'>> & { phase?: 2 | 3 | 4 };
 
 function block(
   type: BlockType, name: string, shortName: string, category: string,
@@ -55,8 +55,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
     'A Normally Open (NO) interactive switch or a receiver for an output with the same tag.', digital('A'), digital('Q'), { source: true, tagged: true }),
   NC_INPUT: block('NC_INPUT', 'Digital Input (Break / NC)', 'I (NC)', 'Digital I/O',
     'A Normally Closed (NC) break contact. It outputs true when the switch is NOT pressed.', digital('A'), digital('Q'), { source: true, tagged: true }),
-  POWER_RAIL: block('POWER_RAIL', 'Power Rail', 'L+', 'Digital I/O',
-    'Provides constant True signal for ladder diagrams.', digital('A'), digital('Q'), { source: true, hidden: true }),
+
   CURSOR_KEY: block('CURSOR_KEY', 'Cursor key', 'KEY', 'Digital I/O',
     'Planned keyboard direction input for interactive control panels.', [], digital('Q'),
     { source: true, phase: 2, parameters: [select('key', 'Direction', 'up', [['up', 'Up'], ['down', 'Down'], ['left', 'Left'], ['right', 'Right']])] }),
