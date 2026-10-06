@@ -39,7 +39,7 @@ function Workspace() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { screenToFlowPosition, fitView } = useReactFlow<CircuitFlowNode>();
+  const { screenToFlowPosition, fitView, setViewport, getNodes } = useReactFlow<CircuitFlowNode>();
 
   const sync = useCallback((scrubTime: number | null = null) => {
     let getOutputs = (id: string) => engine.blocks.get(id)?.outputs;
@@ -86,7 +86,7 @@ function Workspace() {
     try {
       const docFormat = document.format || 'fbd';
       if (docFormat === 'ladder' && !document.blocks.some(b => b.id === 'sys-power-rail')) {
-        document.blocks.push({ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: -30, y: -2500 }, params: {} });
+        document.blocks.push({ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: 0, y: -2500 }, params: {} });
       }
       engine.load(document);
       setRunning(false);
@@ -104,9 +104,15 @@ function Workspace() {
       setNotice(message);
       setPending(null);
       sync();
-      requestAnimationFrame(() => { void fitView({ padding: 0.18, duration: 200, maxZoom: 1 }); });
+      requestAnimationFrame(() => {
+        if (docFormat === 'ladder') {
+          void setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
+        } else {
+          void fitView({ padding: 0.18, duration: 200, maxZoom: 1 });
+        }
+      });
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
-  }, [engine, makeNode, fitView, sync, mode]);
+  }, [engine, makeNode, fitView, setViewport, sync, mode]);
 
   useEffect(() => {
     // Deferring initialization keeps browser storage out of server rendering.
@@ -282,7 +288,7 @@ function Workspace() {
           <div className="grid grid-cols-2 gap-4">
             <button 
               className="flex flex-col items-center justify-center border border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50 transition"
-              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [{ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: -30, y: -2500 }, params: {} }], connections: [] }, 'New Ladder circuit ready.'); }}
+              onClick={() => { setShowNewDialog(false); requestLoad({ version: 1, format: 'ladder', name: 'Untitled circuit', blocks: [{ id: 'sys-power-rail', type: 'POWER_RAIL', position: { x: 0, y: -2500 }, params: {} }], connections: [] }, 'New Ladder circuit ready.'); }}
             >
               <div className="text-2xl mb-2">🪜</div>
               <div className="font-semibold text-gray-800">Ladder Logic</div>

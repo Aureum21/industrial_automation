@@ -17,7 +17,7 @@ export const EXAMPLES: { id: string; name: string; description: string; create: 
     id: 'ladder-basic', name: 'Basic Ladder Circuit', description: 'A simple series circuit on a ladder rung.',
     create: () => ({
       version: 1, format: 'ladder', name: 'Basic Ladder Circuit', blocks: [
-        block('POWER_RAIL', 'sys-power-rail', -30, -2500, 'System Power Rail'),
+        block('POWER_RAIL', 'sys-power-rail', 0, -2500, 'System Power Rail'),
         block('INPUT', 'start', 300, 100, 'Start Button'),
         block('NC_INPUT', 'stop', 500, 100, 'Stop Button'),
         block('OUTPUT', 'motor', 800, 100, 'Motor Coil')

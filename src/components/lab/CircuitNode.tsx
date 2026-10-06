@@ -35,55 +35,76 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
     const type = data.blockType;
     const label = data.tag || data.label || definition.name;
     const isPowered = data.outputs?.Q === true;
-    const wireColor = isPowered ? 'bg-green-500' : 'bg-gray-800';
-    const borderColor = isPowered ? 'border-green-500' : 'border-gray-800';
-    const textColor = isPowered ? 'text-green-600' : 'text-gray-700';
+    const color = isPowered ? '#16a34a' : '#1f2937';
+    const textCls = isPowered ? 'text-green-600' : 'text-gray-700';
 
+    /* ── POWER RAIL ── */
     if (type === 'POWER_RAIL') {
       if (id === 'sys-power-rail') {
         return (
-          <div className="relative w-[6px] h-[5000px]">
-            <div className="absolute inset-0 bg-red-600 rounded-sm shadow-[2px_0_6px_rgba(239,68,68,0.4)]" />
-            <Handle type="source" id="Q" position={Position.Right} className="!h-[5000px] !w-6 !-right-3 !top-0 !bg-transparent !border-none !rounded-none cursor-crosshair" style={{ background: 'transparent' }} />
-            <Handle type="target" id="A" position={Position.Right} className="!h-[5000px] !w-6 !-right-3 !top-0 !bg-transparent !border-none !rounded-none cursor-crosshair" style={{ background: 'transparent' }} />
+          <div className="relative" style={{ width: 28, height: 5000 }}>
+            {/* Visual red bar */}
+            <div className="absolute top-0 bottom-0" style={{ left: 12, width: 4, background: '#dc2626', boxShadow: '2px 0 8px rgba(220,38,38,0.35)' }} />
+            {/* Target handle – left half of the node: drop wires here FROM components */}
+            <Handle type="target" id="A" position={Position.Left}
+              style={{ position: 'absolute', width: 16, height: 5000, left: -2, top: 0, background: 'transparent', border: 'none', borderRadius: 0, cursor: 'crosshair', transform: 'none' }} />
+            {/* Source handle – right half of the node: click here and drag right to pull a wire out */}
+            <Handle type="source" id="Q" position={Position.Right}
+              style={{ position: 'absolute', width: 16, height: 5000, right: -2, top: 0, background: 'transparent', border: 'none', borderRadius: 0, cursor: 'crosshair', transform: 'none' }} />
           </div>
         );
       }
       return (
-        <div className={`flex items-center justify-center relative w-4 h-32 ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`}>
+        <div className={`relative ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`} style={{ width: 16, height: 120 }}>
           <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-600 -translate-x-1/2" />
-          <Handle type="source" id="Q" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 !border-none rounded-none" />
+          <Handle type="source" id="Q" position={Position.Right} className="!w-3 !h-3 !bg-gray-400 !border-none" />
         </div>
       );
     }
 
-    return (
-      <div className={`flex items-center justify-center relative w-16 h-12 ${selected ? 'ring-2 ring-blue-400 rounded' : ''}`}>
-        <div className={`absolute left-0 right-0 top-1/2 h-0.5 ${wireColor} -translate-y-1/2 z-0`} />
-        
-        {type === 'OUTPUT' ? (
-          <div className={`relative z-10 w-8 h-8 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center`}>
-             <Handle type="target" id="A" position={Position.Left} className="!w-2 !h-2 !-left-2 !bg-gray-400 !border-none rounded-none" />
-          </div>
-        ) : (
-          <div className="relative z-10 w-6 h-8 bg-white flex justify-between px-[1px]">
-            <div className={`w-0.5 h-full ${wireColor}`} />
-            {type === 'NC_INPUT' && <div className={`absolute left-1/2 top-1/2 w-8 h-0.5 ${wireColor} -translate-x-1/2 -translate-y-1/2 -rotate-45`} />}
-            <div className={`w-0.5 h-full ${wireColor}`} />
-            <Handle type="target" id="A" position={Position.Left} className="!w-2 !h-2 !-left-5 !bg-gray-400 !border-none rounded-none" />
-            <Handle type="source" id="Q" position={Position.Right} className="!w-2 !h-2 !-right-5 !bg-gray-400 !border-none rounded-none" />
-          </div>
-        )}
-        
-        <span className={`absolute -top-4 whitespace-nowrap text-[10px] font-bold ${textColor}`}>{label}</span>
-        
-        {type !== 'OUTPUT' && !data.tag && (
-          <button className="absolute -bottom-6 text-[8px] font-bold uppercase bg-white border border-gray-200 px-1 py-0.5 rounded text-gray-500 shadow-sm" onClick={() => data.onInput(id, !data.inputValue)}>
-            {data.inputValue ? 'Turn OFF' : 'Turn ON'}
-          </button>
-        )}
-      </div>
-    );
+    /* ── CONTACT (NO / NC) ── */
+    if (type === 'INPUT' || type === 'NC_INPUT') {
+      return (
+        <div className={`relative ${selected ? 'outline outline-2 outline-blue-400 outline-offset-2 rounded' : ''}`} style={{ width: 80, height: 48 }}>
+          <svg width="80" height="48" viewBox="0 0 80 48" fill="none" className="absolute inset-0">
+            <line x1="0" y1="24" x2="26" y2="24" stroke={color} strokeWidth="2" />
+            <line x1="29" y1="8" x2="29" y2="40" stroke={color} strokeWidth="2.5" />
+            <line x1="51" y1="8" x2="51" y2="40" stroke={color} strokeWidth="2.5" />
+            <line x1="54" y1="24" x2="80" y2="24" stroke={color} strokeWidth="2" />
+            {type === 'NC_INPUT' && <line x1="25" y1="40" x2="55" y2="8" stroke={color} strokeWidth="2" />}
+          </svg>
+          <span className={`absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold ${textCls}`}>{label}</span>
+          <Handle type="target" id="A" position={Position.Left}
+            style={{ width: 10, height: 10, left: -5, top: 19, background: 'transparent', border: 'none', borderRadius: 0, cursor: 'crosshair', transform: 'none' }} />
+          <Handle type="source" id="Q" position={Position.Right}
+            style={{ width: 10, height: 10, right: -5, top: 19, background: 'transparent', border: 'none', borderRadius: 0, cursor: 'crosshair', transform: 'none' }} />
+          {!data.tag && (
+            <button
+              className="nodrag absolute -bottom-7 left-1/2 -translate-x-1/2 text-[8px] font-bold uppercase bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm hover:border-green-400"
+              style={{ color: data.inputValue ? '#16a34a' : '#6b7280' }}
+              onClick={() => data.onInput(id, !data.inputValue)}
+            >{data.inputValue ? 'ON' : 'OFF'}</button>
+          )}
+        </div>
+      );
+    }
+
+    /* ── COIL (OUTPUT) ── */
+    if (type === 'OUTPUT') {
+      return (
+        <div className={`relative ${selected ? 'outline outline-2 outline-blue-400 outline-offset-2 rounded' : ''}`} style={{ width: 60, height: 48 }}>
+          <svg width="60" height="48" viewBox="0 0 60 48" fill="none" className="absolute inset-0">
+            <line x1="0" y1="24" x2="14" y2="24" stroke={color} strokeWidth="2" />
+            <path d="M 20 8 C 10 8, 10 40, 20 40" fill="none" stroke={color} strokeWidth="2.5" />
+            <path d="M 40 8 C 50 8, 50 40, 40 40" fill="none" stroke={color} strokeWidth="2.5" />
+          </svg>
+          <span className={`absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold ${textCls}`}>{label}</span>
+          <Handle type="target" id="A" position={Position.Left}
+            style={{ width: 10, height: 10, left: -5, top: 19, background: 'transparent', border: 'none', borderRadius: 0, cursor: 'crosshair', transform: 'none' }} />
+          {/* No source handle — the coil is the end of the rung */}
+        </div>
+      );
+    }
   }
   return <div className={`circuit-node ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}>
     <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5">
