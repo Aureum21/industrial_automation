@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { BLOG_POSTS } from '@/lib/mockPosts';
 import Image from 'next/image';
@@ -15,6 +15,13 @@ export default function Home() {
   const [doorState, setDoorState] = useState<DoorState>('open');
   const [isMoving, setIsMoving] = useState(false);
   const [targetFloor, setTargetFloor] = useState<Floor>('G');
+  const [showAllArticles, setShowAllArticles] = useState(false);
+
+  const sortedPosts = useMemo(() => {
+    return [...BLOG_POSTS].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+  }, []);
+
+  const visiblePosts = showAllArticles ? sortedPosts : sortedPosts.slice(0, 6);
 
   const goToFloor = (floor: Floor) => {
     if (floor === activeFloor || doorState !== 'open') return;
@@ -78,32 +85,51 @@ export default function Home() {
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
             
             <div className="max-w-7xl mx-auto py-16 pb-32 relative z-10">
-              <div className="mb-16">
-                <p className="text-green-500 font-mono text-sm tracking-widest mb-2 shadow-green-500/20 drop-shadow-md">[ DIRECTORY ACCESS ]</p>
-                <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white">Schematics Archive</h2>
-                <div className="h-1 w-24 bg-green-500 mt-6 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+              <div className="mb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-800/80 pb-8">
+                <div>
+                  <p className="text-green-500 font-mono text-xs tracking-widest mb-2 shadow-green-500/20 drop-shadow-md">
+                    [ DIRECTORY ACCESS // RANKED BY READERSHIP ]
+                  </p>
+                  <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white">Schematics Archive</h2>
+                  <div className="h-1 w-24 bg-green-500 mt-4 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+                </div>
+                <div className="font-mono text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-800 px-4 py-2 rounded">
+                  <span className="text-emerald-400">● SORT:</span> MOST VIEWED FIRST · <span className="text-zinc-200">{visiblePosts.length}</span> OF <span className="text-zinc-200">{sortedPosts.length}</span> SCHEMATICS
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {BLOG_POSTS.map((article, i) => (
-                  <Link key={article.slug} href={`/post/${article.slug}`} className="group relative block bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 p-6 hover:bg-zinc-800/60 transition-all duration-300 overflow-hidden hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(34,197,94,0.15)]">
+                {visiblePosts.map((article, i) => (
+                  <Link key={article.slug} href={`/post/${article.slug}`} className="group relative block bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 p-6 hover:bg-zinc-800/60 transition-all duration-300 overflow-hidden hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(34,197,94,0.15)] flex flex-col justify-between">
                     
                     {/* Hover Glow Effect */}
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 group-hover:bg-green-500 transition-colors shadow-[0_0_10px_rgba(34,197,94,0)] group-hover:shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                     
-                    <div className="flex justify-between items-start mb-6">
-                      <span className="font-mono text-[10px] text-zinc-500 group-hover:text-green-400 transition-colors">
-                        SYS.DOC.{String(i + 1).padStart(3, '0')}
-                      </span>
-                      <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider">
-                        {article.tag}
-                      </span>
-                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-6 gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] text-zinc-500 group-hover:text-green-400 transition-colors">
+                            SYS.DOC.{String(i + 1).padStart(3, '0')}
+                          </span>
+                          <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/60">
+                            #{i + 1}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-500/20 px-2 py-0.5 rounded tracking-wider font-semibold">
+                            ⚡ {article.views.toLocaleString()} VIEWS
+                          </span>
+                          <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider">
+                            {article.tag}
+                          </span>
+                        </div>
+                      </div>
 
-                    <h3 className="text-2xl font-bold mb-3 text-zinc-100 group-hover:text-white transition-colors">{article.title}</h3>
-                    <p className="text-zinc-400 text-sm mb-8 line-clamp-3 group-hover:text-zinc-300 transition-colors">{article.excerpt}</p>
+                      <h3 className="text-2xl font-bold mb-3 text-zinc-100 group-hover:text-white transition-colors leading-tight">{article.title}</h3>
+                      <p className="text-zinc-400 text-sm mb-8 line-clamp-3 group-hover:text-zinc-300 transition-colors">{article.excerpt}</p>
+                    </div>
                     
-                    <div className="mt-auto flex items-center justify-between font-mono text-xs text-zinc-500">
+                    <div className="pt-4 border-t border-zinc-800/60 flex items-center justify-between font-mono text-xs text-zinc-500">
                       <div className="flex flex-col gap-1">
                         <span><span className="text-zinc-600">&gt; AUTH:</span> {article.author}</span>
                         <span><span className="text-zinc-600">&gt; DATE:</span> {article.date}</span>
@@ -116,6 +142,27 @@ export default function Home() {
                   </Link>
                 ))}
               </div>
+
+              {sortedPosts.length > 6 && (
+                <div className="mt-14 flex justify-center">
+                  <button
+                    onClick={() => setShowAllArticles(prev => !prev)}
+                    className="group relative inline-flex items-center gap-3 px-8 py-4 bg-zinc-900/90 backdrop-blur-md border border-zinc-700 hover:border-green-500 rounded-sm font-mono text-xs tracking-widest uppercase text-zinc-200 hover:text-white transition-all duration-300 shadow-2xl hover:shadow-[0_0_25px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <span className="text-green-400 font-bold group-hover:scale-125 transition-transform">
+                      {showAllArticles ? '▲' : '▼'}
+                    </span>
+                    <span>
+                      {showAllArticles
+                        ? 'COLLAPSE ARCHIVE'
+                        : `READ MORE (+${sortedPosts.length - 6} SCHEMATICS)`}
+                    </span>
+                    <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded text-[10px] ml-2">
+                      {visiblePosts.length} / {sortedPosts.length}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

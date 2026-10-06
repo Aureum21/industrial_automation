@@ -8,6 +8,7 @@ export interface BlogPost {
   date: string;
   readingTime: string;
   tag: string;
+  views: number;
   content: React.ReactNode;
   dsl: string;
 }
@@ -21,6 +22,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 25',
     readingTime: '12 min read',
     tag: 'Control Systems',
+    views: 18450,
     content: (
       <>
         <p>When designing a control system for a water treatment facility, one of the most fundamental concepts to master is interlocking logic. We need to ensure that the primary pump cannot start unless the intake valve is fully open, and we need a system to gracefully shut down the pump if the tank level exceeds the high-level limit.</p>
@@ -53,6 +55,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Oct 1',
     readingTime: '5 min read',
     tag: 'Control Systems',
+    views: 24190,
     content: (
       <>
         <p>PID loops are the backbone of analog automation. In this example, we control the heating element of an industrial oven. We have an analog setpoint and an analog sensor reading the current temperature.</p>
@@ -93,6 +96,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 28',
     readingTime: '8 min read',
     tag: 'Logic',
+    views: 11340,
     content: (
       <>
         <p>State machines are notoriously tricky in visual block programming, but cascading timers make it easy. We use three TON (Timer On Delay) blocks to represent the duration of the Green, Yellow, and Red lights.</p>
@@ -160,6 +164,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 22',
     readingTime: '6 min read',
     tag: 'Logistics',
+    views: 7620,
     content: (
       <>
         <p>A sorting conveyor requires precise timing. When a sensor detects a defective package, the diverter arm shouldn't swing immediately—it has to wait until the package travels down the belt to the diverter position.</p>
@@ -197,6 +202,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 20',
     readingTime: '7 min read',
     tag: 'Safety',
+    views: 15200,
     content: (
       <>
         <p>Industrial presses often require the operator to press two buttons simultaneously (one for each hand) to ensure their hands are out of the danger zone. To prevent the operator from simply taping one button down, the logic dictates that both buttons must be pressed within 500ms of each other.</p>
@@ -255,6 +261,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 18',
     readingTime: '4 min read',
     tag: 'HVAC',
+    views: 5210,
     content: (
       <>
         <p>An HVAC economizer saves energy by drawing in fresh outside air when the outdoor temperature is cooler than the indoor return air, providing "free cooling."</p>
@@ -298,6 +305,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 15',
     readingTime: '6 min read',
     tag: 'Control Systems',
+    views: 12900,
     content: (
       <>
         <p>If you use a simple comparator to turn on a pump when a tank drops below 50%, the pump will turn on at 49.9% and off at 50.1%, rapidly cycling on and off. This "short-cycling" destroys motors.</p>
@@ -335,6 +343,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 10',
     readingTime: '9 min read',
     tag: 'Maintenance',
+    views: 9870,
     content: (
       <>
         <p>In municipal water stations, two identical pumps are often installed. To ensure equal wear, they alternate cycles: Pump A runs for the first cycle, Pump B for the second, and so on.</p>
@@ -377,6 +386,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 05',
     readingTime: '6 min read',
     tag: 'Safety',
+    views: 6540,
     content: (
       <>
         <p>When an Emergency Stop (E-Stop) is pressed, you cannot always kill power to everything instantly. Some processes require valves to close immediately to starve a reaction, while cooling pumps must run for an additional 10 seconds to prevent overheating.</p>
@@ -410,6 +420,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 02',
     readingTime: '5 min read',
     tag: 'Renewables',
+    views: 3890,
     content: (
       <>
         <p>Solar panel voltage fluctuates rapidly due to passing clouds. If we log raw data directly, the chart becomes noisy and difficult to read.</p>
