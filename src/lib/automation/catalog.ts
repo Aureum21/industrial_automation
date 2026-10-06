@@ -52,9 +52,9 @@ function block(
 /** Complete catalog. Planned entries are discoverable but cannot execute until implemented. */
 export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
   INPUT: block('INPUT', 'Digital Input (Make / NO)', 'I', 'Digital I/O',
-    'A Normally Open (NO) interactive switch or a receiver for an output with the same tag.', digital('A'), digital('Q'), { source: true, tagged: true }),
+    'A Normally Open (NO) interactive switch or a receiver for an output with the same tag.', [], digital('Q'), { source: true, tagged: true }),
   NC_INPUT: block('NC_INPUT', 'Digital Input (Break / NC)', 'I (NC)', 'Digital I/O',
-    'A Normally Closed (NC) break contact. It outputs true when the switch is NOT pressed.', digital('A'), digital('Q'), { source: true, tagged: true }),
+    'A Normally Closed (NC) break contact. It outputs true when the switch is NOT pressed.', [], digital('Q'), { source: true, tagged: true }),
 
   CURSOR_KEY: block('CURSOR_KEY', 'Cursor key', 'KEY', 'Digital I/O',
     'Planned keyboard direction input for interactive control panels.', [], digital('Q'),
