@@ -72,19 +72,46 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Basement 1 (B1) - Blog/Library */}
-          <div className="h-screen w-full bg-white text-gray-900 p-8 overflow-y-auto">
-            <div className="max-w-4xl mx-auto py-12 pb-32">
-              <h2 className="text-4xl font-bold mb-10 border-b pb-4">Library & Articles</h2>
-              <div className="flex flex-col gap-8">
-                {BLOG_POSTS.map(article => (
-                  <Link key={article.slug} href={`/post/${article.slug}`} className="group block border border-gray-100 p-6 rounded-xl hover:shadow-lg transition bg-white relative z-10 cursor-pointer">
-                    <h3 className="text-2xl font-bold mb-2 group-hover:text-green-600">{article.title}</h3>
-                    <p className="text-gray-600 mb-4">{article.excerpt}</p>
-                    <div className="flex gap-4 text-sm text-gray-400">
-                      <span>{article.author}</span>
-                      <span>{article.date}</span>
-                      <span className="bg-gray-100 rounded-full px-3 py-1 text-gray-600 text-[10px] uppercase font-bold">{article.tag}</span>
+          {/* Basement 1 (B1) - Data Archive (Blog) */}
+          <div className="h-screen w-full bg-[#050505] text-gray-200 p-8 overflow-y-auto relative">
+            {/* Subtle animated background grid */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+            
+            <div className="max-w-7xl mx-auto py-16 pb-32 relative z-10">
+              <div className="mb-16">
+                <p className="text-green-500 font-mono text-sm tracking-widest mb-2 shadow-green-500/20 drop-shadow-md">[ DIRECTORY ACCESS ]</p>
+                <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white">Schematics Archive</h2>
+                <div className="h-1 w-24 bg-green-500 mt-6 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {BLOG_POSTS.map((article, i) => (
+                  <Link key={article.slug} href={`/post/${article.slug}`} className="group relative block bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 p-6 hover:bg-zinc-800/60 transition-all duration-300 overflow-hidden hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(34,197,94,0.15)]">
+                    
+                    {/* Hover Glow Effect */}
+                    <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 group-hover:bg-green-500 transition-colors shadow-[0_0_10px_rgba(34,197,94,0)] group-hover:shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                    
+                    <div className="flex justify-between items-start mb-6">
+                      <span className="font-mono text-[10px] text-zinc-500 group-hover:text-green-400 transition-colors">
+                        SYS.DOC.{String(i + 1).padStart(3, '0')}
+                      </span>
+                      <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider">
+                        {article.tag}
+                      </span>
+                    </div>
+
+                    <h3 className="text-2xl font-bold mb-3 text-zinc-100 group-hover:text-white transition-colors">{article.title}</h3>
+                    <p className="text-zinc-400 text-sm mb-8 line-clamp-3 group-hover:text-zinc-300 transition-colors">{article.excerpt}</p>
+                    
+                    <div className="mt-auto flex items-center justify-between font-mono text-xs text-zinc-500">
+                      <div className="flex flex-col gap-1">
+                        <span><span className="text-zinc-600">&gt; AUTH:</span> {article.author}</span>
+                        <span><span className="text-zinc-600">&gt; DATE:</span> {article.date}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-green-500/0 group-hover:text-green-500 transition-colors mr-2">→</span>
+                        {article.readingTime}
+                      </div>
                     </div>
                   </Link>
                 ))}
