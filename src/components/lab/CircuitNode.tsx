@@ -28,7 +28,7 @@ export default function CircuitNode({ id, data, selected }: NodeProps<CircuitFlo
   const definition = BLOCK_CATALOG[data.blockType];
   const active = data.outputs.Q === true;
   const analog = definition.outputs[0]?.kind === 'analog';
-  const input = data.blockType === 'INPUT' || data.blockType === 'ANALOG_INPUT';
+  const input = data.blockType === 'INPUT' || data.blockType === 'ANALOG_INPUT' || data.blockType === 'NC_INPUT';
   
   return <div className={`circuit-node ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}>
     <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5">
