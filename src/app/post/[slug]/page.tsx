@@ -62,30 +62,32 @@ export default function PostPage() {
           {post.content}
         </div>
 
-        {/* Embedded Interactive Simulation */}
-        <div className={isFullscreen 
-          ? "fixed inset-0 z-[100] flex flex-col bg-white" 
-          : "my-16 -mx-5 sm:-mx-12 rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col"
-        }>
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center shrink-0">
-             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Interactive Simulation</span>
-             <div className="flex items-center gap-3">
-               <span className="text-xs text-gray-400 hidden sm:inline">Powered by AutomationHub</span>
-               <button onClick={() => setIsFullscreen(!isFullscreen)} className="text-gray-400 hover:text-gray-700 transition" title={isFullscreen ? 'Minimize' : 'Maximize'}>
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   {isFullscreen ? (
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
-                   ) : (
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
-                   )}
-                 </svg>
-               </button>
-             </div>
+        {/* Embedded Interactive Simulation (for single-lab posts) */}
+        {post.dsl && document && (
+          <div className={isFullscreen 
+            ? "fixed inset-0 z-[100] flex flex-col bg-white" 
+            : "my-16 -mx-5 sm:-mx-12 rounded-xl overflow-hidden border border-gray-200 shadow-xl h-[600px] flex flex-col"
+          }>
+            <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center shrink-0">
+               <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Interactive Simulation</span>
+               <div className="flex items-center gap-3">
+                 <span className="text-xs text-gray-400 hidden sm:inline">Powered by AutomationHub</span>
+                 <button onClick={() => setIsFullscreen(!isFullscreen)} className="text-gray-400 hover:text-gray-700 transition" title={isFullscreen ? 'Minimize' : 'Maximize'}>
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     {isFullscreen ? (
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h12v12H8z M4 16V4h12" />
+                     ) : (
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
+                     )}
+                   </svg>
+                 </button>
+               </div>
+            </div>
+            <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
+              <LabWorkspace readOnly document={document} />
+            </div>
           </div>
-          <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
-            <LabWorkspace readOnly document={document} />
-          </div>
-        </div>
+        )}
 
       </article>
     </main>

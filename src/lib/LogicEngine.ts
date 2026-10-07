@@ -152,6 +152,7 @@ export class LogicEngine {
     this.diagnostics = [];
     for (const block of this.blocks.values()) {
       if (block.type === 'SCAN_DELAY') block.outputs.Q = block.state.previous ?? false;
+      if (block.type === 'ANALOG_SCAN_DELAY') block.outputs.Q = Number(block.state.previous ?? 0);
     }
     for (const id of this.order) {
       const block = this.requireBlock(id);
@@ -159,7 +160,7 @@ export class LogicEngine {
       this.evaluate(block, deltaMs, true);
     }
     for (const block of this.blocks.values()) {
-      if (block.type === 'SCAN_DELAY') {
+      if (block.type === 'SCAN_DELAY' || block.type === 'ANALOG_SCAN_DELAY') {
         this.readInputs(block);
         block.state.previous = block.inputs.A;
       }
@@ -265,7 +266,8 @@ export class LogicEngine {
       incoming.set(id, []);
     }
     const depend = (from: string, to: string) => {
-      if (this.requireBlock(to).type === 'SCAN_DELAY') return;
+      const toType = this.requireBlock(to).type;
+      if (toType === 'SCAN_DELAY' || toType === 'ANALOG_SCAN_DELAY' || toType === 'TRANSFER_FUNCTION' || toType === 'ANALOG_RAMP') return;
       const next = outgoing.get(from)!;
       if (!next.has(to)) {
         next.add(to);
@@ -316,7 +318,7 @@ export class LogicEngine {
       this.evaluate(block, 0, false);
     }
     // Delayed inputs may precede their drivers in the execution order.
-    for (const block of this.blocks.values()) if (block.type === 'SCAN_DELAY') this.readInputs(block);
+    for (const block of this.blocks.values()) if (block.type === 'SCAN_DELAY' || block.type === 'ANALOG_SCAN_DELAY') this.readInputs(block);
   }
 
   private evaluate(block: RuntimeBlock, deltaMs: number, advance: boolean): void {
@@ -882,7 +884,8 @@ export class LogicEngine {
         break;
       }
       case 'PID_CONTROLLER': {
-        const en = digital('EN');
+        const enConnected = (this.incoming.get(block.id) ?? []).some(c => c.toPin === 'EN');
+        const en = enConnected ? digital('EN') : true;
         if (!en) {
           block.state.integral = 0;
           block.state.lastError = 0;
@@ -950,7 +953,8 @@ export class LogicEngine {
         }
         break;
       }
-      case 'SCAN_DELAY': break;
+      case 'SCAN_DELAY':
+      case 'ANALOG_SCAN_DELAY': break;
       default: throw new Error(`Simulation is not implemented for ${block.type}.`);
     }
     for (const [pin, signal] of Object.entries(block.outputs)) {

@@ -1,4 +1,5 @@
 import React from 'react';
+import InlineLab from '@/components/lab/InlineLab';
 
 export interface BlogPost {
   slug: string;
@@ -12,6 +13,57 @@ export interface BlogPost {
   content: React.ReactNode;
   dsl: string;
 }
+
+const LAB1_PROPORTIONAL_DSL = `circuit "Stage 1: Proportional Droop" version 1 {
+  sp: ANALOG_INPUT(label="Target SP", value=180)
+  pv: ANALOG_INPUT(label="Thermocouple PV", value=168)
+  err: MATH(operation="subtract")
+  gain: ANALOG_AMPLIFIER(gain=2)
+  cv: ANALOG_OUTPUT(label="Proportional CV %")
+  err_disp: ANALOG_OUTPUT(label="Active Error")
+
+  sp.Q -> err.A
+  pv.Q -> err.B
+  err.Q -> gain.A
+  gain.Q -> cv.A
+  err.Q -> err_disp.A
+}
+`;
+
+const LAB2_INTEGRAL_PWM_DSL = `circuit "Stage 2: Integral & PWM Actuation" version 1 {
+  sp: ANALOG_INPUT(label="Target SP", value=180)
+  pv: ANALOG_INPUT(label="Thermocouple PV", value=168)
+  pi: PI_CONTROLLER(kp=1.5, ki=0.25)
+  pwm: PWM(period=2000)
+  ssr: OUTPUT(label="Heater SSR Relay")
+  cv_gauge: ANALOG_OUTPUT(label="PI Output Power %")
+
+  sp.Q -> pi.SP
+  pv.Q -> pi.PV
+  pi.Q -> pwm.A
+  pwm.Q -> ssr.A
+  pi.Q -> cv_gauge.A
+}
+`;
+
+const LAB3_CLOSED_LOOP_DSL = `circuit "Stage 3: Full Closed Loop Plant" version 1 {
+  sp: ANALOG_INPUT(label="Target SP", value=180)
+  pid: PI_CONTROLLER(kp=2, ki=0.4, min=0, max=100)
+  plant: TRANSFER_FUNCTION(gain=2.5, tau=2000)
+  pwm: PWM(period=1000)
+  heater: OUTPUT(label="Heater SSR")
+  chamber_temp: ANALOG_OUTPUT(label="Chamber Temp PV")
+  power_pct: ANALOG_OUTPUT(label="Output Effort %")
+
+  sp.Q -> pid.SP
+  pid.Q -> plant.A
+  plant.Q -> pid.PV
+  pid.Q -> pwm.A
+  pwm.Q -> heater.A
+  plant.Q -> chamber_temp.A
+  pid.Q -> power_pct.A
+}
+`;
 
 export const BLOG_POSTS: BlogPost[] = [
   {
@@ -49,44 +101,191 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'pid-oven-tuning',
-    title: 'PID Control for Temperature Regulation',
-    excerpt: "Tuning an oven's temperature using proportional, integral, and derivative logic.",
+    title: 'PID Temperature Regulation: From Catastrophic Overshoot to Critically Damped Control',
+    excerpt: "A step-by-step masterclass on temperature control: diagnosing the fatal flaws of on-off thermostats, deconstructing P and PI logic, and building a full closed-loop thermal simulator.",
     author: 'Alex Engineer',
     date: 'Oct 1',
-    readingTime: '5 min read',
+    readingTime: '14 min read',
     tag: 'Control Systems',
     views: 24190,
     content: (
-      <>
-        <p>PID loops are the backbone of analog automation. In this example, we control the heating element of an industrial oven. We have an analog setpoint and an analog sensor reading the current temperature.</p>
-        <p>The PI_CONTROLLER block calculates the difference (error) and applies a Proportional-Integral algorithm to adjust the analog output. We then feed this output into a PWM (Pulse Width Modulation) block to switch the heating coils on and off rapidly, simulating an analog voltage using digital hardware.</p>
-        <p>Play with the setpoint in the simulation below. Notice how the PI controller smoothly adjusts the PWM duty cycle, and the Ramp block simulates the physical inertia of the oven heating up and cooling down.</p>
-      </>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The $40,000 Scrap Incident at 3:15 AM
+        </h2>
+        <p>
+          At three in the morning inside an aerospace autoclave bay, an alarm buzzer pierced the silence of the night shift. An industrial cure oven loaded with eight carbon-fiber wing spar preforms had just tripped a high-limit thermal interlock.
+        </p>
+        <p>
+          The recipe called for a controlled ramp to 180°C, followed by a mandatory two-hour soak. To save commissioning costs, the equipment builder had installed a simple digital thermostat driving an AC contactor. The logic inside was naive bang-bang control:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          IF Temperature &lt; 180°C THEN Heater_Contactor = TRUE<br />
+          ELSE Heater_Contactor = FALSE
+        </div>
+        <p>
+          On paper, that logic looks bulletproof to an apprentice programmer. But physical thermodynamics does not care about digital booleans. The oven was heated by heavy nichrome ceramic resistance banks. Even when the contactor snapped open at exactly 180°C, the ceramic blocks were still glowing cherry-red.
+        </p>
+        <p>
+          Because of massive thermal inertia, stored radiative heat continued bleeding into the sealed chamber for another five minutes. The thermocouple soared past 180°C, blowing through 190°C and topping out at 205°C before gravity took over. That 25°C overshoot triggered premature exothermic cross-linking in the resin. Microscopic thermal cracks spider-webbed across every spar flange. By sunrise, forty thousand dollars worth of structural aerospace material was forklifted straight into the scrap bin.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
+          Visualizing The Physics: The Step Response Comparison
+        </h2>
+        <p>
+          To understand why thermal systems behave this way, look at the MATLAB Simulink step-response simulation below comparing the exact same oven under three distinct control strategies:
+        </p>
+
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src="/matlab_pid_graph.jpg"
+            alt="MATLAB Simulink Step Response Plot comparing On-Off Thermostat, Proportional Control, and Tuned PID"
+            className="w-full h-auto object-cover"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // MATLAB SIMULINK TRANSIENT ANALYSIS</span>
+            <span>SETPOINT: 180.0 °C · THERMAL TIME CONSTANT τ = 2000 ms</span>
+          </div>
+        </div>
+
+        <p>
+          Examining the curves tells the entire story:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>The Red Sawtooth (On-Off Thermostat):</strong> Once thermal lag is present, on-off control produces violent limit-cycle hunting. It never stabilizes. It destroys mechanical relays and cooks sensitive workpieces.
+          </li>
+          <li>
+            <strong>The Orange Curve (Pure Proportional Control):</strong> Smooth, predictable, and fast—yet it permanently plateaus at 168°C. It suffers from a 12°C "steady-state droop" that no amount of proportional gain can fix without causing instability.
+          </li>
+          <li>
+            <strong>The Green Curve (Tuned Closed-Loop PI Control):</strong> The gold standard. A critically damped rise that smoothly decelerates into the 180°C target line with zero ringing and zero steady-state error.
+          </li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Step 1: The Raw Proportional Engine and the Mystery of Droop
+        </h2>
+        <p>
+          The bedrock of any closed-loop system is the Error signal: the mathematical difference between where you want to be (Setpoint, <em>SP</em>) and where the physical machine actually is (Process Variable, <em>PV</em>):
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          e(t) = SP(t) - PV(t)
+        </div>
+        <p>
+          In a purely Proportional controller, the output effort <em>P(t)</em> is simply the error multiplied by a proportional gain <em>Kp</em>:
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          P(t) = Kp × e(t)
+        </div>
+        <p>
+          Now consider the physical trap: An oven loses heat to the ambient room through its insulation. To stay warm at 180°C, the oven requires roughly 24% continuous electrical power just to counteract ambient losses. But under pure Proportional control, what happens if the oven actually reaches 180°C?
+        </p>
+        <p>
+          If <em>PV</em> = 180°C and <em>SP</em> = 180°C, then <em>e(t)</em> = 0. Therefore, <em>P(t) = Kp × 0 = 0%</em>! The controller immediately kills all power. The chamber cools down until an error re-appears. The system eventually enters a standoff at 168°C where the 12°C error produces exactly 24% power (<em>12°C × Kp=2 = 24%</em>). The system gets trapped in <strong>steady-state droop</strong>.
+        </p>
+        <p>
+          Let us verify this in our first simulation sandbox. Below is the isolated Proportional calculation engine:
+        </p>
+
+        <InlineLab
+          dsl={LAB1_PROPORTIONAL_DSL}
+          title="Stage 1: Error Calculation & Proportional Droop"
+          step="Stage 1 of 3"
+          height={480}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Interactive Exercise:</strong> In Stage 1 above, click on the <strong>Thermocouple PV</strong> block and change its value to <code>180</code>. Watch the <strong>Proportional CV %</strong> collapse to zero. Then change PV to <code>168</code> and observe how the output locks at <code>24%</code>. This illustrates why proportional gain alone can never reach setpoint in a thermal environment with heat loss.
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Step 2: Erasing Offset with the Integral Term & Modulating SSRs
+        </h2>
+        <p>
+          To kill steady-state droop, we introduce the <strong>Integral term</strong> (<em>Ki</em>). The integral term does not care about how large the error is right now—it cares about how long the error has existed over time:
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          I(t) = Ki × ∫ e(τ) dτ
+        </div>
+        <p>
+          Even if the error is a microscopic 0.5°C, the integral accumulator continuously increments scan after scan. It gradually ratchets up output power until it supplies the exact 24% baseline power needed to balance heat dissipation—even when the error drops all the way to zero!
+        </p>
+        <p>
+          However, this introduces another real-world industrial hurdle: <strong>Actuation</strong>. Industrial heating elements run on high-current AC power switched by Solid State Relays (SSRs). An SSR is a binary switch: it is either 100% conducting or 0% off. You cannot send an SSR an analog "42.5%" command.
+        </p>
+        <p>
+          The solution is <strong>Time-Proportioned Pulse Width Modulation (PWM)</strong>. We define a fixed cycle window (for example, 2000 milliseconds). If our PI controller requests 40% power, the PWM block energizes the SSR for 800 ms and shuts it off for 1200 ms. Over time, the thermal mass of the heating element averages this out into steady, seamless heating.
+        </p>
+        <p>
+          In Stage 2 below, we add the PI controller block and feed its control variable directly into a high-speed PWM generator driving a physical Solid State Relay:
+        </p>
+
+        <InlineLab
+          dsl={LAB2_INTEGRAL_PWM_DSL}
+          title="Stage 2: PI Controller & Time-Proportioned PWM Actuation"
+          step="Stage 2 of 3"
+          height={480}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Interactive Exercise:</strong> Click <strong>▶ Run</strong> on Stage 2 above. Observe how the <strong>Heater SSR Relay</strong> pulses on and off. Try dragging the <strong>Thermocouple PV</strong> down to <code>150</code>. Notice how the PI block demands higher power, widening the ON duration of the relay pulses!
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Step 3: Closing The Physical Loop (Thermal Lag & Plant Simulation)
+        </h2>
+        <p>
+          We now have a tuned PI engine and an SSR actuator. But to test true dynamic performance before touching real multi-kilowatt factory hardware, we must model the physical thermal plant itself.
+        </p>
+        <p>
+          In control engineering, thermal chambers are modeled as a First-Order Plus Dead Time (FOPDT) system. We represent this with a first-order lag Transfer Function:
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          G(s) = K / (τ·s + 1)
+        </div>
+        <p>
+          Where <em>τ</em> represents the physical thermal inertia (how long it takes heat to migrate from the coils into the air volume), and <em>K</em> is the system gain.
+        </p>
+        <p>
+          By connecting the output of our Transfer Function directly back into the <code>PV</code> input of the PID controller, we close the loop. Furthermore, we activate <strong>Integral Anti-Windup</strong> by capping the output limits between 0% and 100%. This ensures that if the oven door is swung open, the integrator does not wind up to infinity, which would cause massive thermal overshoot once the door is shut.
+        </p>
+        <p>
+          Behold the complete, fully operational closed-loop temperature control system:
+        </p>
+
+        <InlineLab
+          dsl={LAB3_CLOSED_LOOP_DSL}
+          title="Stage 3: Complete Closed-Loop Thermal Plant Simulation"
+          step="Stage 3 of 3 (Full Lab)"
+          height={540}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Final Commissioning Test:</strong> Click <strong>▶ Run</strong> on Stage 3 above! Watch the simulated cold oven start at room temperature. The PID controller commands full 100% effort, then smoothly throttles back power as the thermocouple passes 160°C, and lands gracefully on exactly 180°C. Click on <strong>Target SP</strong>, change it to <code>220</code>, and watch the control loop automatically track the new setpoint with zero ringing!
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Field-Tested Rules for Industrial Tuning
+        </h2>
+        <p>
+          When you step out onto the plant floor to tune a live heating process, remember these hard-won rules from senior instrumentation engineers:
+        </p>
+        <ol className="list-decimal pl-6 space-y-3">
+          <li>
+            <strong>Beware the Derivative Term (Kd):</strong> While PID algorithms include a derivative component, in 90% of industrial temperature loops, <em>Kd is set to zero</em>. Industrial thermocouples are prone to electromagnetic noise from nearby VFDs and motors. Differentiating high-frequency noise creates massive "derivative spikes" that rattle SSRs and destroy heaters.
+          </li>
+          <li>
+            <strong>Tune Integral in Time, Not Multipliers:</strong> If your PLC uses Integral Time (<em>Ti</em> in seconds or minutes per repeat), remember that <em>smaller numbers mean stronger integration</em>. If it uses Integral Gain (<em>Ki</em>), larger numbers mean stronger integration. Mistaking one for the other has melted dozens of extruder barrels.
+          </li>
+          <li>
+            <strong>Always Enforce Anti-Windup:</strong> Never commission an analog temperature loop without clamping the integral accumulator to the physical actuator limits (0–100%). It is the difference between a pristine production batch and a $40,000 pile of scrap.
+          </li>
+        </ol>
+      </div>
     ),
-    dsl: `
-      setpoint = ANALOG_INPUT(label: "Target Temp (C)", value: 150)
-      sensor = ANALOG_RAMP(riseRate: 10, fallRate: 2, label: "Actual Temp")
-      
-      pid = PI_CONTROLLER(kp: 2, ki: 0.5)
-      setpoint -> pid.SP
-      sensor -> pid.PV
-      
-      pwm = PWM(period: 1000)
-      pid -> pwm.A
-      
-      heater = OUTPUT(label: "Heater Coil")
-      pwm -> heater
-      
-      # Feed the heater back to the ramp to simulate heat
-      heat_val = ANALOG_MUX()
-      heater -> heat_val.S
-      zero = ANALOG_CONSTANT(value: 20)
-      full = ANALOG_CONSTANT(value: 300)
-      zero -> heat_val.A
-      full -> heat_val.B
-      
-      heat_val -> sensor.A
-    `
+    dsl: ''
   },
   {
     slug: 'traffic-lights',

@@ -10,7 +10,7 @@ const READY = new Set<BlockType>([
   'ANALOG_FLAG', 'ANALOG_CONSTANT', 'AND', 'OR', 'NOT', 'XOR', 'NAND', 'NOR',
   'XNOR', 'RS_LATCH', 'PULSE_RELAY', 'R_TRIG', 'F_TRIG', 'TON', 'TOF', 'CLOCK',
   'COUNTER', 'MATH', 'ANALOG_COMPARATOR', 'ANALOG_THRESHOLD', 'ANALOG_AMPLIFIER',
-  'ANALOG_MUX', 'FLOAT_TO_INT', 'INT_TO_FLOAT', 'SCAN_DELAY',
+  'ANALOG_MUX', 'FLOAT_TO_INT', 'INT_TO_FLOAT', 'SCAN_DELAY', 'ANALOG_SCAN_DELAY',
   'ANALOG_WATCHDOG', 'ANALOG_DIFFERENTIAL', 'ANALOG_RAMP', 'PI_CONTROLLER', 'PWM',
   'ANALOG_FILTER', 'MIN_MAX', 'AVERAGE', 'MATH_ERROR', 'DATA_LOG',
   'AND_EDGE', 'NAND_EDGE', 'CURSOR_KEY', 'TD_FUNCTION_KEY', 'SHIFT_REGISTER_BIT',
@@ -226,6 +226,8 @@ export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
     'Produces one scan of true when A changes from true to false.', digital('A'), digital('Q'), { stateful: true }),
   SCAN_DELAY: block('SCAN_DELAY', 'One-scan delay', 'z⁻¹', 'Memory & utilities',
     'Outputs the previous scan input, providing an explicit memory boundary for feedback.', digital('A'), digital('Q'), { stateful: true }),
+  ANALOG_SCAN_DELAY: block('ANALOG_SCAN_DELAY', 'Analog scan delay', 'z⁻¹', 'Analog & math',
+    'Delays an analog signal by one execution scan to establish an explicit memory boundary for feedback loops.', analog('A'), analog('Q'), { stateful: true }),
 
   DATA_LOG: block('DATA_LOG', 'Data log', 'LOG', 'Data & modules',
     'Planned timestamped numeric samples with capture controls and CSV export.', [pin('A', 'analog'), pin('EN'), pin('R')], digital('Q'),
