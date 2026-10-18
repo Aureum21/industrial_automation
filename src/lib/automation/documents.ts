@@ -69,7 +69,7 @@ export function parseCircuitDocument(text: string): CircuitDocument {
     });
   }
 
-  const document: CircuitDocument = { version: 1, name: raw.name.slice(0, 120), blocks, connections, widgets };
+  const document: CircuitDocument = { version: 1, name: raw.name.slice(0, 120), blocks, connections, ...(widgets ? { widgets } : {}) };
   const verifier = new LogicEngine();
   verifier.load(document);
   return document;

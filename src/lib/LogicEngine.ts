@@ -188,6 +188,11 @@ export class LogicEngine {
     for (const block of this.blocks.values()) {
       outputs[block.id] = { ...block.outputs };
     }
+    const last = this.history[this.history.length - 1];
+    if (last && last.timeMs === this.timeMs) {
+      last.outputs = outputs;
+      return;
+    }
     this.history.push({ timeMs: this.timeMs, outputs });
     if (this.history.length > 3000) this.history.shift(); // Keep last 5 minutes (at 100ms ticks)
   }
@@ -209,6 +214,7 @@ export class LogicEngine {
     this.blocks = replacement.blocks;
     this.connections = replacement.connections;
     this.timeMs = 0;
+    this.history = [];
     this.rebuildGraph();
     this.refresh();
   }
@@ -340,6 +346,7 @@ export class LogicEngine {
     }
     // Delayed inputs may precede their drivers in the execution order.
     for (const block of this.blocks.values()) if (block.type === 'SCAN_DELAY' || block.type === 'ANALOG_SCAN_DELAY') this.readInputs(block);
+    this.recordSnapshot();
   }
 
   private evaluate(block: RuntimeBlock, deltaMs: number, advance: boolean): void {
@@ -376,11 +383,13 @@ export class LogicEngine {
         block.outputs.Q = block.state.q;
         break;
       case 'PULSE_RELAY':
+        if (!advance) break;
         if (A && !block.state.lastA) block.state.q = !block.state.q;
         block.state.lastA = A;
         block.outputs.Q = block.state.q ?? false;
         break;
       case 'R_TRIG': case 'F_TRIG':
+        if (!advance) break;
         block.outputs.Q = block.type === 'R_TRIG' ? A && !block.state.lastA : !A && block.state.lastA === true;
         block.state.lastA = A;
         break;
@@ -411,6 +420,7 @@ export class LogicEngine {
         break;
       }
       case 'COUNTER': {
+        if (!advance) break;
         const up = digital('CU');
         const down = digital('CD');
         const reset = digital('R');
