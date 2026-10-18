@@ -62,6 +62,9 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     setDiagnostics([...engine.diagnostics]);
   }, [engine]);
 
+  const runningRef = useRef(running);
+  runningRef.current = running;
+
   const mutate = useCallback((operation: () => void) => {
     try { operation(); if (!readOnly) setDirty(true); sync(); }
     catch (error) { setNotice(error instanceof Error ? error.message : 'That change could not be applied.'); }
@@ -69,16 +72,15 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
 
   const handleScrub = useCallback((time: number | null) => {
     setTimeScrub(time);
-    if (time !== null && running) setRunning(false);
+    if (time !== null && runningRef.current) setRunning(false);
     sync(time);
-  }, [running, sync]);
+  }, [sync]);
 
-  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, running)), [engine, mutate, running]);
+  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, runningRef.current)), [engine, mutate]);
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
   const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam } }), [engine, onInput, onTag, onParam]);
-
 
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
@@ -98,23 +100,26 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
   }, [engine, makeNode, fitView, sync]);
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     if (initialDocument) {
-      load(initialDocument, `${initialDocument.name ?? 'Circuit'} loaded.`);
+      loadRef.current(initialDocument, `${initialDocument.name ?? 'Circuit'} loaded.`);
       return;
     }
     // Deferring initialization keeps browser storage out of server rendering.
     const timer = setTimeout(() => {
       const example = new URLSearchParams(window.location.search).get('example');
-      if (example) { load(getExample(example), 'Example loaded. Press Run or Step to simulate.'); return; }
+      if (example) { loadRef.current(getExample(example), 'Example loaded. Press Run or Step to simulate.'); return; }
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) { load(parseCircuitDocument(saved), 'Restored your saved circuit.'); return; }
-      } catch { load(getExample('start-stop'), 'Saved circuit could not be restored. A starter example is open.'); return; }
-      load(getExample('start-stop'), 'Starter example loaded. Press Run to explore.');
+        if (saved) { loadRef.current(parseCircuitDocument(saved), 'Restored your saved circuit.'); return; }
+      } catch { loadRef.current(getExample('start-stop'), 'Saved circuit could not be restored. A starter example is open.'); return; }
+      loadRef.current(getExample('start-stop'), 'Starter example loaded. Press Run to explore.');
     }, 0);
     return () => clearTimeout(timer);
-  }, [initialDocument, load]);
+  }, [initialDocument]);
 
   useEffect(() => {
     if (!running) return;
