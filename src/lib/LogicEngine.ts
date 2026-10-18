@@ -44,12 +44,21 @@ export class LogicEngine {
       this.validateParameter(definition, key, value);
       params[key] = value;
     }
+    if (block.value !== undefined && 'value' in params) {
+      params.value = block.value;
+    }
+    let initialValue = block.value;
+    if (initialValue === undefined && params.value !== undefined) {
+      initialValue = params.value as Signal;
+    }
+
     const valueKind = definition.outputs[0]?.kind;
-    if (block.value !== undefined && valueKind && !isSignal(block.value, valueKind)) throw new Error(`${definition.name} requires a ${valueKind} value.`);
+    if (initialValue !== undefined && valueKind && !isSignal(initialValue, valueKind)) throw new Error(`${definition.name} requires a ${valueKind} value.`);
     if (block.tag?.trim() && !definition.tagged) throw new Error(`${definition.name} does not support tags.`);
 
     const runtime: RuntimeBlock = {
       ...block, position: { ...block.position }, tag: block.tag?.trim() || undefined,
+      value: initialValue,
       params, inputs: {}, outputs: {}, state: {},
     };
     this.initialize(runtime);
@@ -115,6 +124,9 @@ export class LogicEngine {
     const kind = BLOCK_CATALOG[block.type]?.outputs[0]?.kind;
     if (kind && !isSignal(value, kind)) throw new Error(`This input requires a finite ${kind} value.`);
     block.value = value;
+    if (block.params && 'value' in block.params) {
+      block.params.value = value as ParameterValue;
+    }
     
     if (propagate) {
       this.refresh();
@@ -143,7 +155,10 @@ export class LogicEngine {
     const block = this.requireBlock(id);
     this.validateParameter(BLOCK_CATALOG[block.type], key, value);
     block.params[key] = value;
-    if (block.type === 'ANALOG_INPUT' && key === 'value') block.value = value;
+    if ((block.type === 'ANALOG_INPUT' || block.type.includes('CONSTANT')) && key === 'value') {
+      block.value = value as Signal;
+    }
+    this.refresh();
   }
 
   tick(deltaMs = 100): void {
@@ -224,8 +239,14 @@ export class LogicEngine {
     block.inputs = Object.fromEntries(definition.inputs.map(pin => [pin.id, defaultSignal(pin.kind)]));
     block.outputs = Object.fromEntries(definition.outputs.map(pin => [pin.id, defaultSignal(pin.kind)]));
     block.state = {};
-    if (readers.has(block.type)) {
-      block.value = block.type === 'ANALOG_INPUT' ? Number(block.params.value) : false;
+    if (readers.has(block.type) || block.type.includes('CONSTANT')) {
+      if (block.value === undefined) {
+        if (block.params?.value !== undefined) {
+          block.value = block.params.value as Signal;
+        } else {
+          block.value = block.type === 'ANALOG_INPUT' ? 0 : false;
+        }
+      }
     }
     if (block.type === 'COUNTER') block.outputs.Q = 0 >= Number(block.params.limit);
   }
@@ -341,7 +362,7 @@ export class LogicEngine {
       }
       case 'HIGH': block.outputs.Q = true; break;
       case 'LOW': block.outputs.Q = false; break;
-      case 'ANALOG_CONSTANT': block.outputs.Q = parameter('value'); break;
+      case 'ANALOG_CONSTANT': block.outputs.Q = block.value !== undefined ? Number(block.value) : parameter('value'); break;
       case 'OUTPUT': case 'FLAG': block.outputs.Q = A; break;
       case 'ANALOG_OUTPUT': case 'ANALOG_FLAG': block.outputs.Q = analog('A'); break;
       case 'AND': block.outputs.Q = A && B; break;
@@ -448,8 +469,15 @@ export class LogicEngine {
       }
       case 'ANALOG_DIFFERENTIAL': {
         const a = analog('A');
-        if (a >= parameter('onThreshold')) block.state.q = true;
-        else if (a < parameter('offThreshold')) block.state.q = false;
+        const on = parameter('onThreshold');
+        const off = parameter('offThreshold');
+        if (on <= off) {
+          if (a <= on) block.state.q = true;
+          else if (a >= off) block.state.q = false;
+        } else {
+          if (a >= on) block.state.q = true;
+          else if (a <= off) block.state.q = false;
+        }
         block.outputs.Q = block.state.q ?? false;
         break;
       }

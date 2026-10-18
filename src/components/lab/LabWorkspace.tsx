@@ -76,7 +76,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     sync(time);
   }, [sync]);
 
-  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, runningRef.current)), [engine, mutate]);
+  const onInput = useCallback((id: string, value: Signal) => mutate(() => engine.setInput(id, value, true)), [engine, mutate]);
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
@@ -102,9 +102,13 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
 
   const loadRef = useRef(load);
   loadRef.current = load;
+  const loadedCircuitKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (initialDocument) {
+      const circuitKey = `${initialDocument.name ?? ''}::${initialDocument.blocks.length}::${initialDocument.connections.length}`;
+      if (loadedCircuitKeyRef.current === circuitKey) return;
+      loadedCircuitKeyRef.current = circuitKey;
       loadRef.current(initialDocument, `${initialDocument.name ?? 'Circuit'} loaded.`);
       return;
     }

@@ -508,57 +508,45 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Toggle the "Enable Sequence" switch below to see the cascade in action.</p>
       </>
     ),
-    dsl: `
-      enable = INPUT(label: "Enable Sequence")
-      
-      green_timer = TON(duration: 4000)
-      yellow_timer = TON(duration: 1500)
-      red_timer = TON(duration: 4000)
-      
-      # Green is on when enabled but green timer hasn't finished
-      not_green_done = NOT()
-      green_timer -> not_green_done
-      
-      is_green = AND()
-      enable -> is_green.A
-      not_green_done -> is_green.B
-      
-      # Yellow starts when green is done
-      green_timer -> yellow_timer
-      not_yellow_done = NOT()
-      yellow_timer -> not_yellow_done
-      
-      is_yellow = AND()
-      green_timer -> is_yellow.A
-      not_yellow_done -> is_yellow.B
-      
-      # Red starts when yellow is done
-      yellow_timer -> red_timer
-      not_red_done = NOT()
-      red_timer -> not_red_done
-      
-      is_red = AND()
-      yellow_timer -> is_red.A
-      not_red_done -> is_red.B
-      
-      # Loop reset (if red is done, reset green)
-      # In FBD, we can break the loop by turning off the green timer
-      reset_loop = NOT()
-      red_timer -> reset_loop
-      
-      run_green = AND()
-      enable -> run_green.A
-      reset_loop -> run_green.B
-      
-      run_green -> green_timer.A
-      
-      g_out = OUTPUT(label: "Green Light")
-      is_green -> g_out
-      y_out = OUTPUT(label: "Yellow Light")
-      is_yellow -> y_out
-      r_out = OUTPUT(label: "Red Light")
-      is_red -> r_out
-    `
+    dsl: `circuit "Automated Traffic Light Sequence" version 1 {
+  enable: INPUT(label="Enable Sequence", value=true)
+  green_timer: TON(duration=4000)
+  yellow_timer: TON(duration=1500)
+  red_timer: TON(duration=4000)
+  not_green_done: NOT()
+  is_green: AND()
+  not_yellow_done: NOT()
+  is_yellow: AND()
+  not_red_done: NOT()
+  is_red: AND()
+  reset_loop: NOT()
+  run_green: AND()
+  g_out: OUTPUT(label="Green Light")
+  y_out: OUTPUT(label="Yellow Light")
+  r_out: OUTPUT(label="Red Light")
+
+  enable.Q -> run_green.A
+  reset_loop.Q -> run_green.B
+  run_green.Q -> green_timer.A
+  green_timer.Q -> not_green_done.A
+  run_green.Q -> is_green.A
+  not_green_done.Q -> is_green.B
+  is_green.Q -> g_out.A
+
+  green_timer.Q -> yellow_timer.A
+  yellow_timer.Q -> not_yellow_done.A
+  green_timer.Q -> is_yellow.A
+  not_yellow_done.Q -> is_yellow.B
+  is_yellow.Q -> y_out.A
+
+  yellow_timer.Q -> red_timer.A
+  red_timer.Q -> not_red_done.A
+  yellow_timer.Q -> is_red.A
+  not_red_done.Q -> is_red.B
+  is_red.Q -> r_out.A
+
+  red_timer.Q -> reset_loop.A
+}`
   },
   {
     slug: 'conveyor-sorting',
@@ -576,27 +564,22 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Test the logic by briefly pulsing the "Defect Sensor" below and watch the diverter actuate 2 seconds later.</p>
       </>
     ),
-    dsl: `
-      sensor = INPUT(label: "Defect Sensor")
-      belt_running = INPUT(label: "Belt Running")
-      
-      pulse = TOF(duration: 500)
-      sensor -> pulse
-      
-      # Only process if belt is running
-      active_defect = AND()
-      pulse -> active_defect.A
-      belt_running -> active_defect.B
-      
-      travel_delay = TON(duration: 2000)
-      active_defect -> travel_delay
-      
-      divert_pulse = TOF(duration: 1000)
-      travel_delay -> divert_pulse
-      
-      diverter = OUTPUT(label: "Diverter Arm")
-      divert_pulse -> diverter
-    `
+    dsl: `circuit "Conveyor Belt Sorting System" version 1 {
+  sensor: INPUT(label="Defect Sensor", value=false)
+  belt_running: INPUT(label="Belt Running", value=true)
+  pulse: TOF(duration=500)
+  active_defect: AND()
+  travel_delay: TON(duration=2000)
+  divert_pulse: TOF(duration=1000)
+  diverter: OUTPUT(label="Diverter Arm")
+
+  sensor.Q -> pulse.A
+  pulse.Q -> active_defect.A
+  belt_running.Q -> active_defect.B
+  active_defect.Q -> travel_delay.A
+  travel_delay.Q -> divert_pulse.A
+  divert_pulse.Q -> diverter.A
+}`
   },
   {
     slug: 'two-hand-safety',
@@ -614,48 +597,38 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Try pressing both buttons in the simulation. If you leave one pressed for too long before pressing the second, the press will not actuate.</p>
       </>
     ),
-    dsl: `
-      btn1 = INPUT(label: "Left Hand Button")
-      btn2 = INPUT(label: "Right Hand Button")
-      
-      edge1 = R_TRIG()
-      btn1 -> edge1
-      
-      edge2 = R_TRIG()
-      btn2 -> edge2
-      
-      timer1 = TOF(duration: 500)
-      edge1 -> timer1
-      
-      timer2 = TOF(duration: 500)
-      edge2 -> timer2
-      
-      valid1 = AND()
-      timer1 -> valid1.A
-      btn2 -> valid1.B
-      
-      valid2 = AND()
-      timer2 -> valid2.A
-      btn1 -> valid2.B
-      
-      valid = OR()
-      valid1 -> valid.A
-      valid2 -> valid.B
-      
-      both_held = AND()
-      btn1 -> both_held.A
-      btn2 -> both_held.B
-      
-      latch = RS_LATCH()
-      valid -> latch.S
-      
-      not_held = NOT()
-      both_held -> not_held
-      not_held -> latch.R
-      
-      press = OUTPUT(label: "Actuate Press")
-      latch -> press
-    `
+    dsl: `circuit "Two-Hand Safety Interlock" version 1 {
+  btn1: INPUT(label="Left Hand Button", value=false)
+  btn2: INPUT(label="Right Hand Button", value=false)
+  edge1: R_TRIG()
+  edge2: R_TRIG()
+  timer1: TOF(duration=500)
+  timer2: TOF(duration=500)
+  valid1: AND()
+  valid2: AND()
+  valid: OR()
+  both_held: AND()
+  latch: RS_LATCH()
+  not_held: NOT()
+  press: OUTPUT(label="Actuate Press")
+
+  btn1.Q -> edge1.A
+  btn2.Q -> edge2.A
+  edge1.Q -> timer1.A
+  edge2.Q -> timer2.A
+  timer1.Q -> valid1.A
+  btn2.Q -> valid1.B
+  timer2.Q -> valid2.A
+  btn1.Q -> valid2.B
+  valid1.Q -> valid.A
+  valid2.Q -> valid.B
+  btn1.Q -> both_held.A
+  btn2.Q -> both_held.B
+  valid.Q -> latch.S
+  both_held.Q -> not_held.A
+  not_held.Q -> latch.R
+  latch.Q -> press.A
+}`
   },
   {
     slug: 'hvac-economizer',
@@ -673,33 +646,28 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Adjust the temperatures in the simulation to see when the damper opens.</p>
       </>
     ),
-    dsl: `
-      out_temp = ANALOG_INPUT(label: "Outside Temp (F)", value: 65)
-      in_temp = ANALOG_INPUT(label: "Return Temp (F)", value: 75)
-      call_cool = INPUT(label: "Thermostat Call for Cool")
-      
-      comp = ANALOG_COMPARATOR(operation: "lt")
-      out_temp -> comp.A
-      in_temp -> comp.B
-      
-      damper_logic = AND()
-      comp -> damper_logic.A
-      call_cool -> damper_logic.B
-      
-      damper = OUTPUT(label: "Open Fresh Air Damper")
-      damper_logic -> damper
-      
-      # If cooling is called but outside is hotter, run compressor
-      not_economize = NOT()
-      comp -> not_economize
-      
-      comp_logic = AND()
-      not_economize -> comp_logic.A
-      call_cool -> comp_logic.B
-      
-      compressor = OUTPUT(label: "Run AC Compressor")
-      comp_logic -> compressor
-    `
+    dsl: `circuit "HVAC Economizer Logic" version 1 {
+  out_temp: ANALOG_INPUT(label="Outside Temp F", value=65)
+  in_temp: ANALOG_INPUT(label="Return Temp F", value=75)
+  call_cool: INPUT(label="Thermostat Call for Cool", value=true)
+  comp: ANALOG_COMPARATOR(operation="lt")
+  damper_logic: AND()
+  damper: OUTPUT(label="Open Fresh Air Damper")
+  not_economize: NOT()
+  comp_logic: AND()
+  compressor: OUTPUT(label="Run AC Compressor")
+
+  out_temp.Q -> comp.A
+  in_temp.Q -> comp.B
+  comp.Q -> damper_logic.A
+  call_cool.Q -> damper_logic.B
+  damper_logic.Q -> damper.A
+
+  comp.Q -> not_economize.A
+  not_economize.Q -> comp_logic.A
+  call_cool.Q -> comp_logic.B
+  comp_logic.Q -> compressor.A
+}`
   },
   {
     slug: 'tank-hysteresis',
@@ -717,27 +685,18 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Watch the pump state in the simulation below as you manually adjust the Tank Level analog input.</p>
       </>
     ),
-    dsl: `
-      level = ANALOG_INPUT(label: "Tank Level %", value: 50)
-      
-      # We want pump ON when level < 20, OFF when level > 80.
-      # The differential block turns ON when A >= onThreshold, OFF when A < offThreshold.
-      # So we can invert the logic, or use math. Let's invert the level: 100 - level
-      
-      hundred = ANALOG_CONSTANT(value: 100)
-      math = MATH(operation: "subtract")
-      hundred -> math.A
-      level -> math.B
-      
-      # Now math Q is (100 - level).
-      # Turn on when math > 80 (level < 20). Turn off when math < 20 (level > 80).
-      
-      diff = ANALOG_DIFFERENTIAL(onThreshold: 80, offThreshold: 20)
-      math -> diff.A
-      
-      pump = OUTPUT(label: "Fill Pump")
-      diff -> pump
-    `
+    dsl: `circuit "Tank Level Hysteresis Control" version 1 {
+  level: ANALOG_INPUT(label="Tank Level %", value=50)
+  hundred: ANALOG_CONSTANT(value=100)
+  math: MATH(operation="subtract")
+  diff: ANALOG_DIFFERENTIAL(onThreshold=80, offThreshold=20)
+  pump: OUTPUT(label="Fill Pump")
+
+  hundred.Q -> math.A
+  level.Q -> math.B
+  math.Q -> diff.A
+  diff.Q -> pump.A
+}`
   },
   {
     slug: 'pump-alternator',
@@ -754,33 +713,26 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>A PULSE_RELAY (toggle flip-flop) is perfect for this. Every time the call for water ends (falling edge), the toggle switches state. Depending on the toggle state, the next call for water is routed to either Pump A or Pump B using AND gates.</p>
       </>
     ),
-    dsl: `
-      call = INPUT(label: "Call for Water")
-      
-      # Detect falling edge to switch pumps for NEXT cycle
-      edge = F_TRIG()
-      call -> edge
-      
-      toggle = PULSE_RELAY()
-      edge -> toggle
-      
-      not_toggle = NOT()
-      toggle -> not_toggle
-      
-      pumpA = AND()
-      call -> pumpA.A
-      not_toggle -> pumpA.B
-      
-      pumpB = AND()
-      call -> pumpB.A
-      toggle -> pumpB.B
-      
-      outA = OUTPUT(label: "Pump A")
-      pumpA -> outA
-      
-      outB = OUTPUT(label: "Pump B")
-      pumpB -> outB
-    `
+    dsl: `circuit "Motor Duty Cycling (Alternating Pumps)" version 1 {
+  call: INPUT(label="Call for Water", value=true)
+  edge: F_TRIG()
+  toggle: PULSE_RELAY()
+  not_toggle: NOT()
+  pumpA: AND()
+  pumpB: AND()
+  outA: OUTPUT(label="Pump A")
+  outB: OUTPUT(label="Pump B")
+
+  call.Q -> edge.A
+  edge.Q -> toggle.A
+  toggle.Q -> not_toggle.A
+  call.Q -> pumpA.A
+  not_toggle.Q -> pumpA.B
+  pumpA.Q -> outA.A
+  call.Q -> pumpB.A
+  toggle.Q -> pumpB.B
+  pumpB.Q -> outB.A
+}`
   },
   {
     slug: 'esd-delays',
@@ -797,24 +749,20 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>In this circuit, we use a normally-closed E-Stop button. When it breaks (goes false), the valves drop out immediately. The cooling pump, however, is fed through a TOF (Timer Off Delay), keeping it alive for a brief duration after the shutdown signal.</p>
       </>
     ),
-    dsl: `
-      estop = NC_INPUT(label: "E-Stop (NC)")
-      run_cmd = INPUT(label: "Normal Run Command")
-      
-      sys_ok = AND()
-      estop -> sys_ok.A
-      run_cmd -> sys_ok.B
-      
-      valve = OUTPUT(label: "Feed Valve")
-      sys_ok -> valve
-      
-      # Cooling pump runs if sys_ok is true, OR for 3s after it goes false
-      pump_delay = TOF(duration: 3000)
-      sys_ok -> pump_delay
-      
-      pump = OUTPUT(label: "Cooling Pump")
-      pump_delay -> pump
-    `
+    dsl: `circuit "Emergency Shutdown Sequence (ESD)" version 1 {
+  estop: NC_INPUT(label="E-Stop (NC)", value=true)
+  run_cmd: INPUT(label="Normal Run Command", value=true)
+  sys_ok: AND()
+  valve: OUTPUT(label="Feed Valve")
+  pump_delay: TOF(duration=3000)
+  pump: OUTPUT(label="Cooling Pump")
+
+  estop.Q -> sys_ok.A
+  run_cmd.Q -> sys_ok.B
+  sys_ok.Q -> valve.A
+  sys_ok.Q -> pump_delay.A
+  pump_delay.Q -> pump.A
+}`
   },
   {
     slug: 'solar-logging',
@@ -832,20 +780,17 @@ export const BLOG_POSTS: BlogPost[] = [
         <p>Adjust the "Solar Voltage" randomly in the simulation and observe the smoothed output.</p>
       </>
     ),
-    dsl: `
-      voltage = ANALOG_INPUT(label: "Raw Solar Voltage", value: 12)
-      
-      # Smooth over 10 samples
-      avg = AVERAGE(samples: 10)
-      voltage -> avg.A
-      
-      smoothed = ANALOG_OUTPUT(label: "Smoothed Output")
-      avg -> smoothed
-      
-      log_enable = INPUT(label: "Enable Logging")
-      logger = DATA_LOG(interval: 500)
-      avg -> logger.A
-      log_enable -> logger.EN
-    `
+    dsl: `circuit "Data Logging for a Solar Panel Array" version 1 {
+  voltage: ANALOG_INPUT(label="Raw Solar Voltage", value=12)
+  avg: AVERAGE(samples=10)
+  smoothed: ANALOG_OUTPUT(label="Smoothed Output")
+  log_enable: INPUT(label="Enable Logging", value=true)
+  logger: DATA_LOG(interval=500)
+
+  voltage.Q -> avg.A
+  avg.Q -> smoothed.A
+  avg.Q -> logger.A
+  log_enable.Q -> logger.EN
+}`
   }
 ];
