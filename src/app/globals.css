@@ -25,7 +25,9 @@ button:not(:disabled), select { cursor: pointer; }
 .lab-button.primary { background: #22c55e; color: #ffffff; border-color: #22c55e; font-weight: 650; }
 .lab-button.primary:hover { background: #16a34a; color: #ffffff; }
 .lab-button.danger:hover:not(:disabled) { border-color: #fca5a5; color: #dc2626; }
-.circuit-node { width: 210px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+.circuit-node { width: 210px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 5px 20px rgba(0,0,0,0.08); pointer-events: auto; }
+.react-flow__node { pointer-events: all !important; }
+.circuit-node button, .circuit-node input, .circuit-node select { pointer-events: auto !important; }
 .circuit-node.is-selected { border-color: #06b6d4; box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25); }
 .circuit-node.is-active { border-color: #22c55e; }
 .circuit-node.is-active.is-selected { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4); }

@@ -344,7 +344,6 @@ export class LogicEngine {
 
   private evaluate(block: RuntimeBlock, deltaMs: number, advance: boolean): void {
     const definition = BLOCK_CATALOG[block.type];
-    if (definition.stateful && !advance) return;
     const digital = (pin: string) => block.inputs[pin] === true;
     const analog = (pin: string) => Number(block.inputs[pin] ?? 0);
     const parameter = (key: string) => Number(block.params[key] ?? BLOCK_CATALOG[block.type]?.parameters.find(p => p.key === key)?.defaultValue ?? 0);
