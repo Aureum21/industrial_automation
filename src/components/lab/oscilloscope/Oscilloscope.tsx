@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import type { LogicEngine, RuntimeBlock } from '@/lib/LogicEngine';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import type { Signal } from '@/lib/automation/types';
@@ -8,6 +8,7 @@ interface OscilloscopeProps {
   onScrub?: (timeMs: number | null) => void;
   scrubTime?: number | null;
   timeMs?: number;
+  syncKey?: number;
 }
 
 const TRACE_PALETTE = [
@@ -61,24 +62,24 @@ function getBlockScore(b: RuntimeBlock): number {
   return 10;
 }
 
-export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }: OscilloscopeProps) {
+export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0, syncKey = 0 }: OscilloscopeProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const [timeWindow, setTimeWindow] = useState(30000);
+  const [timeWindow, setTimeWindow] = useState(15000); // 15 seconds default: comfortable for pulse visibility
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [userSelectedIds, setUserSelectedIds] = useState<string[] | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const allBlocks = useMemo(() => Array.from(engine.blocks.values()), [engine.blocks]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allBlocks = useMemo(() => Array.from(engine.blocks.values()), [engine.blocks, syncKey]);
 
   // Determine which blocks to trace
   const activeBlockIds = useMemo(() => {
     if (userSelectedIds !== null) {
-      // Filter out any IDs that no longer exist
       const valid = userSelectedIds.filter(id => engine.blocks.has(id));
       if (valid.length > 0) return valid;
     }
 
-    // Default auto-selection
+    // Default auto-selection: tagged blocks first
     const tagged = allBlocks.filter(b => b.tag).map(b => b.id);
     if (tagged.length >= 2) return tagged;
 
@@ -88,6 +89,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
     return defaultSelection;
   }, [allBlocks, userSelectedIds, engine.blocks]);
 
+  // Build trace definitions
   const traces = useMemo(() => {
     return activeBlockIds.map((id, index) => {
       const b = engine.blocks.get(id);
@@ -176,7 +178,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
           </button>
         </div>
         <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400">
-          <span>Live trace & playhead inspection</span>
+          <span>{latestTime > 0 ? `T = ${(latestTime / 1000).toFixed(1)}s` : 'Paused · Click to inspect'}</span>
         </div>
       </div>
     );
@@ -188,7 +190,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
       <div className="flex justify-between items-center bg-white px-3 py-1.5 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className={`w-2 h-2 rounded-full ${latestTime > 0 ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
             <span className="text-xs font-bold text-gray-800 tracking-wider">LOGIC ANALYZER</span>
           </div>
 
@@ -296,6 +298,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
             >
               <option value={5000}>5s</option>
               <option value={10000}>10s</option>
+              <option value={15000}>15s</option>
               <option value={30000}>30s</option>
               <option value={60000}>60s</option>
               <option value={120000}>2 min</option>
@@ -306,6 +309,12 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
 
         {/* Right Controls: Scrub Status & Collapse */}
         <div className="flex items-center gap-3">
+          {latestTime === 0 && (
+            <span className="hidden sm:inline px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-mono">
+              PAUSED · Press ▶ Run or Step to trace live
+            </span>
+          )}
+
           {scrubTime !== null && scrubTime !== undefined ? (
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-mono font-semibold">
@@ -321,7 +330,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
               )}
             </div>
           ) : (
-            <span className="text-[11px] font-mono text-gray-400">
+            <span className="text-[11px] font-mono text-gray-500 font-bold">
               T = {(latestTime / 1000).toFixed(2)}s
             </span>
           )}
@@ -422,7 +431,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
                           <span 
                             className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border transition-colors ${
                               displayVal === true 
-                                ? 'bg-green-100 text-green-800 border-green-300' 
+                                ? 'bg-green-100 text-green-800 border-green-300 font-black' 
                                 : 'bg-gray-100 text-gray-500 border-gray-200'
                             }`}
                           >
@@ -494,7 +503,10 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
                 className="absolute inset-y-0 right-0 left-44 cursor-ew-resize z-30 group"
                 onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handlePointer(e); }}
                 onPointerMove={(e) => { if (e.buttons > 0) handlePointer(e); }}
-                onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); }}
+                onPointerUp={(e) => { 
+                  e.currentTarget.releasePointerCapture(e.pointerId); 
+                  if (onScrub) onScrub(null);
+                }}
               >
                 {/* Scrub Playhead Hairline */}
                 {scrubTime !== null && scrubTime !== undefined && (
@@ -509,10 +521,10 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0 }:
                 )}
 
                 {/* Live Head Line (if not scrubbing) */}
-                {(scrubTime === null || scrubTime === undefined) && latestTime > minTime && (
+                {(scrubTime === null || scrubTime === undefined) && latestTime > 0 && latestTime >= minTime && (
                   <div 
-                    className="absolute top-0 bottom-0 w-px bg-gray-300 pointer-events-none"
-                    style={{ left: `${((latestTime - minTime) / (maxTime - minTime)) * 100}%` }}
+                    className="absolute top-0 bottom-0 w-px bg-red-400 pointer-events-none"
+                    style={{ left: `${Math.min(100, ((latestTime - minTime) / (maxTime - minTime)) * 100)}%` }}
                   />
                 )}
               </div>
@@ -541,48 +553,31 @@ function TracePath({ history, block, minTime, maxTime, latestTime, isAnalog, col
 
   const blockId = block.id;
 
-  // If history is empty, draw a baseline using current value
-  if (history.length === 0) {
-    const liveVal = extractValue(block);
-    if (isAnalog) {
-      return (
-        <line 
-          x1="0" 
-          y1="50" 
-          x2="100" 
-          y2="50" 
-          stroke={color} 
-          strokeWidth="1.5" 
-          strokeDasharray="4,4" 
-          vectorEffect="non-scaling-stroke" 
-        />
-      );
-    } else {
-      const y = liveVal === true ? 20 : 80;
-      return (
-        <line 
-          x1="0" 
-          y1={y} 
-          x2="100" 
-          y2={y} 
-          stroke={color} 
-          strokeWidth="2" 
-          vectorEffect="non-scaling-stroke" 
-        />
-      );
-    }
-  }
+  // Helper to extract signal value from a snapshot
+  const getSnapVal = (snap: import('@/lib/automation/types').EngineSnapshot): Signal | undefined => {
+    return snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : extractValue(block);
+  };
+
+  // Fallback initial value
+  const liveVal = extractValue(block);
 
   let pointX = -1;
   let pointY = -1;
 
   if (isAnalog) {
-    // Find min and max for scaling
+    // Determine min/max bounds across history
     let vMin = 0;
     let vMax = 100;
     let hasData = false;
+
+    if (typeof liveVal === 'number' && Number.isFinite(liveVal)) {
+      vMin = liveVal;
+      vMax = liveVal;
+      hasData = true;
+    }
+
     for (const snap of history) {
-      const val = snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : undefined;
+      const val = getSnapVal(snap);
       if (typeof val === 'number' && Number.isFinite(val)) {
         if (!hasData) { vMin = val; vMax = val; hasData = true; }
         else { vMin = Math.min(vMin, val); vMax = Math.max(vMax, val); }
@@ -590,98 +585,156 @@ function TracePath({ history, block, minTime, maxTime, latestTime, isAnalog, col
     }
     if (vMax === vMin) { vMax += 1; vMin -= 1; }
 
-    let path = '';
-    history.forEach((snap, i) => {
-      const x = ((snap.timeMs - minTime) / widthMs) * 100;
-      const rawVal = snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : 0;
-      const num = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : 0;
-      const y = 100 - (((num - vMin) / (vMax - vMin)) * 74 + 13);
+    const getY = (num: number) => 100 - (((num - vMin) / (vMax - vMin)) * 74 + 13);
 
-      if (i === 0) path += `M ${x} ${y} `;
-      else path += `L ${x} ${y} `;
-    });
-
-    // If only one snapshot or latestTime exceeds last snapshot, extend line
-    const lastSnap = history[history.length - 1];
-    if (latestTime > lastSnap.timeMs) {
-      const endX = ((latestTime - minTime) / widthMs) * 100;
-      const rawVal = lastSnap.outputs[blockId] ? extractValue(block, lastSnap.outputs[blockId]) : 0;
-      const num = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : 0;
-      const y = 100 - (((num - vMin) / (vMax - vMin)) * 74 + 13);
-      path += `L ${endX} ${y} `;
+    // Initial value at start of window
+    let initialNum = typeof liveVal === 'number' && Number.isFinite(liveVal) ? liveVal : 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].timeMs <= minTime) {
+        const val = getSnapVal(history[i]);
+        if (typeof val === 'number' && Number.isFinite(val)) {
+          initialNum = val;
+          break;
+        }
+      }
     }
 
-    if (scrubTime !== null && scrubTime !== undefined) {
-      const snap = history.find(h => h.timeMs >= scrubTime) || lastSnap;
-      const rawVal = snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : 0;
+    const visibleSnaps = history.filter(s => s.timeMs >= minTime && s.timeMs <= maxTime);
+
+    let path = '';
+    let startY = getY(initialNum);
+    path += `M 0 ${startY} `;
+    let lastX = 0;
+    let lastY = startY;
+
+    for (const snap of visibleSnaps) {
+      const x = Math.max(0, Math.min(100, ((snap.timeMs - minTime) / widthMs) * 100));
+      const rawVal = getSnapVal(snap);
       const num = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : 0;
-      pointY = 100 - (((num - vMin) / (vMax - vMin)) * 74 + 13);
+      const y = getY(num);
+
+      path += `L ${x.toFixed(2)} ${y.toFixed(2)} `;
+      lastX = x;
+      lastY = y;
+    }
+
+    // Extend to current simulation head
+    const currentX = Math.max(0, Math.min(100, ((latestTime - minTime) / widthMs) * 100));
+    const extendX = latestTime > 0 ? Math.max(lastX, currentX) : 100;
+
+    if (extendX > lastX) {
+      path += `L ${extendX.toFixed(2)} ${lastY.toFixed(2)} `;
+    }
+
+    // Scrub intersection point
+    if (scrubTime !== null && scrubTime !== undefined) {
+      const snap = history.find(h => h.timeMs >= scrubTime) || (history.length > 0 ? history[history.length - 1] : undefined);
+      const rawVal = snap ? getSnapVal(snap) : liveVal;
+      const num = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : 0;
+      pointY = getY(num);
       pointX = ((scrubTime - minTime) / widthMs) * 100;
     }
 
     return (
       <>
         <path d={path} fill="none" stroke={color} strokeWidth="1.75" vectorEffect="non-scaling-stroke" />
+        {extendX < 100 && (
+          <line 
+            x1={extendX} 
+            y1={lastY} 
+            x2={100} 
+            y2={lastY} 
+            stroke={color} 
+            strokeWidth="1.25" 
+            strokeDasharray="3,3" 
+            strokeOpacity="0.35" 
+            vectorEffect="non-scaling-stroke" 
+          />
+        )}
         {pointX >= 0 && (
           <circle cx={pointX} cy={pointY} r="3.5" fill="white" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
         )}
       </>
     );
   } else {
-    // Draw digital square wave
+    // DIGITAL SQUARE WAVE
+    // Determine initial digital value at or before minTime
+    let initialVal = liveVal === true;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].timeMs <= minTime) {
+        initialVal = getSnapVal(history[i]) === true;
+        break;
+      }
+    }
+
+    const visibleSnaps = history.filter(s => s.timeMs >= minTime && s.timeMs <= maxTime);
+
     let path = '';
     let areaPath = '';
-    let lastY = -1;
-    let startX = 0;
+    let lastY = initialVal ? 20 : 80;
+    let lastX = 0;
 
-    history.forEach((snap, i) => {
-      const x = ((snap.timeMs - minTime) / widthMs) * 100;
-      const rawVal = snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : false;
-      const val = rawVal === true;
+    path += `M 0 ${lastY} `;
+    areaPath += `M 0 80 L 0 ${lastY} `;
+
+    for (const snap of visibleSnaps) {
+      const x = Math.max(0, Math.min(100, ((snap.timeMs - minTime) / widthMs) * 100));
+      const val = getSnapVal(snap) === true;
       const y = val ? 20 : 80;
 
-      if (i === 0) {
-        startX = x;
-        path += `M ${x} ${y} `;
-        areaPath += `M ${x} 80 L ${x} ${y} `;
-        lastY = y;
-      } else {
-        if (y !== lastY) {
-          path += `L ${x} ${lastY} `;
-          areaPath += `L ${x} ${lastY} `;
-        }
-        path += `L ${x} ${y} `;
-        areaPath += `L ${x} ${y} `;
+      if (x > lastX) {
+        path += `L ${x.toFixed(2)} ${lastY} `;
+        areaPath += `L ${x.toFixed(2)} ${lastY} `;
+        lastX = x;
+      }
+
+      if (y !== lastY) {
+        path += `L ${x.toFixed(2)} ${y} `;
+        areaPath += `L ${x.toFixed(2)} ${y} `;
         lastY = y;
       }
-    });
+    }
 
-    // Extend to latestTime if needed
-    const lastSnap = history[history.length - 1];
-    let finalX = ((lastSnap.timeMs - minTime) / widthMs) * 100;
-    if (latestTime > lastSnap.timeMs) {
-      finalX = ((latestTime - minTime) / widthMs) * 100;
-      path += `L ${finalX} ${lastY} `;
-      areaPath += `L ${finalX} ${lastY} `;
+    // Extend to current simulation head
+    const currentX = Math.max(0, Math.min(100, ((latestTime - minTime) / widthMs) * 100));
+    const extendX = latestTime > 0 ? Math.max(lastX, currentX) : 100;
+
+    if (extendX > lastX) {
+      path += `L ${extendX.toFixed(2)} ${lastY} `;
+      areaPath += `L ${extendX.toFixed(2)} ${lastY} `;
     }
 
     // Close area under curve for HIGH state shading
-    areaPath += `L ${finalX} 80 L ${startX} 80 Z`;
+    areaPath += `L ${extendX.toFixed(2)} 80 L 0 80 Z`;
 
+    // Scrub intersection point
     if (scrubTime !== null && scrubTime !== undefined) {
-      const snap = history.find(h => h.timeMs >= scrubTime) || lastSnap;
-      const rawVal = snap.outputs[blockId] ? extractValue(block, snap.outputs[blockId]) : false;
-      const val = rawVal === true;
+      const snap = history.find(h => h.timeMs >= scrubTime) || (history.length > 0 ? history[history.length - 1] : undefined);
+      const val = snap ? (getSnapVal(snap) === true) : (liveVal === true);
       pointY = val ? 20 : 80;
       pointX = ((scrubTime - minTime) / widthMs) * 100;
     }
 
     return (
       <>
-        {/* Subtle pulse fill for HIGH state */}
-        <path d={areaPath} fill={color} fillOpacity="0.10" />
-        {/* Crisp square wave stroke */}
+        {/* Shading under HIGH pulses */}
+        <path d={areaPath} fill={color} fillOpacity="0.12" />
+        {/* Solid active waveform */}
         <path d={path} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        {/* Dashed future continuation if window extends past current time */}
+        {extendX < 100 && (
+          <line 
+            x1={extendX} 
+            y1={lastY} 
+            x2={100} 
+            y2={lastY} 
+            stroke={color} 
+            strokeWidth="1.5" 
+            strokeDasharray="3,3" 
+            strokeOpacity="0.35" 
+            vectorEffect="non-scaling-stroke" 
+          />
+        )}
         {pointX >= 0 && (
           <circle cx={pointX} cy={pointY} r="3.5" fill="white" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
         )}

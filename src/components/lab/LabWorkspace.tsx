@@ -35,6 +35,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
+  const [syncKey, setSyncKey] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
@@ -60,6 +61,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     }));
     setTimeMs(engine.timeMs);
     setDiagnostics([...engine.diagnostics]);
+    setSyncKey(k => k + 1);
   }, [engine]);
 
   const runningRef = useRef(running);
@@ -282,7 +284,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
         )}
         {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
-        <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} timeMs={timeMs} />
+        <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} timeMs={timeMs} syncKey={syncKey} />
       </div>
     </div>
     <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-white px-4 py-2 text-[10px]"><p role="status" className={diagnostics.length ? 'text-amber-500 font-semibold' : notice.includes('Invalid DSL') ? 'text-red-500 font-semibold' : 'text-gray-500'}>{diagnostics[0] ?? notice}</p><span className="font-mono text-gray-400">{nodes.length} blocks · {edges.length} wires {!readOnly && <span className="ml-3 hidden sm:inline">Select + Delete · Green: digital · Cyan: analog</span>}</span></div>
