@@ -1,7 +1,8 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { BLOG_POSTS } from '@/lib/mockPosts';
+import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
+import { getAllPosts } from '@/lib/blogStorage';
 import Image from 'next/image';
 
 type Floor = 'G' | 'B1' | 'B2' | 'B3';
@@ -16,10 +17,15 @@ export default function Home() {
   const [isMoving, setIsMoving] = useState(false);
   const [targetFloor, setTargetFloor] = useState<Floor>('G');
   const [showAllArticles, setShowAllArticles] = useState(false);
+  const [allPosts, setAllPosts] = useState<BlogPost[]>(BLOG_POSTS);
+
+  useEffect(() => {
+    setAllPosts(getAllPosts());
+  }, []);
 
   const sortedPosts = useMemo(() => {
-    return [...BLOG_POSTS].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
-  }, []);
+    return [...allPosts].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+  }, [allPosts]);
 
   const visiblePosts = showAllArticles ? sortedPosts : sortedPosts.slice(0, 6);
 

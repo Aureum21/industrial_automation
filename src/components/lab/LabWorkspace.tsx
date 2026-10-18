@@ -99,6 +99,10 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   }, [engine, makeNode, fitView, sync]);
 
   useEffect(() => {
+    if (initialDocument) {
+      load(initialDocument, `${initialDocument.name ?? 'Circuit'} loaded.`);
+      return;
+    }
     // Deferring initialization keeps browser storage out of server rendering.
     const timer = setTimeout(() => {
       const example = new URLSearchParams(window.location.search).get('example');
@@ -110,8 +114,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
       load(getExample('start-stop'), 'Starter example loaded. Press Run to explore.');
     }, 0);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialDocument, load]);
 
   useEffect(() => {
     if (!running) return;

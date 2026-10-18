@@ -1,8 +1,9 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import LabWorkspace from '@/components/lab/LabWorkspace';
-import { BLOG_POSTS } from '@/lib/mockPosts';
+import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
+import { getPostBySlug } from '@/lib/blogStorage';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
@@ -13,7 +14,12 @@ export default function PostPage() {
   const params = useParams();
   const slug = params.slug as string;
   
-  const post = BLOG_POSTS.find(p => p.slug === slug);
+  const [post, setPost] = useState<BlogPost | undefined>(() => BLOG_POSTS.find(p => p.slug === slug));
+
+  useEffect(() => {
+    const found = getPostBySlug(slug);
+    if (found) setPost(found);
+  }, [slug]);
   
   const document = useMemo(() => {
     if (!post?.dsl) return undefined;

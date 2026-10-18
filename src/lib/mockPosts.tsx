@@ -65,39 +65,244 @@ const LAB3_CLOSED_LOOP_DSL = `circuit "Stage 3: Full Closed Loop Plant" version 
 }
 `;
 
+const WT_LAB1_DSL = `circuit "Stage 1: Intake Permissives" version 1 {
+  valve: INPUT(label="Intake Valve XV-101 Open", value=true)
+  suction_ok: INPUT(label="Wet Well Level > NPSH", value=true)
+  start_pb: INPUT(label="Start Pushbutton", value=false)
+  stop_pb: INPUT(label="E-Stop / Trip", value=false)
+  perm: AND()
+  start_gate: AND()
+  latch: RS_LATCH()
+  pump: OUTPUT(label="Raw Water Pump P-101")
+
+  valve.Q -> perm.A
+  suction_ok.Q -> perm.B
+  perm.Q -> start_gate.A
+  start_pb.Q -> start_gate.B
+  start_gate.Q -> latch.S
+  stop_pb.Q -> latch.R
+  latch.Q -> pump.A
+}
+`;
+
+const WT_LAB2_DSL = `circuit "Stage 2: Basin Level Control" version 1 {
+  level: ANALOG_INPUT(label="Basin Level LIT-301 %", value=25)
+  fill_ctrl: ANALOG_DIFFERENTIAL(onThreshold=30, offThreshold=85)
+  hi_hi_sensor: ANALOG_COMPARATOR(operation="gt")
+  hi_hi_limit: ANALOG_CONSTANT(value=95)
+  fill_valve: OUTPUT(label="Inflow Valve XV-201")
+  alarm: OUTPUT(label="High-High Overflow Alarm")
+
+  level.Q -> fill_ctrl.A
+  fill_ctrl.Q -> fill_valve.A
+  level.Q -> hi_hi_sensor.A
+  hi_hi_limit.Q -> hi_hi_sensor.B
+  hi_hi_sensor.Q -> alarm.A
+}
+`;
+
+const WT_LAB3_DSL = `circuit "Stage 3: Full Treatment Train" version 1 {
+  run_req: INPUT(label="Plant Run Permissive", value=true)
+  flow_rate: ANALOG_INPUT(label="Raw Flow Rate FIT-101 (GPM)", value=1200)
+  dose_ratio: ANALOG_CONSTANT(value=0.05)
+  dose_calc: MATH(operation="multiply")
+  dose_pump: ANALOG_OUTPUT(label="Coagulant Dosing Rate (GPH)")
+  cycle_edge: F_TRIG()
+  alt_flip: PULSE_RELAY()
+  not_alt: NOT()
+  gate_a: AND()
+  gate_b: AND()
+  pump_a: OUTPUT(label="Duty Pump P-101A")
+  pump_b: OUTPUT(label="Standby Pump P-101B")
+
+  flow_rate.Q -> dose_calc.A
+  dose_ratio.Q -> dose_calc.B
+  dose_calc.Q -> dose_pump.A
+
+  run_req.Q -> cycle_edge.A
+  cycle_edge.Q -> alt_flip.A
+  alt_flip.Q -> not_alt.A
+
+  run_req.Q -> gate_a.A
+  not_alt.Q -> gate_a.B
+  gate_a.Q -> pump_a.A
+
+  run_req.Q -> gate_b.A
+  alt_flip.Q -> gate_b.B
+  gate_b.Q -> pump_b.A
+}
+`;
+
 export const BLOG_POSTS: BlogPost[] = [
   {
     slug: 'water-treatment',
-    title: 'Building a Water Treatment Simulator',
-    excerpt: 'An introduction to interlocking logic using RS Latches and logic gates.',
+    title: 'Building an Industrial Water Treatment Simulator: Intake Permissives, Basin Hysteresis & Automated Pump Alternation',
+    excerpt: 'A comprehensive masterclass on municipal and industrial water treatment SCADA: diagnosing cavitation disasters, interlocking intake permissives, eliminating basin short-cycling with hysteresis, and automating chemical dosing.',
     author: 'John Doe',
     date: 'Sep 25',
-    readingTime: '12 min read',
-    tag: 'Control Systems',
+    readingTime: '16 min read',
+    tag: 'Process Control',
     views: 18450,
     content: (
-      <>
-        <p>When designing a control system for a water treatment facility, one of the most fundamental concepts to master is interlocking logic. We need to ensure that the primary pump cannot start unless the intake valve is fully open, and we need a system to gracefully shut down the pump if the tank level exceeds the high-level limit.</p>
-        <p>In our logic, this is handled with a mix of latches and AND gates. I have embedded the simulation below. Try toggling the <strong>Intake Valve</strong> and then press the <strong>Start Button</strong> to see how the RS Latch holds the state of the motor.</p>
-        <p>Once the latch is set, releasing the start button doesn't stop the motor. The only way to stop the process is by triggering the Reset pin, which in our case is wired to the High-Level Sensor.</p>
-      </>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The Midnight Basin 3 Overflow & Mechanical Seal Blowout
+        </h2>
+        <p>
+          At 2:40 AM during a torrential spring thunderstorm, the regional municipal water reclamation plant suffered an environmental disaster. The lead intake centrifugal pump (P-101A) suddenly started screaming with a deafening rattle that sounded like pumping gravel through a steel pipe.
+        </p>
+        <p>
+          Heavy debris had blinded the raw intake bar screens, starving the wet well. The suction pressure plummeted far below the vapor pressure of water, throwing the impeller into violent <strong>cavitation</strong>. Vapor bubbles imploded against the stainless steel vanes with shockwaves exceeding 10,000 PSI. Within ninety seconds, the mechanical seal shattered, spraying river water across the motor floor and tripping the 480V thermal overload.
+        </p>
+        <p>
+          To make matters worse, the downstream clarifier basin relied on a software polling loop rather than a dedicated hardware interlock. When the standby pump was manually kicked on by a panicked night-shift operator, the inlet valve was forced wide open into an already saturated sedimentation tank. By 3:15 AM, over 120,000 gallons of untreated wastewater had overflowed the weir into the adjacent municipal canal, drawing state environmental citations and hundreds of thousands of dollars in fines.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
+          System Blueprint: The Multi-Stage Process Architecture
+        </h2>
+        <p>
+          Modern water treatment facilities rely on rigid physical separations and automated interlocks between process zones. Below is the Piping and Instrumentation Diagram (P&ID) of the plant showing the full flow from raw water intake to high-service distribution:
+        </p>
+
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src="/water_treatment_pid.jpg"
+            alt="Water Treatment Piping and Instrumentation Diagram (P&ID)"
+            className="w-full h-auto object-cover"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // PROCESS FLOW & P&ID OVERVIEW</span>
+            <span>INTAKE LIFT → COAGULATION → SEDIMENTATION → RAPID SAND FILTRATION</span>
+          </div>
+        </div>
+
+        <p>
+          The water treatment chain consists of five critical stages:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Raw Water Pump Station (P-101A/B):</strong> Dual high-capacity intake pumps lifting river water through automated isolation valves (XV-102/103) into the chemical flash-mix basin.
+          </li>
+          <li>
+            <strong>Coagulation & Flocculation (T-201):</strong> Dosing precise ratios of alum and polyelectrolyte proportional to inflow velocity to aggregate suspended microscopic colloidal particulates into heavy flocs.
+          </li>
+          <li>
+            <strong>Clarifier / Sedimentation Basin:</strong> Gravity settling tank with automated sludge rake (M-301) and continuous level transmitter (LIT-301) that must be protected against overflow.
+          </li>
+          <li>
+            <strong>Rapid Sand Filter Beds (F-401A/B):</strong> Deep multi-media filter beds requiring differential pressure monitoring (DP-401) to trigger backwash cycles before channel clogging occurs.
+          </li>
+          <li>
+            <strong>High-Service Clean Distribution (P-601A/B/C):</strong> Triplex booster pump station delivering disinfected clean potable water into the city main.
+          </li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: Permissives vs. Interlocks — Intake Suction & Dry-Run Lockout
+        </h2>
+        <p>
+          In industrial automation, there is a strict distinction between an <strong>Operational Permissive</strong> and a <strong>Safety Interlock</strong>:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Permissive (Pre-Condition):</strong> A set of criteria that must ALL be true before an equipment run command is allowed to execute (e.g. "Intake isolation valve confirmed 100% open AND wet well level exceeds NPSH required").
+          </li>
+          <li>
+            <strong>Interlock (Runtime Trip):</strong> A condition that actively de-energizes the motor at any instant during operation (e.g. emergency stop, dry-run float switch, or motor bearing over-temperature).
+          </li>
+        </ul>
+        <p>
+          In our Stage 1 simulation below, we implement a fail-safe start/stop circuit using an <code>RS_LATCH</code>. The Start Pushbutton can only successfully energize the Set (<code>S</code>) pin if the Permissive AND-gate confirms both the intake valve limit switch and suction level transmitters are healthy. If the suction well drops below minimum level, the latch instantly Resets (<code>R</code>), locking out the pump.
+        </p>
+
+        <InlineLab
+          dsl={WT_LAB1_DSL}
+          title="Stage 1: Intake Permissives & Dry-Run Lockout"
+          step="Stage 1 of 3"
+          height={480}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Interactive Exercise:</strong> In Stage 1 above, click on <strong>Start Pushbutton</strong> to energize the pump. The RS Latch holds the pump running. Now toggle <strong>Wet Well Level</strong> to OFF. Notice how the safety reset trips the pump offline immediately. Now try toggling the Start Pushbutton while the Intake Valve is closed—the permissive gate prevents the pump from ever starting dry!
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Basin Level Control with Differential Hysteresis
+        </h2>
+        <p>
+          Why do naive automation engineers cause motor burnouts in clarifier basins? Because they use single-point setpoints:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          // THE SHORT-CYCLING DISASTER:<br />
+          IF Basin_Level &lt; 50% THEN Fill_Valve = OPEN<br />
+          ELSE Fill_Valve = CLOSED
+        </div>
+        <p>
+          Surface ripples and hydraulic turbulence cause the analog sensor to fluctuate between 49.9% and 50.1% several times per second. The inlet valve actuator cycles on and off dozens of times every hour, burning out motor starter contactors and creating hydraulic water hammer across the main headers.
+        </p>
+        <p>
+          The correct solution is <strong>Schmitt Trigger Differential Hysteresis</strong> (<code>ANALOG_DIFFERENTIAL</code>). We configure an ON threshold of 30% and an OFF threshold of 85%. When the basin drains to 30%, the valve opens and stays continuously open until the basin fills to 85%. Between 30% and 85%, the controller holds its prior state. In addition, an independent safety comparator monitors for a High-High emergency condition (&gt; 95%) to trigger an overflow alarm:
+        </p>
+
+        <InlineLab
+          dsl={WT_LAB2_DSL}
+          title="Stage 2: Basin Level Differential Hysteresis Control"
+          step="Stage 2 of 3"
+          height={480}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Interactive Exercise:</strong> In Stage 2 above, click on <strong>Basin Level LIT-301</strong>. Change the level from <code>25%</code> to <code>50%</code>—notice the Inflow Valve stays ON. Raise it to <code>85%</code>—the valve snaps OFF. Now lower it to <code>70%</code>—the valve stays OFF! Only when the water drops back below <code>30%</code> does the fill cycle re-engage. Try raising the level to <code>98%</code> to watch the High-High Overflow Alarm fire!
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Full Treatment Train (Flow Pacing & Pump Alternation)
+        </h2>
+        <p>
+          In a 24/7 continuous treatment facility, equipment wear must be balanced across duty cycles. If Pump A runs 10,000 hours while Pump B sits idle, Pump A will fail prematurely while Pump B suffers seal degradation from stagnation.
+        </p>
+        <p>
+          We implement automated <strong>Lead/Lag Duty Alternation</strong> using a <code>PULSE_RELAY</code> (bistable toggle flip-flop) coupled with a Falling-Edge Trigger (<code>F_TRIG</code>). Every time the plant run permissive completes a cycle (transitions from true to false), the toggle flips state. When the next run permissive arrives, the command is routed to the alternate pump!
+        </p>
+        <p>
+          Simultaneously, raw water turbidity demands proportional coagulant chemical dosing. The magnetic flowmeter (<code>FIT-101</code>) sends continuous GPM flow data to an analog <code>MATH</code> multiplier, dynamically pacing chemical injection to maintain an exact parts-per-million ratio regardless of river flow swings:
+        </p>
+
+        <InlineLab
+          dsl={WT_LAB3_DSL}
+          title="Stage 3: Flow Paced Chemical Dosing & Duty Alternation"
+          step="Stage 3 of 3 (Full Lab)"
+          height={540}
+        />
+
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
+          <strong>Interactive Exercise:</strong> In Stage 3 above, observe that <strong>Duty Pump P-101A</strong> is active. Toggle <strong>Plant Run Permissive</strong> to OFF, then toggle it back to ON—watch the flip-flop switch control over to <strong>Standby Pump P-101B</strong>! Change the <strong>Raw Flow Rate</strong> from <code>1200</code> to <code>2000 GPM</code> and observe the chemical dosing rate automatically scale up from 60 to 100 GPH in real time!
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Field-Tested Rules for Municipal SCADA Deployment
+        </h2>
+        <p>
+          Before commissioning any water reclamation or filtration SCADA system on live municipal infrastructure, verify these five mandatory safety principles:
+        </p>
+        <ol className="list-decimal pl-6 space-y-3">
+          <li>
+            <strong>Hardware Interlocks Over Software Flags:</strong> Critical safety trips (dry-run low float and basin overflow high float) must be hardwired directly into the variable frequency drive (VFD) safe torque off (STO) circuit, independent of PLC software logic.
+          </li>
+          <li>
+            <strong>Valve Stroke Time Travel Watchdogs:</strong> Never assume an automated motorized butterfly valve opened just because an output coil energized. Always wire open/closed limit switches and implement a 15-second travel timer watchdog in ladder/FBD logic.
+          </li>
+          <li>
+            <strong>Anti-Water-Hammer Sequencing:</strong> Always sequence pump ramp-down before slow-closing discharge check valves to prevent shock pressure transients from blowing out ductile iron piping joints.
+          </li>
+          <li>
+            <strong>Hysteresis Deadbands Must Exceed Hydraulic Waves:</strong> In outdoor open basins, wind shear can generate 6-inch surface chop. Ensure your differential hysteresis span is at least 3× the maximum wave height.
+          </li>
+        </ol>
+      </div>
     ),
-    dsl: `
-      valve = INPUT(label: "Intake Valve")
-      start = INPUT(label: "Start Button")
-      stop = INPUT(label: "High Level Sensor")
-      
-      can_start = AND()
-      valve -> can_start.A
-      start -> can_start.B
-      
-      latch = RS_LATCH()
-      can_start -> latch.S
-      stop -> latch.R
-      
-      pump = OUTPUT(label: "Main Pump")
-      latch -> pump
-    `
+    dsl: ''
   },
   {
     slug: 'pid-oven-tuning',
