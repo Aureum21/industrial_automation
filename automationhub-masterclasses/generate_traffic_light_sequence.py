@@ -97,15 +97,15 @@ traffic_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" 
   <text x="745" y="205" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#065f46" text-anchor="middle">EW GREEN</text>
   <text x="745" y="218" font-family="Arial,sans-serif" font-size="9" fill="#047857" text-anchor="middle">Extend on Loop</text>
 
-  <text x="460" y="245" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#334155">&bull; Ring Barrier Constraint: NS and EW Greens never cross concurrently</text>
-  <text x="460" y="262" font-family="Arial,sans-serif" font-size="10" fill="#475569">&bull; Inductive Loop Actuation: L-EW demand triggers safe termination</text>
-  <text x="460" y="278" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#0d9488">&bull; Mandatory Clearance: Y &ge; 4.0s and All-Red &ge; 1.5s per MUTCD</text>
+  <text x="460" y="245" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#334155">• Ring Barrier Constraint: NS and EW Greens never cross concurrently</text>
+  <text x="460" y="262" font-family="Arial,sans-serif" font-size="10" fill="#475569">• Inductive Loop Actuation: L-EW demand triggers safe termination</text>
+  <text x="460" y="278" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#0d9488">• Mandatory Clearance: Y ≥ 4.0s and All-Red ≥ 1.5s per MUTCD</text>
 
   <rect x="450" y="300" width="335" height="90" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
   <text x="617" y="322" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#14532d" text-anchor="middle">ITE CLEARANCE INTERVAL EQUATIONS</text>
   <text x="617" y="342" font-family="Courier,monospace" font-size="12" font-weight="bold" fill="#15803d" text-anchor="middle">Yellow: Y = t + V / (2a + 2Gg) = 4.3 s</text>
   <text x="617" y="360" font-family="Courier,monospace" font-size="12" font-weight="bold" fill="#15803d" text-anchor="middle">All-Red: R = (W + L) / V = 1.6 s</text>
-  <text x="617" y="378" font-family="Arial,sans-serif" font-size="10" fill="#166534" text-anchor="middle">45 MPH Arterial (66 ft/s) &bull; Intersection Width W = 80 ft</text>
+  <text x="617" y="378" font-family="Arial,sans-serif" font-size="10" fill="#166534" text-anchor="middle">45 MPH Arterial (66 ft/s) • Intersection Width W = 80 ft</text>
 
   <rect x="450" y="400" width="335" height="75" rx="8" fill="#f8fafc" stroke="#23495c" stroke-width="1.5"/>
   <text x="617" y="420" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#142c3d" text-anchor="middle">PEDESTRIAN CLEARANCE &amp; FLASHING DONT WALK</text>
@@ -121,7 +121,7 @@ traffic_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" 
   <circle cx="910" cy="215" r="14" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
   <text x="910" y="219" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle">CMU</text>
   <text x="940" y="210" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#7f1d1d">AC Voltage Sense Matrix</text>
-  <text x="940" y="226" font-family="Arial,sans-serif" font-size="10" fill="#991b1b">Trip Window: &le; 450 ms</text>
+  <text x="940" y="226" font-family="Arial,sans-serif" font-size="10" fill="#991b1b">Trip Window: ≤ 450 ms</text>
   <text x="997" y="255" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#b91c1c" text-anchor="middle">Detects Conflicting Green / Yellow Displays</text>
 
   <rect x="850" y="290" width="295" height="100" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
@@ -132,8 +132,8 @@ traffic_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" 
 
   <rect x="850" y="405" width="295" height="70" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
   <text x="997" y="425" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#334155" text-anchor="middle">PROTECTED CMU FAULT CHANNELS</text>
-  <text x="997" y="443" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">&bull; Conflict (Dual Green) &bull; Multiple Indications</text>
-  <text x="997" y="460" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">&bull; Short Yellow Clearance &bull; 24V DC Brownout</text>
+  <text x="997" y="443" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">• Conflict (Dual Green) • Multiple Indications</text>
+  <text x="997" y="460" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">• Short Yellow Clearance • 24V DC Brownout</text>
 
   <path d="M408 280 h22" fill="none" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arr)"/>
   <path d="M805 210 h25" fill="none" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arr-red)"/>
@@ -526,12 +526,12 @@ article = {
 
         Stage 2 introduces the standardized 6-phase cyclic state machine incorporating mandatory ITE clearance windows:
 
-        1. **P1: North-South Green** ($3.5\\text{ s}$) &bull; East-West holds Red
-        2. **P2: North-South Yellow** ($1.5\\text{ s}$) &bull; East-West holds Red
-        3. **P3: ALL-RED CLEARANCE 1** ($1.5\\text{ s}$) &bull; **Both North-South and East-West hold solid RED** while the conflict box clears!
-        4. **P4: East-West Green** ($3.0\\text{ s}$) &bull; North-South holds Red
-        5. **P5: East-West Yellow** ($1.5\\text{ s}$) &bull; North-South holds Red
-        6. **P6: ALL-RED CLEARANCE 2** ($1.5\\text{ s}$) &bull; **Both hold solid RED** before North-South receives green!
+        1. **P1: North-South Green** ($3.5\\text{ s}$) • East-West holds Red
+        2. **P2: North-South Yellow** ($1.5\\text{ s}$) • East-West holds Red
+        3. **P3: ALL-RED CLEARANCE 1** ($1.5\\text{ s}$) • **Both North-South and East-West hold solid RED** while the conflict box clears!
+        4. **P4: East-West Green** ($3.0\\text{ s}$) • North-South holds Red
+        5. **P5: East-West Yellow** ($1.5\\text{ s}$) • North-South holds Red
+        6. **P6: ALL-RED CLEARANCE 2** ($1.5\\text{ s}$) • **Both hold solid RED** before North-South receives green!
 
         A `SCAN_DELAY` block provides an explicit, safe memory boundary for the loop reset without race conditions.
         '''),

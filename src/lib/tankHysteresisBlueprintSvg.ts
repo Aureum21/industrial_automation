@@ -78,21 +78,21 @@ export const TANK_HYSTERESIS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <!-- Signal Filtering Block -->
   <rect x="430" y="155" width="330" height="70" rx="8" fill="#f0fdfa" stroke="#0d9488" stroke-width="1.5"/>
   <text x="595" y="178" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="#134e4a" text-anchor="middle">1.5s LOW-PASS FILTER (ANTI-SLOSH)</text>
-  <text x="595" y="196" font-family="Arial,sans-serif" font-size="11" fill="#0f766e" text-anchor="middle">&alpha; = &Delta;t / (&tau; + &Delta;t) &bull; Exponential Moving Average</text>
+  <text x="595" y="196" font-family="Arial,sans-serif" font-size="11" fill="#0f766e" text-anchor="middle">α = Δt / (τ + Δt) • Exponential Moving Average</text>
   <text x="595" y="214" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#059669" text-anchor="middle">Eliminates surface ripples, splashing &amp; echo transients</text>
 
   <!-- Schmitt Trigger / Hysteresis Block -->
   <rect x="430" y="240" width="330" height="110" rx="8" fill="#f8fafc" stroke="#23495c" stroke-width="1.5"/>
   <text x="595" y="262" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#142c3d" text-anchor="middle">SCHMITT TRIGGER HYSTERESIS ENGINE</text>
-  <text x="595" y="282" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#059669" text-anchor="middle">&bull; Level &le; 20%: Latch Fill Command ON</text>
-  <text x="595" y="300" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#bd7b24" text-anchor="middle">&bull; Level &ge; 80%: Reset Fill Command OFF</text>
-  <text x="595" y="320" font-family="Arial,sans-serif" font-size="11" fill="#475569" text-anchor="middle">&bull; Between 20% &amp; 80%: Retain Previous Output (Deadband)</text>
-  <text x="595" y="338" font-family="Courier,monospace" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle">Hysteresis Width &Delta;H = 80% &minus; 20% = 60%</text>
+  <text x="595" y="282" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#059669" text-anchor="middle">• Level ≤ 20%: Latch Fill Command ON</text>
+  <text x="595" y="300" font-family="Arial,sans-serif" font-size="11" font-weight="bold" fill="#bd7b24" text-anchor="middle">• Level ≥ 80%: Reset Fill Command OFF</text>
+  <text x="595" y="320" font-family="Arial,sans-serif" font-size="11" fill="#475569" text-anchor="middle">• Between 20% &amp; 80%: Retain Previous Output (Deadband)</text>
+  <text x="595" y="338" font-family="Courier,monospace" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle">Hysteresis Width ΔH = 80% − 20% = 60%</text>
 
   <!-- NEMA Protection & Contactor Gate -->
   <rect x="430" y="365" width="330" height="65" rx="8" fill="#fef2f2" stroke="#b91c1c" stroke-width="1.5"/>
   <text x="595" y="388" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="#b91c1c" text-anchor="middle">NEMA MG 1 ANTI-SHORT-CYCLING</text>
-  <text x="595" y="406" font-family="Arial,sans-serif" font-size="10" fill="#7f1d1d" text-anchor="middle">Prevents contactor flutter &bull; Max 3&ndash;4 starts/hr rating</text>
+  <text x="595" y="406" font-family="Arial,sans-serif" font-size="10" fill="#7f1d1d" text-anchor="middle">Prevents contactor flutter • Max 3–4 starts/hr rating</text>
   <text x="595" y="420" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#991b1b" text-anchor="middle">LSHH overflow trip and dry-well LSLL lockout gates</text>
 
   <!-- Wiring from Tank to Controller -->
