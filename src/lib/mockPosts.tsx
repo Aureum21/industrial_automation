@@ -16,6 +16,7 @@ export interface BlogPost {
 
 import { HEATER_SVG } from './heaterBlueprintSvg';
 import { TWO_HAND_SAFETY_SVG } from './safetyBlueprintSvg';
+import { TANK_HYSTERESIS_SVG } from './tankHysteresisBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -388,6 +389,114 @@ const SAFETY_LAB3_DSL = `circuit "Stage 3 - Type III C Redundant Safety Train" v
   dual_out_B.Q -> valveA_cmd.A
   dual_out_B.Q -> valveB_cmd.A
   dual_out_B.Q -> stroke_active.A
+}
+`;
+
+const TANK_HYSTERESIS_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(TANK_HYSTERESIS_SVG);
+
+const HYSTERESIS_LAB1_DSL = `circuit "Stage 1 - The Naive Single-Setpoint Flaw" version 1 {
+  level: ANALOG_INPUT(label="Raw Tank Level %", value=50)
+  setpoint: ANALOG_CONSTANT(label="Threshold Setpoint 50%", params.value=50)
+  comp: ANALOG_COMPARATOR(label="Naive Comparator (< 50%)", operation="lt")
+  cycle_edge: R_TRIG()
+  chatter_counter: COUNTER(label="Motor Starts Count", limit=100)
+  pump: OUTPUT(label="Pump Motor Command (UNSTABLE)")
+
+  level.Q -> comp.A
+  setpoint.Q -> comp.B
+  comp.Q -> pump.A
+  comp.Q -> cycle_edge.A
+  cycle_edge.Q -> chatter_counter.CU
+}
+`;
+
+const HYSTERESIS_LAB2_DSL = `circuit "Stage 2 - Hysteresis Band (Schmitt Trigger)" version 1 {
+  level: ANALOG_INPUT(label="Tank Level %", value=50)
+  diff: ANALOG_DIFFERENTIAL(label="Schmitt Trigger (20% to 80%)", onThreshold=20, offThreshold=80)
+  pump: OUTPUT(label="Fill Pump Motor Command")
+  low_mark: ANALOG_CONSTANT(label="20% Low Ref", params.value=20)
+  high_mark: ANALOG_CONSTANT(label="80% High Ref", params.value=80)
+  in_deadband: AND(label="In Hysteresis Deadband")
+  above_low: ANALOG_COMPARATOR(operation="gt")
+  below_high: ANALOG_COMPARATOR(operation="lt")
+  deadband_lamp: OUTPUT(label="Operating Inside Deadband")
+
+  level.Q -> diff.A
+  diff.Q -> pump.A
+  level.Q -> above_low.A
+  low_mark.Q -> above_low.B
+  level.Q -> below_high.A
+  high_mark.Q -> below_high.B
+  above_low.Q -> in_deadband.A
+  below_high.Q -> in_deadband.B
+  in_deadband.Q -> deadband_lamp.A
+}
+`;
+
+const HYSTERESIS_LAB3_DSL = `circuit "Stage 3 - Closed-Loop Storage Tank with Dynamic Hysteresis" version 1 {
+  permit: INPUT(label="System Permissive & Breaker Healthy", value=true)
+  targetEmpty: ANALOG_CONSTANT(label="Gravity Drain Target", params.value=0)
+  targetFull: ANALOG_CONSTANT(label="Pump Inflow Target", params.value=100)
+  startLevel: ANALOG_CONSTANT(label="Start Threshold (20%)", params.value=20)
+  stopLevel: ANALOG_CONSTANT(label="Stop Threshold (80%)", params.value=80)
+  hiHiLimit: ANALOG_CONSTANT(label="High-High Cutout (92%)", params.value=92)
+  loLoLimit: ANALOG_CONSTANT(label="Low-Low Dry Alarm (8%)", params.value=8)
+
+  tankTarget: ANALOG_MUX()
+  tankLevel: ANALOG_RAMP(label="Physical Vessel Level", riseRate=7, fallRate=4)
+  filter: ANALOG_FILTER(label="Surface Wave Filter", timeConstant=1000)
+
+  needsFill: ANALOG_COMPARATOR(operation="lte")
+  isFull: ANALOG_COMPARATOR(operation="gte")
+  isHiHi: ANALOG_COMPARATOR(operation="gte")
+  isLoLo: ANALOG_COMPARATOR(operation="lte")
+
+  hiHiNot: NOT()
+  permitTrip: AND()
+  stopFill: OR()
+  fillDemand: RS_LATCH(label="Hysteresis Memory (Reset Priority)")
+  pumpEnable: AND()
+
+  pump: OUTPUT(label="P-201 Fill Pump Motor")
+  hiHiAlarm: OUTPUT(label="LSHH-201 High-High Alarm")
+  loLoAlarm: OUTPUT(label="LSLL-201 Low-Low Dry Run Alarm")
+  levelGauge: ANALOG_OUTPUT(label="Vessel Level LT-201 %")
+  filteredGauge: ANALOG_OUTPUT(label="Smoothed Level %")
+
+  pumpEnable.Q -> tankTarget.S
+  targetEmpty.Q -> tankTarget.A
+  targetFull.Q -> tankTarget.B
+  tankTarget.Q -> tankLevel.A
+  tankLevel.Q -> levelGauge.A
+  tankLevel.Q -> filter.A
+  filter.Q -> filteredGauge.A
+
+  filter.Q -> needsFill.A
+  startLevel.Q -> needsFill.B
+  filter.Q -> isFull.A
+  stopLevel.Q -> isFull.B
+  tankLevel.Q -> isHiHi.A
+  hiHiLimit.Q -> isHiHi.B
+  tankLevel.Q -> isLoLo.A
+  loLoLimit.Q -> isLoLo.B
+
+  isHiHi.Q -> hiHiAlarm.A
+  isLoLo.Q -> loLoAlarm.A
+
+  isHiHi.Q -> hiHiNot.A
+  permit.Q -> permitTrip.A
+  hiHiNot.Q -> permitTrip.B
+
+  isFull.Q -> stopFill.A
+  isHiHi.Q -> stopFill.B
+
+  needsFill.Q -> fillDemand.S
+  stopFill.Q -> fillDemand.R
+
+  fillDemand.Q -> pumpEnable.A
+  permitTrip.Q -> pumpEnable.B
+  pumpEnable.Q -> pump.A
 }
 `;
 
@@ -1241,32 +1350,245 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'tank-hysteresis',
-    title: 'Tank Level Hysteresis Control',
-    excerpt: 'Preventing pump short-cycling with differential triggers.',
-    author: 'John Doe',
-    date: 'Sep 15',
-    readingTime: '6 min read',
+    title: 'The 40-Second Motor Burnout: Tank Level Hysteresis, Schmitt Triggers & Anti-Short-Cycling',
+    excerpt: 'A deep masterclass on process vessel level control: diagnosing why single-threshold comparators cause catastrophic contactor chattering, implementing mathematical hysteresis bands with Schmitt triggers, and building dynamic closed-loop tank models with surface slosh filtering.',
+    author: 'John Doe & AutomationHub Engineering',
+    date: 'Oct 19',
+    readingTime: '18 min read + 20 min labs',
     tag: 'Control Systems',
-    views: 12900,
+    views: 16840,
     content: (
-      <>
-        <p>If you use a simple comparator to turn on a pump when a tank drops below 50%, the pump will turn on at 49.9% and off at 50.1%, rapidly cycling on and off. This "short-cycling" destroys motors.</p>
-        <p>The solution is Hysteresis. We use an ANALOG_DIFFERENTIAL block to turn the pump on when the level drops below 20%, and keep it on until the level reaches 80%.</p>
-        <p>Watch the pump state in the simulation below as you manually adjust the Tank Level analog input.</p>
-      </>
-    ),
-    dsl: `circuit "Tank Level Hysteresis Control" version 1 {
-  level: ANALOG_INPUT(label="Tank Level %", value=50)
-  hundred: ANALOG_CONSTANT(value=100)
-  math: MATH(operation="subtract")
-  diff: ANALOG_DIFFERENTIAL(onThreshold=80, offThreshold=20)
-  pump: OUTPUT(label="Fill Pump")
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={TANK_HYSTERESIS_SVG_DATA_URI}
+            alt="Industrial Process Vessel Level Hysteresis and Schmitt Trigger Control P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // PROCESS VESSEL LEVEL HYSTERESIS &amp; SCHMITT TRIGGER</span>
+            <span>DUAL-THRESHOLD DEADBAND &amp; NEMA MG 1 PROTECTION ARCHITECTURE</span>
+          </div>
+        </div>
 
-  hundred.Q -> math.A
-  level.Q -> math.B
-  math.Q -> diff.A
-  diff.Q -> pump.A
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          1. The 40-Second Motor Burnout &amp; The Welded Contactor
+        </h2>
+        <p>
+          At 03:14 AM on a frigid November night inside a commercial beverage bottling and pasteurization plant, a pungent chemical stench of charred epoxy and vaporized copper filled the motor control center (MCC). Seconds later, the main 480V substation feeder breaker tripped on instantaneous magnetic overcurrent, plunging the entire packaging line into total blackout.
+        </p>
+        <p>
+          The culprit was the primary 75 kW (100 HP) centrifugal pump (<code>P-201</code>) feeding a 50,000-gallon raw water buffer vessel (<code>TK-201</code>). When electricians unbolted the enclosure of motor starter contactor <code>M-201</code>, they found the silver-cadmium contacts burned into molten spheres and permanently welded shut. The motor windings had reached temperatures exceeding 240°C, destroying the Class H insulation and shorting all three phases directly to ground.
+        </p>
+        <p>
+          During the root-cause investigation, controls engineers pulled the PLC program archive. A junior automation technician had implemented the tank filling routine using a single naive analog comparator:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          // NAIVE TANK FILL LOGIC - DO NOT USE IN PRODUCTION<br />
+          IF Tank_Level_LT201 &lt; 50.0 THEN<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;Pump_Cmd := TRUE;<br />
+          ELSE<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;Pump_Cmd := FALSE;<br />
+          END_IF;
+        </div>
+        <p>
+          The incoming city water feed was turbulent, and the liquid surface suffered continuous 2-inch ripples from an adjacent agitator. As the tank filled to exactly 50.0%, the radar level transmitter (<code>LT-201</code>) dithered between 49.9% and 50.1% every 300 to 500 milliseconds.
+        </p>
+        <p>
+          In less than 12 minutes, the 480V contactor slammed open and closed over <strong>1,400 times</strong>. The motor inrush current (6× to 8× full load amperage) never subsided. Heat accumulated in the copper stator windings exponentially faster than the cooling fan could dissipate it, incinerating a $14,000 motor and causing $85,000 in unscheduled downtime.
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">Physical Hazards: Contactor Contact Welding &amp; NEMA Motor Start Limits</strong>
+          <p>
+            Standard 3-phase induction motors are thermally rated according to NEMA MG 1 and IEC 60034. Large motors (above 50 HP) must NEVER be started more than 3 to 4 times per hour from cold, or 2 times per hour from hot running temperature! A single-threshold comparator causes destructive contactor chattering that welds contactor tips shut, burns motor coils, and propagates acoustic water hammer shockwaves throughout piping networks.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          2. Engineering Theory: Schmitt Triggers, Deadband Sizing &amp; Fluid Slosh Dynamics
+        </h2>
+        <p>
+          To stop rapid chattering, control engineers implement <strong>Hysteresis</strong> (also known as a <strong>Schmitt Trigger</strong> or <strong>Differential Gap</strong>). Instead of a single switching point, the control algorithm defines two discrete, separated thresholds:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li><strong>Lower Threshold (H<sub>start</sub>):</strong> Turn the pump ON when level drops below <strong>20%</strong>.</li>
+          <li><strong>Upper Threshold (H<sub>stop</sub>):</strong> Turn the pump OFF when level reaches <strong>80%</strong>.</li>
+          <li><strong>Deadband (&Delta;H):</strong> Between 20% and 80%, the controller <strong>holds its previous state</strong>. No switching can occur inside the deadband!</li>
+        </ol>
+
+        <div className="my-6 overflow-x-auto not-prose rounded-xl border border-zinc-200 shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-zinc-200 text-sm text-left">
+            <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 border-b border-zinc-200">Control Architecture</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Complexity</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Noise Immunity</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Starts Per Hour</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Primary Failure Mode</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 bg-white">
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Naive Single-Point Comparator</td>
+                <td className="px-4 py-3 text-zinc-600">Trivial (1 block)</td>
+                <td className="px-4 py-3 text-red-600 font-semibold">Zero (Severe Chatter)</td>
+                <td className="px-4 py-3 text-red-600 font-semibold">&gt;500 starts/hr</td>
+                <td className="px-4 py-3 text-zinc-600">Welded contactors, motor stator burnout, water hammer</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Fixed Hysteresis (Schmitt Trigger)</td>
+                <td className="px-4 py-3 text-zinc-600">Low (1 block)</td>
+                <td className="px-4 py-3 text-zinc-600">Excellent (Within Deadband)</td>
+                <td className="px-4 py-3 text-zinc-600">0.5&ndash;2 starts/hr</td>
+                <td className="px-4 py-3 text-zinc-600">Large liquid level swings in tight buffer tanks</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors bg-teal-50/50">
+                <td className="px-4 py-3 font-semibold text-teal-900">Filtered Hysteresis + Safety Alarms</td>
+                <td className="px-4 py-3 text-teal-800">Industrial Grade</td>
+                <td className="px-4 py-3 text-teal-800 font-bold">Impervious (Filters Wave Echoes)</td>
+                <td className="px-4 py-3 text-teal-800 font-bold">Strictly bounded</td>
+                <td className="px-4 py-3 text-teal-800">Requires dual independent hardwired safety switches (LSHH/LSLL)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
+          Sizing the Hysteresis Deadband vs. Vessel Geometry
+        </h3>
+        <p>
+          The time required to complete one full fill-drain cycle (t<sub>cycle</sub>) is a direct mathematical function of the deadband volume:
+        </p>
+        <div className="bg-zinc-900 text-teal-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800 text-center">
+          &Delta;V = A<sub>tank</sub> &times; &Delta;H = A<sub>tank</sub> &times; (H<sub>stop</sub> &minus; H<sub>start</sub>)
+        </div>
+        <p>
+          For a 50,000-gallon vessel with a 1,200 GPM pump and a 400 GPM average process draw:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>With a naive 0.2% ripple at 50%: &Delta;V = 100 gal &rarr; t<sub>cycle</sub> = 18.7 seconds (<strong>192 starts/hour &mdash; fatal!</strong>)</li>
+          <li>With a 60% hysteresis band (20% to 80%): &Delta;V = 30,000 gal &rarr; t<sub>cycle</sub> = 5,625 seconds &asymp; 1.56 hours (<strong>0.64 starts/hour &mdash; rock solid!</strong>)</li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          3. Stage 1: The Naive Single-Setpoint Flaw (Destructive Short-Cycling)
+        </h2>
+        <p>
+          Examine the Stage 1 circuit below. It implements the exact naive boolean comparison that destroyed the bottling plant&apos;s motor:
+          <code>level.Q &rarr; comp.A (operation=&quot;lt&quot;)</code> with <code>setpoint = 50%</code>.
+        </p>
+        <p>
+          We have wired an edge trigger (<code>R_TRIG</code>) into a <code>COUNTER</code> block to record every time the motor contactor is energized.
+        </p>
+
+        <InlineLab
+          dsl={HYSTERESIS_LAB1_DSL}
+          title="Stage 1: The Naive Single-Setpoint Flaw"
+          step="Stage 1 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg my-4 text-sm font-sans text-red-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 1 (Simulating Destructive Chatter)</strong>
+          <p>
+            In Stage 1 above, click on <strong>Raw Tank Level %</strong> (currently 50%). Change it to 49%&mdash;the pump turns ON and the counter records 1 start. Now change it to 51% (pump turns OFF), then 49% (pump turns ON), then 50%... Notice how every tiny fluctuation around 50% pulses the motor starter! In a turbulent tank with surface ripples, this produces dozens of contactor arcs per minute, destroying mechanical contacts and overheating the motor windings.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          4. Stage 2: Dual Threshold Hysteresis with ANALOG_DIFFERENTIAL (Schmitt Trigger)
+        </h2>
+        <p>
+          To solve short-cycling once and for all, Stage 2 introduces the <strong>ANALOG_DIFFERENTIAL</strong> functional block. It features independent turn-on and turn-off thresholds:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><code>onThreshold = 20</code>: When the tank level drops down to or below 20%, the block turns its output <code>Q</code> to TRUE (starts the fill pump).</li>
+          <li><code>offThreshold = 80</code>: When the tank level rises up to or above 80%, the block turns its output <code>Q</code> to FALSE (shuts the fill pump off).</li>
+          <li><strong>The Deadband:</strong> While the level is anywhere between 20% and 80%, the block retains its existing state.</li>
+        </ul>
+
+        <InlineLab
+          dsl={HYSTERESIS_LAB2_DSL}
+          title="Stage 2: Hysteresis Band (Schmitt Trigger)"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 2 (Testing the Deadband Window)</strong>
+          <p>
+            In Stage 2 above:
+            <br />1. Click on <strong>Tank Level %</strong> and drop the level down to 18%. Notice that <strong>Fill Pump Motor Command</strong> turns ON!
+            <br />2. Now raise the level to 35%, then 50%, then 75%. Notice the pump stays solidly ENERGIZED throughout the deadband!
+            <br />3. Now raise the level to 82%: the pump instantly shuts OFF!
+            <br />4. Now lower the level back to 70%, then 50%, then 30%: the pump stays reliably DE-ENERGIZED until you drop below 20%! Contactor chattering is mathematically impossible.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          5. Stage 3: Closed-Loop Dynamic Storage Tank with Wave Slosh Filter &amp; Safety Alarms
+        </h2>
+        <p>
+          In real-world process vessels, liquid is continuously consumed by downstream equipment while the pump delivers pressurized inflow. Furthermore, incoming fluid creates surface sloshing, splashing, and acoustic radar echo noise.
+        </p>
+        <p>
+          Stage 3 couples a dynamic physical vessel with industrial signal conditioning:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li><strong>Dynamic Plant Model (<code>ANALOG_RAMP</code> + <code>ANALOG_MUX</code>):</strong> When the pump is ON, inflow exceeds outflow (level rises at 7%/s). When the pump is OFF, gravity drain empties the tank at 4%/s.</li>
+          <li><strong>First-Order Low-Pass Filter (<code>ANALOG_FILTER</code>):</strong> Uses an exponential moving average with time constant &tau; = 1,000 ms to eliminate turbulence before feeding the Schmitt trigger.</li>
+          <li><strong>Safety Protection Permissives:</strong>
+            <ul className="list-disc pl-6 mt-1 space-y-1">
+              <li><strong>High-High Limit (<code>LSHH-201</code> at 92%):</strong> Independent trip gate that immediately de-energizes the pump contactor if fluid nears tank overflow.</li>
+              <li><strong>Low-Low Dry-Run Alarm (<code>LSLL-201</code> at 8%):</strong> Warns operators of suction well starvation to protect downstream impellers from cavitation.</li>
+            </ul>
+          </li>
+        </ol>
+
+        <InlineLab
+          dsl={HYSTERESIS_LAB3_DSL}
+          title="Stage 3: Closed-Loop Storage Tank with Dynamic Hysteresis"
+          step="Stage 3 of 3"
+          height={650}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 3 (Dynamic Cycling &amp; High-High Trips)</strong>
+          <p>
+            In Stage 3 above:
+            <br />1. Press <strong>▶ Run</strong>. Watch the tank level smoothly oscillate between 20% and 80% in a continuous, automated triangular cycle. Notice the <strong>Smoothed Level %</strong> lags raw surface ripples cleanly.
+            <br />2. Open the Logic Analyzer at the bottom to view the analog ramps and clean digital pump square wave.
+            <br />3. Test the Safety Interlock: Toggle <strong>System Permissive &amp; Breaker Healthy</strong> to OFF while the pump is running&mdash;notice the pump drops out immediately regardless of water level!
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          6. Commissioning Checklist &amp; Plant Floor Level Sensor Proof Testing
+        </h2>
+        <ul className="list-disc pl-6 space-y-3">
+          <li>
+            <strong>Calculate Minimum Deadband from Motor Nameplate:</strong> Verify the motor&apos;s rated maximum starts per hour with the manufacturer (f<sub>max</sub>). Ensure the volume deadband &Delta;V guarantees t<sub>cycle</sub> &ge; 3600 / f<sub>max</sub> under worst-case peak inflow and minimum gravity consumption.
+          </li>
+          <li>
+            <strong>Instrument Stilling Well Verification:</strong> Ultrasonic and radar transmitters must be mounted inside a vertical, perforated <strong>stilling well</strong> (or bypass bridle) if the vessel has mechanical agitation, turbulent top-filling nozzles, or boiling liquids.
+          </li>
+          <li>
+            <strong>Damping Parameter Alignment:</strong> Configure transmitter internal damping (2 to 5 seconds) to suppress physical surface ripples before transmitting 4&ndash;20 mA signals to the analog input card.
+          </li>
+          <li>
+            <strong>Independent High-High Float Switches (LSHH):</strong> Never rely solely on an analog transmitter for overflow prevention. A physical magnetic float or tuning fork switch must be hardwired directly into the motor starter safety circuit.
+          </li>
+          <li>
+            <strong>Fail-Safe Signal Behavior (NAMUR NE 43):</strong> Ensure that sensor wire break (&lt;3.6 mA) or short circuit (&gt;21.0 mA) causes the PLC to immediately default to a safe state (stop filling pump, trigger operator diagnostic alarm).
+          </li>
+          <li>
+            <strong>Quarterly Contactor Tip Inspection:</strong> Periodically unbolt MCC starter covers and inspect silver-alloy contact tips for pitting, carbon buildup, or signs of contact chatter arcing.
+          </li>
+        </ul>
+      </div>
+    ),
+    dsl: ''
   },
   {
     slug: 'pump-alternator',
