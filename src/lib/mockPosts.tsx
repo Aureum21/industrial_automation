@@ -19,6 +19,7 @@ import { TWO_HAND_SAFETY_SVG } from './safetyBlueprintSvg';
 import { TANK_HYSTERESIS_SVG } from './tankHysteresisBlueprintSvg';
 import { TRAFFIC_LIGHT_SVG } from './trafficBlueprintSvg';
 import { PUMP_ALTERNATOR_SVG } from './pumpAlternatorBlueprintSvg';
+import { CONVEYOR_SORTING_SVG } from './conveyorBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -1015,6 +1016,83 @@ const PUMP_ALT_LAB3_DSL = `circuit "Stage 3 - Duplex Lead / Lag Sequencing & Pea
 }
 `;
 
+const CONVEYOR_SORTING_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(CONVEYOR_SORTING_SVG);
+
+const CONVEYOR_LAB1_DSL = `circuit "Stage 1 - The Fixed Timer Delay Flaw" version 1 {
+  sensor: INPUT(label="PE-101 Defect Photoeye", value=false)
+  belt_running: INPUT(label="Conveyor Motor Running", value=true)
+  pulse: TOF(label="Sensor Pulse Capture", duration=600)
+  active_defect: AND()
+  travel_delay: TON(label="Fixed Travel Delay (2.0s)", duration=2000)
+  divert_pulse: TOF(label="Diverter Arm Stroke (0.8s)", duration=800)
+  diverter: OUTPUT(label="Pneumatic Diverter Arm")
+  hazard_alert: OUTPUT(label="Multi-Package Collision Risk")
+
+  sensor.Q -> pulse.A
+  pulse.Q -> active_defect.A
+  belt_running.Q -> active_defect.B
+  active_defect.Q -> travel_delay.A
+  travel_delay.Q -> divert_pulse.A
+  divert_pulse.Q -> diverter.A
+  active_defect.Q -> hazard_alert.A
+}
+`;
+
+const CONVEYOR_LAB2_DSL = `circuit "Stage 2 - Synchronous Zone Tracking via Shift Register" version 1 {
+  defect_pe: INPUT(label="PE-101 Defect Photoeye", value=false)
+  belt_run: INPUT(label="Conveyor Drive Running", value=true)
+  belt_tick: CLOCK(label="Belt Travel Zone Pulses", onTime=400, offTime=400)
+  reset_reg: INPUT(label="Clear Tracking Register", value=false)
+
+  dir_low: LOW()
+  gate_clk: AND()
+  shift: SHIFT_REGISTER(label="4-Zone Conveyor Tracking", length=4)
+  divert_pulse: TOF(label="Diverter Fire Pulse", duration=600)
+  diverter: OUTPUT(label="Zone 4 Reject Diverter Solenoid")
+  box_at_reject: OUTPUT(label="Defect Box Arrived at Zone 4")
+
+  belt_run.Q -> gate_clk.A
+  belt_tick.Q -> gate_clk.B
+
+  defect_pe.Q -> shift.D
+  gate_clk.Q -> shift.CLK
+  dir_low.Q -> shift.DIR
+  reset_reg.Q -> shift.R
+
+  shift.Q -> box_at_reject.A
+  shift.Q -> divert_pulse.A
+  divert_pulse.Q -> diverter.A
+}
+`;
+
+const CONVEYOR_LAB3_DSL = `circuit "Stage 3 - Pneumatic Diverter with Jam Watchdog" version 1 {
+  run_cmd: INPUT(label="Conveyor Start Request", value=true)
+  pe_jam: INPUT(label="PE-102 Diverter Jam Photoeye", value=false)
+  diverter_fwd: INPUT(label="ZSE Diverter Full Extend Sw", value=true)
+  reset_pb: INPUT(label="Operator Reset Pushbutton", value=false)
+
+  jam_timer: TON(label="Jam Detection Timer (1.5s)", duration=1500)
+  jam_latch: RS_LATCH(label="Conveyor Jam Cutout Latch")
+  jam_safe: NOT()
+
+  conv_permit: AND(label="Conveyor Run Permissive")
+  motor_run: OUTPUT(label="Conveyor Drive Contactor (KM-101)")
+  jam_alarm: OUTPUT(label="Carton Jam Alarm (LINE STOP)")
+
+  pe_jam.Q -> jam_timer.A
+  jam_timer.Q -> jam_latch.S
+  reset_pb.Q -> jam_latch.R
+
+  jam_latch.Q -> jam_alarm.A
+  jam_latch.Q -> jam_safe.A
+
+  run_cmd.Q -> conv_permit.A
+  jam_safe.Q -> conv_permit.B
+  conv_permit.Q -> motor_run.A
+}
+`;
+
 export const BLOG_POSTS: BlogPost[] = [
   {
     slug: 'water-treatment',
@@ -1770,36 +1848,226 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'conveyor-sorting',
-    title: 'Conveyor Belt Sorting System',
-    excerpt: 'Using sensors and timers to divert packages accurately.',
-    author: 'Mike Systems',
+    title: 'Automated Conveyor Sorting: Shift-Register Tracking, Diverter Timing & Jam Watchdogs',
+    excerpt: 'An intermediate masterclass on packaging and material handling automation: why fixed timers fail when multiple cartons queue up, implementing multi-zone shift register tracking, and engineering pneumatic diverters with jam-detection interlocks.',
+    author: 'Mike Systems & AutomationHub Team',
     date: 'Sep 22',
-    readingTime: '6 min read',
-    tag: 'Logistics',
-    views: 7620,
+    readingTime: '12 min read + 15 min labs',
+    tag: 'Intermediate',
+    views: 11450,
     content: (
-      <>
-        <p>A sorting conveyor requires precise timing. When a sensor detects a defective package, the diverter arm shouldn't swing immediately—it has to wait until the package travels down the belt to the diverter position.</p>
-        <p>We solve this using a TOF (Timer Off Delay) combined with a TON. The TOF extends the sensor pulse to ensure it's captured, and the TON delays the diverter actuation by exactly the travel time (e.g., 2000ms).</p>
-        <p>Test the logic by briefly pulsing the "Defect Sensor" below and watch the diverter actuate 2 seconds later.</p>
-      </>
-    ),
-    dsl: `circuit "Conveyor Belt Sorting System" version 1 {
-  sensor: INPUT(label="Defect Sensor", value=false)
-  belt_running: INPUT(label="Belt Running", value=true)
-  pulse: TOF(duration=500)
-  active_defect: AND()
-  travel_delay: TON(duration=2000)
-  divert_pulse: TOF(duration=1000)
-  diverter: OUTPUT(label="Diverter Arm")
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={CONVEYOR_SORTING_SVG_DATA_URI}
+            alt="Automated Conveyor Sorting System and Diverter Tracking P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // AUTOMATED CONVEYOR SORTING</span>
+            <span>MULTI-ZONE TRACKING, PNEUMATIC DIVERTER &amp; ANTI-JAM WATCHDOG</span>
+          </div>
+        </div>
 
-  sensor.Q -> pulse.A
-  pulse.Q -> active_defect.A
-  belt_running.Q -> active_defect.B
-  active_defect.Q -> travel_delay.A
-  travel_delay.Q -> divert_pulse.A
-  divert_pulse.Q -> diverter.A
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The Sorting Conveyor Dilemma: Single-Box Timers vs. Multi-Box Pipelines
+        </h2>
+        <p>
+          Automated sorting conveyors are the lifeblood of distribution centers, bottling plants, and food packaging facilities. A standard sorting line features:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Infeed Inspection Station:</strong> A vision camera, barcode scanner, or optical checkweigher photoeye (<code>PE-101</code>) that flags defective or misrouted cartons.
+          </li>
+          <li>
+            <strong>Transport Bed:</strong> A powered belt or roller conveyor moving items at constant linear speed (e.g., 60 to 120 FPM).
+          </li>
+          <li>
+            <strong>Diverter Station:</strong> A high-speed pneumatic pusher arm, pop-up wheel diverter, or air blast nozzle (<code>SOL-101</code>) positioned downstream to kick flagged items into a reject lane.
+          </li>
+        </ul>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          Why Beginners Use Fixed Timers (And Why They Fail)
+        </h3>
+        <p>
+          When tasked with triggering the diverter 2 meters downstream, a beginner controls engineer naturally reaches for timers:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          Defect Detected &rarr; TON Timer (2.0 seconds) &rarr; Fire Diverter Arm (0.8s TOF)
+        </div>
+        <p>
+          <strong>The High-Throughput Trap:</strong> This timer circuit works during low-speed commissioning when you gently push one test box down the belt. But as soon as production ramps up to 60 cartons per minute:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li>
+            <strong>Queue Collisions:</strong> What happens if Box #1 is defective, and Box #2 (1.0 second behind it) is also defective? The <code>TON</code> timer is already busy timing Box #1. When Box #2 passes the sensor, the timer cannot track two distinct time horizons simultaneously!
+          </li>
+          <li>
+            <strong>Timer Reset Flaw:</strong> If the sensor pulse drops between cartons, the timer resets completely&mdash;causing the diverter to miss Box #1 and fire late for Box #2!
+          </li>
+          <li>
+            <strong>Speed Drift Misalignment:</strong> If the conveyor belt slows down under a heavy load or stops during an upstream pause, wall-clock timers keep counting down! The diverter fires into empty air, and the defective box rolls right into good stock.
+          </li>
+        </ol>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">Intermediate Control Rule: Track Distance, Not Time</strong>
+          <p>
+            Conveyor parcel tracking should always be coupled to physical belt displacement rather than wall-clock seconds. Using travel encoder pulses or discrete zone shift registers ensures that if the belt speeds up, slows down, or stops entirely, the tracked positions of all parcels freeze and move in perfect physical synchronism.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Fixed Timer Delay Flaw
+        </h2>
+        <p>
+          Examine the Stage 1 circuit below. It implements the classic single-box timer delay: a <code>TOF</code> captures the optical photoeye pulse, a <code>TON</code> delays actuation by 2000 ms of travel time, and a second <code>TOF</code> strokes the diverter arm for 800 ms.
+        </p>
+        <p>
+          Notice the <strong>Multi-Package Collision Risk</strong> indicator: the moment a defect is registered, the single timer channel becomes locked. If another carton arrives before the first completes its 2-second travel, tracking is lost.
+        </p>
+
+        <InlineLab
+          dsl={CONVEYOR_LAB1_DSL}
+          title="Stage 1: The Fixed Timer Delay Flaw"
+          step="Stage 1 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-rose-500 bg-rose-50 p-4 rounded-r-lg my-4 text-sm font-sans text-rose-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 1 (Witness the Lost Package)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>Click <strong>PE-101 Defect Photoeye</strong> once to simulate a defective box. Watch <strong>Sensor Pulse Capture</strong> hold the pulse, and after 2.0s, <strong>Pneumatic Diverter Arm</strong> strokes for 0.8s. That works!</li>
+            <li>Now click <strong>PE-101 Defect Photoeye</strong>, wait 0.8s, and click it a SECOND time (two defective cartons close together). Watch how the second pulse is completely swallowed by the running timer! The diverter only strokes once&mdash;the second defective box escapes!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Synchronous Zone Tracking via Shift Register
+        </h2>
+        <p>
+          In professional material handling systems, the conveyor line is mathematically divided into discrete physical <strong>Zones</strong> (e.g. Zone 1 = Scan, Zone 2 = Acceleration, Zone 3 = Alignment, Zone 4 = Divert).
+        </p>
+        <p>
+          A <strong>Bit Shift Register (<code>SHIFT_REGISTER</code>)</strong> acts as a true First-In, First-Out (FIFO) pipeline:
+        </p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>Each clock pulse (<code>CLK</code>) represents the belt moving forward by exactly one zone length.</li>
+          <li>If a package at <code>PE-101</code> is marked defective, a digital <code>1</code> is shifted into the register at bit 0.</li>
+          <li>With every travel pulse, the <code>1</code> bit marches synchronously through the zones:
+            <div className="bg-zinc-900 text-emerald-400 p-3 rounded font-mono text-xs my-2">
+              Zone 1 (Scan): &nbsp;&nbsp;&nbsp;[ 1, 0, 0, 0 ]<br />
+              Zone 2 (Accel): &nbsp;&nbsp;[ 0, 1, 0, 0 ]<br />
+              Zone 3 (Align): &nbsp;&nbsp;[ 0, 0, 1, 0 ]<br />
+              Zone 4 (Divert): &nbsp;[ 0, 0, 0, 1 ] &rarr; FIRE DIVERTER!
+            </div>
+          </li>
+          <li>If three defective packages pass in a row, the register simply holds <code>[ 1, 1, 1, 0 ]</code>. Each package is individually tracked and diverted with 100% precision!</li>
+        </ul>
+
+        <InlineLab
+          dsl={CONVEYOR_LAB2_DSL}
+          title="Stage 2: Synchronous Zone Tracking via Shift Register"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 2 (Multi-Carton Pipeline in Action)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>Click <strong>Run</strong> to start the simulation. The <strong>Belt Travel Zone Pulses</strong> clock pulses continuously as the conveyor rolls.</li>
+            <li>Click <strong>PE-101 Defect Photoeye</strong> to flag a package. Notice how the defect bit enters the shift register.</li>
+            <li>Count 4 travel steps: precisely when the carton arrives at Zone 4, <strong>Defect Box Arrived at Zone 4</strong> turns ON, and the diverter solenoid fires!</li>
+            <li>Now pulse <strong>PE-101 Defect Photoeye</strong> two or three times across successive clock ticks. Watch how multiple defect bits travel in sequence without overwriting each other!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Pneumatic Diverter Safety, Reed Switches &amp; Jam Watchdog
+        </h2>
+        <p>
+          A real industrial diverter arm is powered by a double-acting pneumatic cylinder. If a box gets wedged against the guide rail or the air supply drops, the cylinder may stall half-way, causing the next oncoming carton to crash into the arm at full speed.
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          Real-World Diverter Interlocks:
+        </h3>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Cylinder Reed Switches (<code>diverter_fwd</code> / <code>diverter_ret</code>):</strong> Magnetic sensors mounted on the pneumatic cylinder verify that the arm has fully retracted before the next carton is allowed to enter the zone.
+          </li>
+          <li>
+            <strong>Jam Detection Watchdog (<code>PE-102</code>):</strong> An optical retro-reflective sensor positioned directly at the divert chute. Under normal operation, cartons pass the sensor within 200&ndash;400 ms. If <code>PE-102</code> remains continuously blocked for longer than <strong>1.5 seconds</strong>, a <strong>Carton Jam</strong> is declared:
+            <ul className="list-disc pl-6 mt-1 space-y-1">
+              <li>The line drive motor (<code>KM-101</code>) trips immediately.</li>
+              <li>An <code>RS_LATCH</code> locks the conveyor in an Emergency Stop state to prevent back-pressure box crushing.</li>
+              <li>A flashing <code>jam_alarm</code> alerts operators to clear the physical obstruction and press <code>reset_pb</code>.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <InlineLab
+          dsl={CONVEYOR_LAB3_DSL}
+          title="Stage 3: Pneumatic Diverter with Jam Watchdog"
+          step="Stage 3 of 3"
+          height={600}
+        />
+
+        <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded-r-lg my-4 text-sm font-sans text-indigo-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 3 (Simulate a Carton Jam &amp; Emergency Stop)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>Notice <strong>Conveyor Drive Contactor (KM-101)</strong> is running normally.</li>
+            <li>Toggle <strong>PE-102 Diverter Jam Photoeye</strong> to ON (simulating a package stuck at the reject mouth).</li>
+            <li>Watch the <strong>Jam Detection Timer</strong> count: after 1.5 seconds of sustained blockage, the latch trips, the motor stops instantly, and <strong>Carton Jam Alarm (LINE STOP)</strong> turns ON!</li>
+            <li>Clear the simulated jam by toggling <strong>PE-102</strong> to OFF. Notice the line remains safely stopped until you pulse <strong>Operator Reset Pushbutton</strong> to restore line run permissive!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Field Commissioning &amp; Sensor Alignment Rules
+        </h2>
+        <p>
+          When commissioning high-speed sorting belts on the factory floor, apply these five practical guidelines:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Optical Photoeye Debounce Filtering:</strong> Industrial cardboard flaps and shipping labels have ripples that can cause optical beams to flicker. Always insert a 15&ndash;20 ms on-delay filter on photoeye inputs to prevent a single ragged carton from registering as two distinct boxes.
+          </li>
+          <li>
+            <strong>Link Tracking to Shaft Encoders:</strong> For variable-speed conveyors, mount an incremental quadrature encoder (e.g., 1024 pulses/rev) on an unpowered idler pulley. Never use the motor drive shaft, as belt slip will introduce cumulative tracking error.
+          </li>
+          <li>
+            <strong>Pneumatic Pressure Switches &amp; Flow Controls:</strong> Install dual meter-out speed control mufflers on the diverter cylinder. Adjust extend speed to cushion carton impact, and adjust retract speed to ensure the paddle clears the belt before the next carton arrives.
+          </li>
+          <li>
+            <strong>Mechanical Guide Rails &amp; Singulation:</strong> Software tracking assumes consistent package spacing. Upstream metering belts or pop-up brake pads must enforce minimum package pitch (gap) before cartons reach the inspection photoeye.
+          </li>
+          <li>
+            <strong>Latched Jam Alarms with Manual Reset:</strong> Never allow an automatic jam clear to restart conveyor motors autonomously. A jammed carton can dislodge suddenly; requiring a deliberate operator reset button press protects technicians clearing wedged boxes.
+          </li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Timers do not scale to queues:</strong> Fixed delay timers (<code>TON</code>) fail when multiple items are in flight simultaneously or when belt speed fluctuates.
+          </li>
+          <li>
+            <strong>Shift registers provide true FIFO tracking:</strong> By indexing parcel positions to discrete conveyor displacement zones, multi-item sorting operates with 100% precision.
+          </li>
+          <li>
+            <strong>Physical safety requires watchdog sensing:</strong> Cylinders must prove full retraction via magnetic reed switches, and downstream photoeyes must trip conveyor drives on sustained carton blockage.
+          </li>
+          <li>
+            <strong>Simplicity and reliability:</strong> Combining synchronous bit shifting with latching jam interlocks provides an industrial-grade sortation solution suitable for any factory or distribution hub.
+          </li>
+        </ul>
+      </div>
+    ),
+    dsl: ''
   },
   {
     slug: 'two-hand-safety',
