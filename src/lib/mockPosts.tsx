@@ -15,6 +15,7 @@ export interface BlogPost {
 }
 
 import { HEATER_SVG } from './heaterBlueprintSvg';
+import { TWO_HAND_SAFETY_SVG } from './safetyBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -264,6 +265,131 @@ const WATER_TREATMENT_SVG_DATA_URI =
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-labelledby="t d"><title id="t">Intake station and receiving tank</title><desc id="d">A source sump feeds two parallel pumps through an open-proved isolation valve. Check valves join the receiving tank. Level feedback selects the duty pump. An independent high-high switch and suction-low switch inhibit pumping.</desc><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#227b92"/></marker></defs><rect width="1200" height="560" rx="18" fill="#f3f6f8"/><g font-family="Arial,sans-serif" fill="#142c3d"><text x="38" y="42" font-size="24" font-weight="bold">01 / INTAKE DUTY, PERMISSIVES AND TANK LEVEL</text><text x="38" y="70" font-size="15">Conceptual P&amp;ID — physical protection and PLC logic are separate layers</text></g><g fill="#fff" stroke="#23495c" stroke-width="3"><path d="M55 190v190h165V190"/><path d="M65 300h145" stroke="#227b92"/><circle cx="510" cy="220" r="43"/><circle cx="510" cy="355" r="43"/><path d="M490 239v-38l37 19Z M490 374v-38l37 19Z"/><rect x="845" y="185" width="210" height="220" rx="14"/><path d="M850 310h200" stroke="#227b92"/><path d="M302 264l25 20-25 20Z M352 264l-25 20 25 20Z"/></g><g fill="none" stroke="#227b92" stroke-width="5" marker-end="url(#arr)"><path d="M220 284h80"/><path d="M354 284h66V220h46"/><path d="M420 284v71h46"/><path d="M554 220h170v64h117"/><path d="M554 355h170v-71"/><path d="M1055 350h108"/></g><g fill="none" stroke="#23495c" stroke-width="2"><path d="M624 204v32l22-16Z M649 204v32 M624 339v32l22-16Z M649 339v32"/><circle cx="138" cy="165" r="32"/><path d="M138 197v100"/><circle cx="922" cy="128" r="31"/><path d="M922 159v27"/><circle cx="1010" cy="128" r="31"/><path d="M1010 159v27"/><rect x="320" y="100" width="400" height="60" rx="8"/></g><g fill="none" stroke="#bd7b24" stroke-width="2" stroke-dasharray="7 5"><path d="M170 165h95v-35h55 M720 130h171 M979 128h-25 M327 260v-100 M510 160v16 M570 160v152"/></g><g font-family="Arial,sans-serif" fill="#142c3d" text-anchor="middle"><text x="138" y="160" font-size="13">LSL-101</text><text x="138" y="178" font-size="11">suction OK</text><text x="135" y="415" font-size="17">TK-101 / source sump</text><text x="327" y="335" font-size="15">XV-101 / ZSO-101</text><text x="510" y="287" font-size="16">P-101A</text><text x="510" y="419" font-size="16">P-101B</text><text x="655" y="190" font-size="13">NRV-A</text><text x="655" y="400" font-size="13">NRV-B</text><text x="950" y="436" font-size="17">TK-102 / receiving tank</text><text x="922" y="133" font-size="13">LT-102</text><text x="1010" y="133" font-size="12">LSHH-102</text><text x="520" y="125" font-size="17">PLC / demand latch + duty selector</text><text x="520" y="147" font-size="12">Start 35% • stop 75% • independent HH inhibit</text></g><g font-family="Arial,sans-serif" font-size="15" fill="#294758"><text x="40" y="496">Blue: water flow →    Dashed amber: logical / instrument signals</text><text x="40" y="524">Duty alternation is not automatic fault substitution. Valve and motor feedback must be proved separately.</text></g></svg>`
   );
+
+const TWO_HAND_SAFETY_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(TWO_HAND_SAFETY_SVG);
+
+const SAFETY_LAB1_DSL = `circuit "Stage 1 - The Naive Bypass Flaw" version 1 {
+  pb1: INPUT(label="Left Hand PB-101A", value=false)
+  pb2: INPUT(label="Right Hand PB-101B", value=false)
+  and_gate: AND(label="Naive Concurrence")
+  stroke: OUTPUT(label="Press Ram Solenoid (UNSAFE)")
+
+  pb1.Q -> and_gate.A
+  pb2.Q -> and_gate.B
+  and_gate.Q -> stroke.A
+}
+`;
+
+const SAFETY_LAB2_DSL = `circuit "Stage 2 - 500ms Synchronism Window" version 1 {
+  pb1: INPUT(label="Left Hand PB-101A", value=false)
+  pb2: INPUT(label="Right Hand PB-101B", value=false)
+  edge1: R_TRIG(label="PB1 Rising Edge")
+  edge2: R_TRIG(label="PB2 Rising Edge")
+  window1: TOF(label="500ms Window from PB1", duration=500)
+  window2: TOF(label="500ms Window from PB2", duration=500)
+  sync1: AND(label="PB2 inside PB1 window")
+  sync2: AND(label="PB1 inside PB2 window")
+  any_sync: OR(label="Synchronous Press Proved")
+  both_held: AND(label="Both Actively Held")
+  valid_run: AND(label="Synchronous & Held")
+  run_cmd: OUTPUT(label="Press Stroke Permissive")
+  sync_lamp: OUTPUT(label="Sync Timing OK (<500ms)")
+
+  pb1.Q -> edge1.A
+  pb2.Q -> edge2.A
+  edge1.Q -> window1.A
+  edge2.Q -> window2.A
+  window1.Q -> sync1.A
+  pb2.Q -> sync1.B
+  window2.Q -> sync2.A
+  pb1.Q -> sync2.B
+  sync1.Q -> any_sync.A
+  sync2.Q -> any_sync.B
+  pb1.Q -> both_held.A
+  pb2.Q -> both_held.B
+  any_sync.Q -> valid_run.A
+  both_held.Q -> valid_run.B
+  valid_run.Q -> run_cmd.A
+  any_sync.Q -> sync_lamp.A
+}
+`;
+
+const SAFETY_LAB3_DSL = `circuit "Stage 3 - Type III C Redundant Safety Train" version 1 {
+  estop: NC_INPUT(label="E-Stop Button (NC)", value=false)
+  pb1: INPUT(label="Left Hand PB-101A", value=false)
+  pb2: INPUT(label="Right Hand PB-101B", value=false)
+  tdc_cam: INPUT(label="TDC Stroke Complete Cam", value=false)
+  valveA_spool: INPUT(label="Valve A Spool Proved Normal", value=true)
+  valveB_spool: INPUT(label="Valve B Spool Proved Normal", value=true)
+
+  edge1: R_TRIG()
+  edge2: R_TRIG()
+  window1: TOF(duration=500)
+  window2: TOF(duration=500)
+  sync1: AND()
+  sync2: AND()
+  any_sync: OR()
+  both_held: AND()
+  sync_held: AND()
+
+  anti_repeat: RS_LATCH(label="Anti-Repeat Single-Stroke Latch")
+  both_released: NOR(label="Both Released to Reset")
+
+  spool_healthy: AND(label="Dual Spool Feedback Healthy")
+  system_permissive: AND(label="Safety Permissive")
+
+  dual_out_A: AND()
+  dual_out_B: AND()
+
+  valveA_cmd: OUTPUT(label="Safety Valve Pilot Solenoid A")
+  valveB_cmd: OUTPUT(label="Safety Valve Pilot Solenoid B")
+  stroke_active: OUTPUT(label="Press Downstroke Active")
+  fault_lamp: OUTPUT(label="Safety Valve Spool Fault")
+
+  spool_fault: NOT()
+  spool_fault.Q -> fault_lamp.A
+
+  valveA_spool.Q -> spool_healthy.A
+  valveB_spool.Q -> spool_healthy.B
+  spool_healthy.Q -> spool_fault.A
+
+  estop.Q -> system_permissive.A
+  spool_healthy.Q -> system_permissive.B
+
+  pb1.Q -> edge1.A
+  pb2.Q -> edge2.A
+  edge1.Q -> window1.A
+  edge2.Q -> window2.A
+  window1.Q -> sync1.A
+  pb2.Q -> sync1.B
+  window2.Q -> sync2.A
+  pb1.Q -> sync2.B
+  sync1.Q -> any_sync.A
+  sync2.Q -> any_sync.B
+
+  pb1.Q -> both_held.A
+  pb2.Q -> both_held.B
+  any_sync.Q -> sync_held.A
+  both_held.Q -> sync_held.B
+
+  sync_held.Q -> anti_repeat.S
+  tdc_cam.Q -> anti_repeat.R
+
+  pb1.Q -> both_released.A
+  pb2.Q -> both_released.B
+
+  anti_repeat.Q -> dual_out_A.A
+  both_held.Q -> dual_out_A.B
+
+  dual_out_A.Q -> dual_out_B.A
+  system_permissive.Q -> dual_out_B.B
+
+  dual_out_B.Q -> valveA_cmd.A
+  dual_out_B.Q -> valveB_cmd.A
+  dual_out_B.Q -> stroke_active.A
+}
+`;
 
 export const BLOG_POSTS: BlogPost[] = [
   {
@@ -831,52 +957,248 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'two-hand-safety',
-    title: 'Two-Hand Safety Interlock',
-    excerpt: 'Ensuring operator safety with strict timing logic.',
+    title: 'The $240,000 Tie-Down Disaster: Engineering ISO 13851 Type III C Two-Hand Safety Controls',
+    excerpt: 'A deep masterclass in functional safety: diagnosing why naive AND-gate circuits cause catastrophic press amputations, implementing the strict 500 ms synchronism window with anti-tie-down and anti-repeat, and engineering Category 4 / PL e dual-channel monitored safety valves.',
     author: 'Emma Safety',
-    date: 'Sep 20',
-    readingTime: '7 min read',
+    date: 'Oct 19',
+    readingTime: '18 min read + 20 min labs',
     tag: 'Safety',
     views: 15200,
     content: (
-      <>
-        <p>Industrial presses often require the operator to press two buttons simultaneously (one for each hand) to ensure their hands are out of the danger zone. To prevent the operator from simply taping one button down, the logic dictates that both buttons must be pressed within 500ms of each other.</p>
-        <p>We use Edge Triggers (R_TRIG) and Timers to enforce this strict window. If the window expires, the operator must release both buttons and try again.</p>
-        <p>Try pressing both buttons in the simulation. If you leave one pressed for too long before pressing the second, the press will not actuate.</p>
-      </>
-    ),
-    dsl: `circuit "Two-Hand Safety Interlock" version 1 {
-  btn1: INPUT(label="Left Hand Button", value=false)
-  btn2: INPUT(label="Right Hand Button", value=false)
-  edge1: R_TRIG()
-  edge2: R_TRIG()
-  timer1: TOF(duration=500)
-  timer2: TOF(duration=500)
-  valid1: AND()
-  valid2: AND()
-  valid: OR()
-  both_held: AND()
-  latch: RS_LATCH()
-  not_held: NOT()
-  press: OUTPUT(label="Actuate Press")
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={TWO_HAND_SAFETY_SVG_DATA_URI}
+            alt="Two-Hand Safety Interlock and Monitored Press Hydraulic Train P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // TWO-HAND CONTROL &amp; MONITORED PRESS SAFETY TRAIN</span>
+            <span>ISO 13851 TYPE III C &amp; CATEGORY 4 / PL e ARCHITECTURE</span>
+          </div>
+        </div>
 
-  btn1.Q -> edge1.A
-  btn2.Q -> edge2.A
-  edge1.Q -> timer1.A
-  edge2.Q -> timer2.A
-  timer1.Q -> valid1.A
-  btn2.Q -> valid1.B
-  timer2.Q -> valid2.A
-  btn1.Q -> valid2.B
-  valid1.Q -> valid.A
-  valid2.Q -> valid.B
-  btn1.Q -> both_held.A
-  btn2.Q -> both_held.B
-  valid.Q -> latch.S
-  both_held.Q -> not_held.A
-  not_held.Q -> latch.R
-  latch.Q -> press.A
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          1. The 07:15 AM Stamping Press Amputation Near-Miss
+        </h2>
+        <p>
+          At 07:15 on a Tuesday morning inside a tier-1 automotive chassis stamping facility, the plant safety siren echoed across the press bay. A 150-ton hydraulic C-frame stamping press had just cycled while an operator was reaching into the die bed to dislodge a jammed sheet metal blank.
+        </p>
+        <p>
+          The operator survived with severe crushing injuries, escaping traumatic amputation by fractions of an inch. During the subsequent OSHA investigation and root-cause analysis, investigators discovered a wooden wedge wrapped in electrical tape forced into the left-hand actuation button (<code>PB-101A</code>).
+        </p>
+        <p>
+          The machine builder had written naive boolean concurrence inside a standard programmable controller:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          IF Left_PB AND Right_PB THEN Clutch_Solenoid = TRUE<br />
+          ELSE Clutch_Solenoid = FALSE
+        </div>
+        <p>
+          To boost piece-rate production quota, the operator had wedged the left button permanently down, freeing their left hand to load sheet metal blanks while cycling the 150-ton ram single-handedly using only the right button! While reaching into the pinch zone to clear an off-center slug, their hip accidentally brushed against the right button. The hydraulic ram surged downward with 3,000 PSI of fluid pressure.
+        </p>
+        <p>
+          The incident resulted in a $240,000 regulatory fine, immediate revocation of machine CE certification, and an emergency plant-wide safety shutdown across all twelve stamping lines.
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">Regulatory Mandate: OSHA 1910.217 &amp; ISO 13849-1</strong>
+          <p>
+            Never use standard PLC inputs or non-safety boolean gates for primary operator point-of-operation safeguarding. A single welded contact, short circuit, or mechanical tie-down wedge completely defeats naive software logic. Certified safety controllers, dual-channel inputs with test pulsing, and monitored safety valves are mandatory by international law.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          2. Engineering Standards: ISO 13851 Classification &amp; The Physics of Distance
+        </h2>
+        <p>
+          Point-of-operation safeguarding by two-hand control is governed by <strong>ISO 13851</strong>. The standard categorizes two-hand controls into functional types based on their resistance to defeat and internal architecture:
+        </p>
+
+        <div className="my-6 overflow-x-auto not-prose rounded-xl border border-zinc-200 shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-zinc-200 text-sm text-left">
+            <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 border-b border-zinc-200">ISO 13851 Type</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Synchronous Window</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Anti-Tie-Down</th>
+                <th className="px-4 py-3 border-b border-zinc-200">ISO 13849-1 Cat / PL</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Industrial Application</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 bg-white">
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Type I</td>
+                <td className="px-4 py-3 text-zinc-600">No (Static concurrence)</td>
+                <td className="px-4 py-3 text-zinc-600">No</td>
+                <td className="px-4 py-3 text-zinc-600">Cat B / PL a</td>
+                <td className="px-4 py-3 text-zinc-600">Non-hazardous auxiliary positioning</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Type II</td>
+                <td className="px-4 py-3 text-zinc-600">No</td>
+                <td className="px-4 py-3 text-zinc-600">Yes (Both release required)</td>
+                <td className="px-4 py-3 text-zinc-600">Cat 1 / PL c</td>
+                <td className="px-4 py-3 text-zinc-600">Low-speed material clamping</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Type III A</td>
+                <td className="px-4 py-3 text-zinc-600">Yes (&Delta;t &le; 500 ms)</td>
+                <td className="px-4 py-3 text-zinc-600">Yes</td>
+                <td className="px-4 py-3 text-zinc-600">Cat 1 / PL c</td>
+                <td className="px-4 py-3 text-zinc-600">Pneumatic riveters, light presses</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-semibold text-zinc-900">Type III B</td>
+                <td className="px-4 py-3 text-zinc-600">Yes (&Delta;t &le; 500 ms)</td>
+                <td className="px-4 py-3 text-zinc-600">Yes</td>
+                <td className="px-4 py-3 text-zinc-600">Cat 3 / PL d</td>
+                <td className="px-4 py-3 text-zinc-600">Intermediate mechanical presses</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors bg-teal-50/50">
+                <td className="px-4 py-3 font-semibold text-teal-900">Type III C</td>
+                <td className="px-4 py-3 text-teal-800">Yes (&Delta;t &le; 500 ms)</td>
+                <td className="px-4 py-3 text-teal-800">Yes</td>
+                <td className="px-4 py-3 text-teal-800 font-bold">Cat 4 / PL e</td>
+                <td className="px-4 py-3 text-teal-800">Heavy hydraulic &amp; mechanical stamping presses</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
+          The Physics of Safety Distance: EN ISO 13855
+        </h3>
+        <p>
+          Even the most rigorous Type III C logic cannot save an operator if the console is mounted too close to the pinch point. Once the operator releases either button, their hand moves toward the closing die at human approach speed (<em>K</em>). The safety distance (<em>S</em>) must satisfy:
+        </p>
+        <div className="bg-zinc-900 text-teal-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800 text-center">
+          S = (K &times; T) + C
+        </div>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>K = 1,600 mm/s:</strong> Standard hand approach speed defined by EN ISO 13855.</li>
+          <li><strong>T = t&#8321; + t&#8322;:</strong> Overall system stopping performance, where t&#8321; is safety controller reaction time (e.g. 15 ms) and t&#8322; is valve de-energization and hydraulic brake stopping time (e.g. 180 ms), totaling T = 195 ms.</li>
+          <li><strong>C = 250 mm:</strong> Penetration depth constant (minimum 250 mm for two-hand consoles without physical shrouds, reducible to 0 mm when buttons have physical ring guards and &ge; 260 mm button separation).</li>
+        </ul>
+        <p>
+          For a press system with T = 0.22 s and shrouded buttons (C = 0): S = (1,600 &times; 0.22) + 0 = 352 mm. Mounting the buttons even 50 mm closer would allow a fast operator to enter the pinch zone before the hydraulic ram comes to a complete standstill!
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          3. Stage 1: The Naive Bypass Flaw (Why Boolean AND Fails)
+        </h2>
+        <p>
+          To understand why traditional ladder logic fails, examine the Stage 1 circuit below. It implements a simple <code>AND</code> gate combining <code>PB-101A</code> and <code>PB-101B</code>.
+        </p>
+
+        <InlineLab
+          dsl={SAFETY_LAB1_DSL}
+          title="Stage 1: The Naive Concurrence &amp; The Fatal Bypass"
+          step="Stage 1 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg my-4 text-sm font-sans text-red-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 1 (Simulate the Fatal Bypass)</strong>
+          <p>
+            In Stage 1 above, toggle <strong>Left Hand PB-101A</strong> to ON (simulating an operator taping down the button or wedging it with a piece of wood). Notice that the input stays permanently energized. Now toggle <strong>Right Hand PB-101B</strong> on and off: observe that you can actuate the Press Ram single-handedly at will! The operator&apos;s left hand is completely free to reach into the 150-ton pinch zone. This is the exact fatal defect that caused the $240,000 amputation incident.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          4. Stage 2: The 500 ms Synchronism Window &amp; Anti-Tie-Down
+        </h2>
+        <p>
+          To eliminate the tie-down bypass, ISO 13851 mandates <strong>Synchronous Actuation</strong>:
+          Both pushbuttons must be pressed within a time window of <strong>no more than 500 ms</strong>:
+        </p>
+        <div className="bg-zinc-900 text-teal-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800 text-center">
+          | t(PB-101A) &minus; t(PB-101B) | &le; 500 ms
+        </div>
+        <p>
+          If either button is pressed first, a rising-edge trigger (<code>R_TRIG</code>) starts an off-delay timer (<code>TOF</code>) with a 500 ms preset. The second button must transition to TRUE before that 500 ms window expires. If an operator wedges <code>PB-101A</code> down permanently:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li>The rising edge fires once when the wedge is inserted, timing out after 500 ms.</li>
+          <li>When the operator later presses <code>PB-101B</code>, the 500 ms window from PB-A has long expired.</li>
+          <li>No permissive command is produced. Both buttons must be fully released to re-arm the edge triggers!</li>
+        </ol>
+
+        <InlineLab
+          dsl={SAFETY_LAB2_DSL}
+          title="Stage 2: 500 ms Synchronism Window &amp; Anti-Tie-Down"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 2 (Testing Synchronism &amp; Lockout)</strong>
+          <p>
+            In Stage 2 above, click <strong>PB-101A</strong> and then immediately click <strong>PB-101B</strong> within 500 ms. Notice how <strong>Press Stroke Permissive</strong> and <strong>Sync Timing OK</strong> energize! Now reset both to OFF. Next, simulate a tie-down bypass: toggle <strong>PB-101A</strong> to ON and wait 2 seconds. Now toggle <strong>PB-101B</strong> to ON. Notice that the press permissive refuses to energize! The circuit successfully detects the tie-down and locks out operation.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          5. Stage 3: Type III C Full Safety Train (Anti-Repeat &amp; Monitored Valves)
+        </h2>
+        <p>
+          Synchronous actuation alone is not enough for heavy industrial presses. Two critical mechanical hazards remain:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Continuous Holding &amp; Repeat Strokes:</strong> If an operator keeps both buttons held down after the ram completes a punch, the machine must not begin a second stroke automatically. An <strong>Anti-Repeat</strong> single-stroke circuit is required. The stroke memory latches on valid synchronous press, and is reset by the <strong>Top Dead Center (TDC) Cam Switch</strong>. Both buttons must be released (<code>NOR</code> gate) before the next cycle can initiate.
+          </li>
+          <li>
+            <strong>Valve Spool Sticking (Single Point of Failure):</strong> Hydraulic valves can weld or seize due to particulate contamination in 3,000 PSI oil. In a Category 4 / PL e architecture, redundant dual valves (<code>SV-101</code> and <code>SV-102</code>) are piped in series. Inductive proximity sensors (<code>ZSO-101</code> and <code>ZSO-102</code>) verify that both spools are in their de-energized resting state before power is applied. If either valve sticks open, a Spool Fault is triggered and all subsequent motion is locked out!
+          </li>
+        </ul>
+
+        <InlineLab
+          dsl={SAFETY_LAB3_DSL}
+          title="Stage 3: Full Category 4 / PL e Two-Hand Safety Train"
+          step="Stage 3 of 3"
+          height={650}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 3 (Simulate Spool Jamming &amp; TDC Reset)</strong>
+          <p>
+            In Stage 3 above:
+            <br />1. Click <strong>PB-101A</strong> and <strong>PB-101B</strong> synchronously. Dual Safety Valve Solenoids A &amp; B energize together and <strong>Press Downstroke Active</strong> engages!
+            <br />2. Now pulse the <strong>TDC Stroke Complete Cam</strong> to ON: notice the anti-repeat latch instantly resets and de-energizes the valve outputs, even if both pushbuttons remain held down!
+            <br />3. Now simulate a welded or jammed hydraulic valve: toggle <strong>Valve A Spool Proved Normal</strong> to OFF. Watch <strong>Safety Valve Spool Fault</strong> trip immediately, dropping safety permissives and preventing any further press actuation!
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          6. Commissioning Checklist &amp; Mandatory Plant Floor Proof Testing
+        </h2>
+        <ul className="list-disc pl-6 space-y-3">
+          <li>
+            <strong>500 ms Synchronism Verification:</strong> Use a calibrated multi-channel digital oscilloscope or safety PLC trace buffer to measure input arrival times. Press PB-A, wait 550 ms, press PB-B, and verify zero voltage reaches the valve pilots. Repeat with PB-B leading.
+          </li>
+          <li>
+            <strong>Anti-Tie-Down Proof Test:</strong> Mechanically clamp or wedge PB-A in the actuated position. Actuate PB-B fifty consecutive times at random intervals. Verify zero unintended machine motion occurs on every cycle.
+          </li>
+          <li>
+            <strong>Anti-Repeat Limit Cam Integrity:</strong> Initiate a legitimate stroke and deliberately hold both buttons down continuously for 10 seconds. Verify the ram performs exactly one stroke, hits the Top Dead Center (TDC) limit switch, halts, and will not repeat until both buttons are released.
+          </li>
+          <li>
+            <strong>Cross-Monitoring Discrepancy Fault:</strong> Disconnect the feedback connector from valve spool position sensor ZSO-101. Attempt a press cycle. Verify the safety relay drops out within 20 ms and displays a permanent cross-monitoring fault code.
+          </li>
+          <li>
+            <strong>Safety Distance Physical Audit:</strong> Measure the physical distance from the center of the pushbuttons to the closest point of the pinch hazard. Confirm that the distance meets or exceeds <em>S = (1,600 mm/s &times; T) + C</em> based on the latest annual stopping-time measurement report.
+          </li>
+          <li>
+            <strong>Physical Button Shrouding &amp; Separation:</strong> Verify pushbuttons are separated by at least 260 mm centerline-to-centerline or isolated by a rigid physical baffle to prevent simultaneous actuation with one hand, wrist, or elbow.
+          </li>
+          <li>
+            <strong>Pre-Shift Functional Safety Inspection:</strong> Operators must perform a documented functional test at every shift handover: verify E-Stop trips immediately, individual button presses produce no motion, and late actuation (&gt;500 ms) inhibits stroke initiation.
+          </li>
+        </ul>
+      </div>
+    ),
+    dsl: ''
   },
   {
     slug: 'hvac-economizer',
