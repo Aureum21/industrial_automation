@@ -27,64 +27,226 @@ export interface ExternalBlogPost {
 
 const STORAGE_KEY_CUSTOM_POSTS = 'automationhub_custom_posts';
 
-/** Render simple markdown prose and headers safely */
-function SimpleMarkdownRenderer({ text }: { text: string }) {
-  const lines = text.split('\n');
-  const elements: React.ReactNode[] = [];
-  let currentParagraph: string[] = [];
+function renderInline(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const regex = /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(`([^`]+)`)|(\*([^*]+)\*)/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
 
-  const flushParagraph = (key: string) => {
-    if (currentParagraph.length > 0) {
-      elements.push(
-        <p key={key} className="mb-4 leading-relaxed text-zinc-800">
-          {currentParagraph.join(' ')}
-        </p>
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(text.slice(lastIdx, match.index));
+    }
+    if (match[1]) {
+      parts.push(
+        <a
+          key={`link-${match.index}`}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-600 underline hover:text-emerald-700 font-medium"
+        >
+          {match[2]}
+        </a>
       );
-      currentParagraph = [];
+    } else if (match[4]) {
+      parts.push(
+        <strong key={`bold-${match.index}`} className="font-semibold text-zinc-900">
+          {match[5]}
+        </strong>
+      );
+    } else if (match[6]) {
+      parts.push(
+        <code
+          key={`code-${match.index}`}
+          className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 font-mono text-xs border border-zinc-200"
+        >
+          {match[7]}
+        </code>
+      );
+    } else if (match[8]) {
+      parts.push(<em key={`em-${match.index}`}>{match[9]}</em>);
     }
-  };
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < text.length) {
+    parts.push(text.slice(lastIdx));
+  }
+  return parts.length > 0 ? parts : text;
+}
 
-  lines.forEach((line, index) => {
+/** Render markdown prose, tables, code blocks, lists, and headers safely */
+function SimpleMarkdownRenderer({ text }: { text: string }) {
+  const rawLines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
     const trimmed = line.trim();
+
     if (!trimmed) {
-      flushParagraph(`p-${index}`);
-      return;
+      i++;
+      continue;
     }
 
-    if (trimmed.startsWith('### ')) {
-      flushParagraph(`p-before-h3-${index}`);
+    // Code blocks
+    if (trimmed.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < rawLines.length && !rawLines[i].trim().startsWith('```')) {
+        codeLines.push(rawLines[i]);
+        i++;
+      }
+      if (i < rawLines.length) i++; // consume closing ```
       elements.push(
-        <h3 key={`h3-${index}`} className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
-          {trimmed.slice(4)}
+        <pre
+          key={`code-${elements.length}`}
+          className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-xs sm:text-sm overflow-x-auto my-4 border border-zinc-800"
+        >
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    // Markdown tables
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const tableLines: string[] = [];
+      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+        tableLines.push(rawLines[i].trim());
+        i++;
+      }
+      if (tableLines.length >= 2) {
+        const rows = tableLines.map(l =>
+          l.split('|').slice(1, -1).map(c => c.trim())
+        );
+        const headers = rows[0];
+        // check if second row is separator like :--- or ---
+        const isSeparator = rows[1].every(cell => /^:?-+:?$/.test(cell));
+        const bodyRows = isSeparator ? rows.slice(2) : rows.slice(1);
+
+        elements.push(
+          <div key={`table-${elements.length}`} className="my-6 overflow-x-auto not-prose rounded-xl border border-zinc-200 shadow-sm bg-white">
+            <table className="min-w-full divide-y divide-zinc-200 text-sm text-left">
+              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                <tr>
+                  {headers.map((h, hi) => (
+                    <th key={`th-${hi}`} className="px-4 py-3 border-b border-zinc-200">
+                      {renderInline(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 bg-white">
+                {bodyRows.map((r, ri) => (
+                  <tr key={`tr-${ri}`} className="hover:bg-zinc-50/80 transition-colors">
+                    {r.map((c, ci) => (
+                      <td key={`td-${ci}`} className="px-4 py-3 text-zinc-800 whitespace-normal">
+                        {renderInline(c)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
+    }
+
+    // Headings
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        <h3 key={`h3-${elements.length}`} className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
+          {renderInline(trimmed.slice(4))}
         </h3>
       );
-    } else if (trimmed.startsWith('## ')) {
-      flushParagraph(`p-before-h2-${index}`);
+      i++;
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
       elements.push(
-        <h2 key={`h2-${index}`} className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
-          {trimmed.slice(3)}
+        <h2 key={`h2-${elements.length}`} className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
+          {renderInline(trimmed.slice(3))}
         </h2>
       );
-    } else if (trimmed.startsWith('# ')) {
-      flushParagraph(`p-before-h1-${index}`);
+      i++;
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
       elements.push(
-        <h1 key={`h1-${index}`} className="text-3xl font-extrabold font-serif text-zinc-950 mt-12 mb-5">
-          {trimmed.slice(2)}
+        <h1 key={`h1-${elements.length}`} className="text-3xl font-extrabold font-serif text-zinc-950 mt-12 mb-5">
+          {renderInline(trimmed.slice(2))}
         </h1>
       );
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      flushParagraph(`p-before-li-${index}`);
-      elements.push(
-        <li key={`li-${index}`} className="ml-6 list-disc mb-1.5 text-zinc-800">
-          {trimmed.slice(2)}
-        </li>
-      );
-    } else {
-      currentParagraph.push(trimmed);
+      i++;
+      continue;
     }
-  });
 
-  flushParagraph('p-final');
+    // Ordered list
+    if (/^\d+\.\s/.test(trimmed)) {
+      const listItems: string[] = [];
+      while (i < rawLines.length && /^\d+\.\s/.test(rawLines[i].trim())) {
+        listItems.push(rawLines[i].trim().replace(/^\d+\.\s*/, ''));
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${elements.length}`} className="list-decimal pl-6 space-y-2 my-4 text-zinc-800">
+          {listItems.map((item, idx) => (
+            <li key={`oli-${idx}`} className="leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Unordered list
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const listItems: string[] = [];
+      while (i < rawLines.length && (rawLines[i].trim().startsWith('- ') || rawLines[i].trim().startsWith('* '))) {
+        listItems.push(rawLines[i].trim().slice(2));
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${elements.length}`} className="list-disc pl-6 space-y-2 my-4 text-zinc-800">
+          {listItems.map((item, idx) => (
+            <li key={`uli-${idx}`} className="leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Paragraph (accumulate multi-line prose until next empty line or block element)
+    const pLines: string[] = [trimmed];
+    i++;
+    while (
+      i < rawLines.length &&
+      rawLines[i].trim() &&
+      !rawLines[i].trim().startsWith('#') &&
+      !rawLines[i].trim().startsWith('```') &&
+      !rawLines[i].trim().startsWith('|') &&
+      !/^\d+\.\s/.test(rawLines[i].trim()) &&
+      !rawLines[i].trim().startsWith('- ') &&
+      !rawLines[i].trim().startsWith('* ')
+    ) {
+      pLines.push(rawLines[i].trim());
+      i++;
+    }
+
+    elements.push(
+      <p key={`p-${elements.length}`} className="mb-4 leading-relaxed text-zinc-800">
+        {renderInline(pLines.join(' '))}
+      </p>
+    );
+  }
+
   return <div className="prose prose-zinc max-w-none">{elements}</div>;
 }
 
@@ -300,5 +462,10 @@ export function getAllPosts(): BlogPost[] {
 
 export function getPostBySlug(slug: string): BlogPost | undefined {
   const all = getAllPosts();
-  return all.find(p => p.slug === slug);
+  const direct = all.find(p => p.slug === slug);
+  if (direct) return direct;
+  if (slug === 'pid-oven-tuning') {
+    return all.find(p => p.slug === 'industrial-heater-pi-pwm-anti-windup');
+  }
+  return undefined;
 }

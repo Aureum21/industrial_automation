@@ -14,56 +14,114 @@ export interface BlogPost {
   dsl: string;
 }
 
-const LAB1_PROPORTIONAL_DSL = `circuit "Stage 1: Proportional Droop" version 1 {
-  sp: ANALOG_INPUT(label="Target SP", value=180)
-  pv: ANALOG_INPUT(label="Thermocouple PV", value=168)
-  err: MATH(operation="subtract")
-  gain: ANALOG_AMPLIFIER(gain=2)
-  cv: ANALOG_OUTPUT(label="Proportional CV %")
-  err_disp: ANALOG_OUTPUT(label="Active Error")
+import { HEATER_SVG } from './heaterBlueprintSvg';
 
-  sp.Q -> err.A
-  pv.Q -> err.B
-  err.Q -> gain.A
-  gain.Q -> cv.A
-  err.Q -> err_disp.A
+const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
+  sp: ANALOG_INPUT(label="Setpoint C", value=60)
+  pv: ANALOG_INPUT(label="Measured Temperature C", value=20)
+  error: MATH(label="SP minus PV", operation="subtract")
+  proportional: ANALOG_AMPLIFIER(label="Kp 2 percent per C", gain=2, offset=0)
+  zero: ANALOG_CONSTANT(value=0)
+  full: ANALOG_CONSTANT(value=100)
+  below_zero: ANALOG_COMPARATOR(label="Below zero", operation="lt")
+  lower_limit: ANALOG_MUX(label="Clamp at zero")
+  above_full: ANALOG_COMPARATOR(label="Above 100 percent", operation="gt")
+  upper_limit: ANALOG_MUX(label="Clamp at 100")
+  error_meter: ANALOG_OUTPUT(label="Error C")
+  raw_meter: ANALOG_OUTPUT(label="Raw Demand percent")
+  demand_meter: ANALOG_OUTPUT(label="Limited Demand percent")
+
+  sp.Q -> error.A
+  pv.Q -> error.B
+  error.Q -> proportional.A
+  error.Q -> error_meter.A
+  proportional.Q -> raw_meter.A
+  proportional.Q -> below_zero.A
+  zero.Q -> below_zero.B
+  below_zero.Q -> lower_limit.S
+  proportional.Q -> lower_limit.A
+  zero.Q -> lower_limit.B
+  lower_limit.Q -> above_full.A
+  full.Q -> above_full.B
+  above_full.Q -> upper_limit.S
+  lower_limit.Q -> upper_limit.A
+  full.Q -> upper_limit.B
+  upper_limit.Q -> demand_meter.A
 }
 `;
 
-const LAB2_INTEGRAL_PWM_DSL = `circuit "Stage 2: Integral & PWM Actuation" version 1 {
-  sp: ANALOG_INPUT(label="Target SP", value=180)
-  pv: ANALOG_INPUT(label="Thermocouple PV", value=168)
-  pi: PI_CONTROLLER(kp=1.5, ki=0.25)
-  pwm: PWM(period=2000)
-  ssr: OUTPUT(label="Heater SSR Relay")
-  cv_gauge: ANALOG_OUTPUT(label="PI Output Power %")
+const HEATER_LAB2_DSL = `circuit "Stage 2 - PI and PWM" version 1 {
+  sp: ANALOG_INPUT(label="Setpoint C", value=60)
+  pv: ANALOG_INPUT(label="Manual Temperature C", value=60)
+  enabled: HIGH()
+  controller: PID_CONTROLLER(label="PI with Internal Limits", kp=4, ki=0.1, kd=0, min=0, max=100)
+  pwm: PWM(label="SSR Time Proportioning", period=2000)
+  command: OUTPUT(label="SSR Command")
+  demand: ANALOG_OUTPUT(label="Heater Demand percent")
+  full: ANALOG_CONSTANT(value=100)
+  at_limit: ANALOG_COMPARATOR(label="At Upper Limit", operation="gte")
+  saturation_lamp: OUTPUT(label="Output Saturated High")
 
-  sp.Q -> pi.SP
-  pv.Q -> pi.PV
-  pi.Q -> pwm.A
+  sp.Q -> controller.SP
+  pv.Q -> controller.PV
+  enabled.Q -> controller.EN
+  controller.CV -> pwm.A
+  pwm.Q -> command.A
+  controller.CV -> demand.A
+  controller.CV -> at_limit.A
+  full.Q -> at_limit.B
+  at_limit.Q -> saturation_lamp.A
+}
+`;
+
+const HEATER_LAB3_DSL = `circuit "Stage 3 - Closed Loop Thermal Plant" version 1 {
+  sp: ANALOG_INPUT(label="Setpoint C", value=60)
+  tuning: ANALOG_INPUT(label="Gain Multiplier G", value=1)
+  load: ANALOG_INPUT(label="Cooling Load Equivalent C", value=0)
+  error: MATH(label="Actual SP minus PV", operation="subtract")
+  scaled_error: MATH(label="Error times G", operation="multiply")
+  zero: ANALOG_CONSTANT(value=0)
+  enabled: HIGH()
+  controller: PID_CONTROLLER(label="PI on Scaled Error", kp=4, ki=0.1, kd=0, min=0, max=100)
+  heater_gain: ANALOG_AMPLIFIER(label="Temperature Rise from Power", gain=0.8, offset=0)
+  net_heat: MATH(label="Heat minus Cooling Load", operation="subtract")
+  plant: TRANSFER_FUNCTION(label="Jacket Thermal Inertia", gain=1, tau=30000)
+  absolute_temperature: ANALOG_AMPLIFIER(label="Add Ambient 20 C", gain=1, offset=20)
+  pwm: PWM(label="SSR Command Representation", period=2000)
+  ssr: OUTPUT(label="SSR Command")
+  temperature_meter: ANALOG_OUTPUT(label="TT101 Temperature C")
+  setpoint_meter: ANALOG_OUTPUT(label="Actual Setpoint C")
+  error_meter: ANALOG_OUTPUT(label="Actual Error C")
+  demand_meter: ANALOG_OUTPUT(label="Heater Demand percent")
+  full: ANALOG_CONSTANT(value=100)
+  saturated: ANALOG_COMPARATOR(label="At Upper Limit", operation="gte")
+  saturation_lamp: OUTPUT(label="Output Saturated High")
+
+  sp.Q -> error.A
+  absolute_temperature.Q -> error.B
+  error.Q -> scaled_error.A
+  tuning.Q -> scaled_error.B
+  scaled_error.Q -> controller.SP
+  zero.Q -> controller.PV
+  enabled.Q -> controller.EN
+  controller.CV -> heater_gain.A
+  heater_gain.Q -> net_heat.A
+  load.Q -> net_heat.B
+  net_heat.Q -> plant.A
+  plant.Q -> absolute_temperature.A
+  controller.CV -> pwm.A
   pwm.Q -> ssr.A
-  pi.Q -> cv_gauge.A
+  absolute_temperature.Q -> temperature_meter.A
+  sp.Q -> setpoint_meter.A
+  error.Q -> error_meter.A
+  controller.CV -> demand_meter.A
+  controller.CV -> saturated.A
+  full.Q -> saturated.B
+  saturated.Q -> saturation_lamp.A
 }
 `;
 
-const LAB3_CLOSED_LOOP_DSL = `circuit "Stage 3: Full Closed Loop Plant" version 1 {
-  sp: ANALOG_INPUT(label="Target SP", value=180)
-  pid: PI_CONTROLLER(kp=2, ki=0.4, min=0, max=100)
-  plant: TRANSFER_FUNCTION(gain=2.5, tau=2000)
-  pwm: PWM(period=1000)
-  heater: OUTPUT(label="Heater SSR")
-  chamber_temp: ANALOG_OUTPUT(label="Chamber Temp PV")
-  power_pct: ANALOG_OUTPUT(label="Output Effort %")
-
-  sp.Q -> pid.SP
-  pid.Q -> plant.A
-  plant.Q -> pid.PV
-  pid.Q -> pwm.A
-  pwm.Q -> heater.A
-  plant.Q -> chamber_temp.A
-  pid.Q -> power_pct.A
-}
-`;
+const HEATER_SVG_DATA_URI = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(HEATER_SVG);
 
 const WT_LAB1_DSL = `circuit "Intake 1 - Permissives clear the run memory" version 1 {
   start: INPUT(label="Start pulse - release after one scan", value=false)
@@ -372,189 +430,312 @@ export const BLOG_POSTS: BlogPost[] = [
     dsl: ''
   },
   {
-    slug: 'pid-oven-tuning',
-    title: 'PID Temperature Regulation: From Catastrophic Overshoot to Critically Damped Control',
-    excerpt: "A step-by-step masterclass on temperature control: diagnosing the fatal flaws of on-off thermostats, deconstructing P and PI logic, and building a full closed-loop thermal simulator.",
-    author: 'Alex Engineer',
-    date: 'Oct 1',
-    readingTime: '14 min read',
-    tag: 'Control Systems',
+    slug: 'industrial-heater-pi-pwm-anti-windup',
+    title: 'When 100% Heat Is Not Enough: PI Control, PWM, and Anti-Windup',
+    excerpt: 'Build an industrial heater controller in three interactive FBD labs: proportional demand, PI with PWM, and a closed-loop thermal plant with live tuning and saturation-recovery experiments.',
+    author: 'AutomationHub Editorial',
+    date: 'Oct 19',
+    readingTime: '20 min read + 25 min labs',
+    tag: 'Process Control',
     views: 24190,
     content: (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
-          The $40,000 Scrap Incident at 3:15 AM
-        </h2>
-        <p>
-          At three in the morning inside an aerospace autoclave bay, an alarm buzzer pierced the silence of the night shift. An industrial cure oven loaded with eight carbon-fiber wing spar preforms had just tripped a high-limit thermal interlock.
-        </p>
-        <p>
-          The recipe called for a controlled ramp to 180°C, followed by a mandatory two-hour soak. To save commissioning costs, the equipment builder had installed a simple digital thermostat driving an AC contactor. The logic inside was naive bang-bang control:
-        </p>
-        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
-          IF Temperature &lt; 180°C THEN Heater_Contactor = TRUE<br />
-          ELSE Heater_Contactor = FALSE
-        </div>
-        <p>
-          On paper, that logic looks bulletproof to an apprentice programmer. But physical thermodynamics does not care about digital booleans. The oven was heated by heavy nichrome ceramic resistance banks. Even when the contactor snapped open at exactly 180°C, the ceramic blocks were still glowing cherry-red.
-        </p>
-        <p>
-          Because of massive thermal inertia, stored radiative heat continued bleeding into the sealed chamber for another five minutes. The thermocouple soared past 180°C, blowing through 190°C and topping out at 205°C before gravity took over. That 25°C overshoot triggered premature exothermic cross-linking in the resin. Microscopic thermal cracks spider-webbed across every spar flange. By sunrise, forty thousand dollars worth of structural aerospace material was forklifted straight into the scrap bin.
-        </p>
-
-        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
-          Visualizing The Physics: The Step Response Comparison
-        </h2>
-        <p>
-          To understand why thermal systems behave this way, look at the MATLAB Simulink step-response simulation below comparing the exact same oven under three distinct control strategies:
-        </p>
-
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
           <img
-            src="/matlab_pid_graph.jpg"
-            alt="MATLAB Simulink Step Response Plot comparing On-Off Thermostat, Proportional Control, and Tuned PID"
-            className="w-full h-auto object-cover"
+            src={HEATER_SVG_DATA_URI}
+            alt="Heater control schematic showing setpoint, TIC-101, PWM, SSR, heater, temperature feedback, and a separate high-temperature power isolation path."
+            className="w-full h-auto object-cover max-h-[550px]"
           />
           <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
-            <span className="text-emerald-400 font-semibold">FIG 1.1 // MATLAB SIMULINK TRANSIENT ANALYSIS</span>
-            <span>SETPOINT: 180.0 °C · THERMAL TIME CONSTANT τ = 2000 ms</span>
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // HEATER CONTROL &amp; INDEPENDENT LIMIT PATH</span>
+            <span>FUNCTIONAL SCHEMATIC: CLOSED-LOOP PI, TIME-PROPORTIONED PWM &amp; HARDWIRED CUTOUT</span>
           </div>
         </div>
 
-        <p>
-          Examining the curves tells the entire story:
-        </p>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>
-            <strong>The Red Sawtooth (On-Off Thermostat):</strong> Once thermal lag is present, on-off control produces violent limit-cycle hunting. It never stabilizes. It destroys mechanical relays and cooks sensitive workpieces.
-          </li>
-          <li>
-            <strong>The Orange Curve (Pure Proportional Control):</strong> Smooth, predictable, and fast—yet it permanently plateaus at 168°C. It suffers from a 12°C "steady-state droop" that no amount of proportional gain can fix without causing instability.
-          </li>
-          <li>
-            <strong>The Green Curve (Tuned Closed-Loop PI Control):</strong> The gold standard. A critically damped rise that smoothly decelerates into the 180°C target line with zero ringing and zero steady-state error.
-          </li>
-        </ul>
-
-        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
-          Step 1: The Raw Proportional Engine and the Mystery of Droop
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          1. The $18,600 Batch That Kept Getting Hotter
         </h2>
         <p>
-          The bedrock of any closed-loop system is the Error signal: the mathematical difference between where you want to be (Setpoint, <em>SP</em>) and where the physical machine actually is (Process Variable, <em>PV</em>):
+          At 02:17, the operator reduced the jacket-temperature setpoint from 90°C to 60°C. The heater output stayed at 100%.
         </p>
-        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
-          e(t) = SP(t) - PV(t)
+        <p>
+          For the previous warm-up period, the controller had been demanding more heat than the installed heater could deliver. Its integral term kept accumulating error. Now the temperature was above the new target, but the stored integral demand was still large enough to hold the output against its upper limit.
+        </p>
+        <p>
+          The jacket overshot the revised recipe temperature. Heat continued moving into the product, viscosity drifted outside the batch specification, and the shift stopped the line. The illustrative loss ledger was $12,000 of rejected material plus three hours of downtime at $2,200 per hour: $18,600 before cleanup.
+        </p>
+        <p>
+          The mistake was treating a bounded output as proof of a bounded controller state. Limiting the displayed command to 100% does not, by itself, stop an integrator from winding up. Anti-windup must account for actuator saturation inside the control algorithm.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-10 mb-4">
+          2. The Technical Blueprint: Follow the Heat, Then Follow the Signal
+        </h2>
+        <p>
+          Our process is an electrically heated, well-mixed jacket represented by one measured temperature. HTR-101 supplies heat. TT-101 measures temperature. TIC-101 compares that measurement with the operator&apos;s setpoint and produces a 0–100% demand. PWM-101 converts that demand into a repeating ON/OFF signal for SSR-101.
+        </p>
+        <p>
+          The diagram also shows an independent high-temperature limit and a power contactor. These belong in the physical protection design; they are not implemented by the three instructional control circuits.
+        </p>
+
+        <div className="my-6 overflow-x-auto not-prose rounded-xl border border-zinc-200 shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-zinc-200 text-sm text-left">
+            <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 border-b border-zinc-200">Tag or variable</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Meaning</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Laboratory value</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 bg-white">
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SP</td>
+                <td className="px-4 py-3 text-zinc-800">Requested jacket temperature</td>
+                <td className="px-4 py-3 text-zinc-800">60°C initially</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">TT-101 / PV</td>
+                <td className="px-4 py-3 text-zinc-800">Measured jacket temperature</td>
+                <td className="px-4 py-3 text-zinc-800">Generated by the plant in Stage 3</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">TIC-101 / u</td>
+                <td className="px-4 py-3 text-zinc-800">Heater demand</td>
+                <td className="px-4 py-3 text-zinc-800">0–100%; 50 means 50%, not 0.50</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">PWM-101</td>
+                <td className="px-4 py-3 text-zinc-800">Time-proportioning period</td>
+                <td className="px-4 py-3 text-zinc-800">2,000 ms</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SSR-101</td>
+                <td className="px-4 py-3 text-zinc-800">Solid-state power-switch command</td>
+                <td className="px-4 py-3 text-zinc-800">Digital ON/OFF indicator</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">Tₐ</td>
+                <td className="px-4 py-3 text-zinc-800">Ambient reference</td>
+                <td className="px-4 py-3 text-zinc-800">20°C</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">K</td>
+                <td className="px-4 py-3 text-zinc-800">Steady-state temperature rise per output %</td>
+                <td className="px-4 py-3 text-zinc-800">0.8°C/%</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">τ</td>
+                <td className="px-4 py-3 text-zinc-800">First-order thermal time constant</td>
+                <td className="px-4 py-3 text-zinc-800">30,000 ms = 30 s</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">L</td>
+                <td className="px-4 py-3 text-zinc-800">Additional heat-removal disturbance</td>
+                <td className="px-4 py-3 text-zinc-800">0°C initially</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>The teaching plant follows the first-order differential equation:</p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          30 × dT/dt = 20 + 0.8u − L − T
         </div>
         <p>
-          In a purely Proportional controller, the output effort <em>P(t)</em> is simply the error multiplied by a proportional gain <em>Kp</em>:
+          At steady state, <code>T = 20 + 0.8u − L</code>. With no additional load, 50% output holds 60°C and 100% output approaches 100°C. A request for 110°C is therefore unreachable.
+        </p>
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Before running the labs</strong>
+          <p>
+            The numerical tuning below assumes integral gain is applied per second. Anti-windup clamps the internal integrator to prevent output runaway during actuator saturation.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          3. Stage 1: Calculate the Error Before You Tune the Loop
+        </h2>
+        <p>
+          For a heating process, define error as <code>e = SP − PV</code>. A positive error should request more heat. Start with a proportional gain of 2 output percentage points per degree:
         </p>
         <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
-          P(t) = Kp × e(t)
+          u_raw = 2 × (SP − PV)
         </div>
         <p>
-          Now consider the physical trap: An oven loses heat to the ambient room through its insulation. To stay warm at 180°C, the oven requires roughly 24% continuous electrical power just to counteract ambient losses. But under pure Proportional control, what happens if the oven actually reaches 180°C?
+          The heater cannot produce negative power or exceed full output, so the usable command is <code>u = max(0, min(100, u_raw))</code>.
         </p>
         <p>
-          If <em>PV</em> = 180°C and <em>SP</em> = 180°C, then <em>e(t)</em> = 0. Therefore, <em>P(t) = Kp × 0 = 0%</em>! The controller immediately kills all power. The chamber cools down until an error re-appears. The system eventually enters a standoff at 168°C where the 12°C error produces exactly 24% power (<em>12°C × Kp=2 = 24%</em>). The system gets trapped in <strong>steady-state droop</strong>.
-        </p>
-        <p>
-          Let us verify this in our first simulation sandbox. Below is the isolated Proportional calculation engine:
+          The first lab builds those limits explicitly. The low comparator selects zero whenever raw demand is negative. The high comparator then selects 100 whenever the lower-limited result exceeds 100.
         </p>
 
         <InlineLab
-          dsl={LAB1_PROPORTIONAL_DSL}
-          title="Stage 1: Error Calculation & Proportional Droop"
+          dsl={HEATER_LAB1_DSL}
+          title="Stage 1: Error, Proportional Demand, and Output Limits"
           step="Stage 1 of 3"
-          height={480}
-        />
-
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
-          <strong>Interactive Exercise:</strong> In Stage 1 above, click on the <strong>Thermocouple PV</strong> block and change its value to <code>180</code>. Watch the <strong>Proportional CV %</strong> collapse to zero. Then change PV to <code>168</code> and observe how the output locks at <code>24%</code>. This illustrates why proportional gain alone can never reach setpoint in a thermal environment with heat loss.
-        </div>
-
-        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
-          Step 2: Erasing Offset with the Integral Term & Modulating SSRs
-        </h2>
-        <p>
-          To kill steady-state droop, we introduce the <strong>Integral term</strong> (<em>Ki</em>). The integral term does not care about how large the error is right now—it cares about how long the error has existed over time:
-        </p>
-        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
-          I(t) = Ki × ∫ e(τ) dτ
-        </div>
-        <p>
-          Even if the error is a microscopic 0.5°C, the integral accumulator continuously increments scan after scan. It gradually ratchets up output power until it supplies the exact 24% baseline power needed to balance heat dissipation—even when the error drops all the way to zero!
-        </p>
-        <p>
-          However, this introduces another real-world industrial hurdle: <strong>Actuation</strong>. Industrial heating elements run on high-current AC power switched by Solid State Relays (SSRs). An SSR is a binary switch: it is either 100% conducting or 0% off. You cannot send an SSR an analog "42.5%" command.
-        </p>
-        <p>
-          The solution is <strong>Time-Proportioned Pulse Width Modulation (PWM)</strong>. We define a fixed cycle window (for example, 2000 milliseconds). If our PI controller requests 40% power, the PWM block energizes the SSR for 800 ms and shuts it off for 1200 ms. Over time, the thermal mass of the heating element averages this out into steady, seamless heating.
-        </p>
-        <p>
-          In Stage 2 below, we add the PI controller block and feed its control variable directly into a high-speed PWM generator driving a physical Solid State Relay:
-        </p>
-
-        <InlineLab
-          dsl={LAB2_INTEGRAL_PWM_DSL}
-          title="Stage 2: PI Controller & Time-Proportioned PWM Actuation"
-          step="Stage 2 of 3"
-          height={480}
-        />
-
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
-          <strong>Interactive Exercise:</strong> Click <strong>▶ Run</strong> on Stage 2 above. Observe how the <strong>Heater SSR Relay</strong> pulses on and off. Try dragging the <strong>Thermocouple PV</strong> down to <code>150</code>. Notice how the PI block demands higher power, widening the ON duration of the relay pulses!
-        </div>
-
-        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
-          Step 3: Closing The Physical Loop (Thermal Lag & Plant Simulation)
-        </h2>
-        <p>
-          We now have a tuned PI engine and an SSR actuator. But to test true dynamic performance before touching real multi-kilowatt factory hardware, we must model the physical thermal plant itself.
-        </p>
-        <p>
-          In control engineering, thermal chambers are modeled as a First-Order Plus Dead Time (FOPDT) system. We represent this with a first-order lag Transfer Function:
-        </p>
-        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
-          G(s) = K / (τ·s + 1)
-        </div>
-        <p>
-          Where <em>τ</em> represents the physical thermal inertia (how long it takes heat to migrate from the coils into the air volume), and <em>K</em> is the system gain.
-        </p>
-        <p>
-          By connecting the output of our Transfer Function directly back into the <code>PV</code> input of the PID controller, we close the loop. Furthermore, we activate <strong>Integral Anti-Windup</strong> by capping the output limits between 0% and 100%. This ensures that if the oven door is swung open, the integrator does not wind up to infinity, which would cause massive thermal overshoot once the door is shut.
-        </p>
-        <p>
-          Behold the complete, fully operational closed-loop temperature control system:
-        </p>
-
-        <InlineLab
-          dsl={LAB3_CLOSED_LOOP_DSL}
-          title="Stage 3: Complete Closed-Loop Thermal Plant Simulation"
-          step="Stage 3 of 3 (Full Lab)"
           height={540}
         />
 
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg my-4 text-sm text-emerald-950 font-sans">
-          <strong>Final Commissioning Test:</strong> Click <strong>▶ Run</strong> on Stage 3 above! Watch the simulated cold oven start at room temperature. The PID controller commands full 100% effort, then smoothly throttles back power as the thermocouple passes 160°C, and lands gracefully on exactly 180°C. Click on <strong>Target SP</strong>, change it to <code>220</code>, and watch the control loop automatically track the new setpoint with zero ringing!
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive exercise: prove the direction and both limits</strong>
+          <p>
+            Keep SP at 60°C. Set PV to 20°C: error should be 40°C and demand 80%. Change PV to 55°C: demand should fall to 10%. Change PV to 70°C: raw demand should be −20%, but limited demand must be 0%. Finally set SP to 80°C and PV to 20°C: raw demand should be 120%, while limited demand remains 100%.
+          </p>
+        </div>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
+          Why proportional control settles below the target
+        </h3>
+        <p>
+          At exactly zero error, this proportional-only controller requests zero heat. But our jacket needs 50% power to remain at 60°C. It must retain a positive error to generate the required holding power.
+        </p>
+        <p>
+          Combining the unsaturated proportional controller with the zero-load plant gives:
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          T = 20 + 0.8 × 2 × (60 − T) &nbsp;⇒&nbsp; T ≈ 44.6°C, u ≈ 30.8%
+        </div>
+        <p>
+          The remaining 15.4°C error is <strong>steady-state droop</strong>. Integral action supplies the missing holding demand.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          4. Stage 2: Add Integral Action and Translate Demand into Switching
+        </h2>
+        <p>
+          A PI controller combines the immediate proportional response with an accumulated correction:
+        </p>
+        <div className="bg-zinc-100 p-4 rounded-lg font-mono text-sm not-prose my-3 border border-zinc-200 text-zinc-800">
+          u_raw(t) = Kp × e(t) + Ki × ∫ e(τ) dτ
+        </div>
+        <p>
+          We use <code>PID_CONTROLLER</code> with <code>kd=0</code> and internal limits set to the actuator&apos;s actual range: 0–100%. The starting values are <code>kp=4</code> and <code>ki=0.1</code>. Under the seconds-based parallel PI convention, that corresponds to an integral time <code>Kp/Ki</code> of 40 seconds.
+        </p>
+        <p>
+          PWM converts controller demand into an ON fraction of a repeating period. With a 2,000 ms period, a steady 25% demand represents approximately 500 ms ON and 1,500 ms OFF; 50% represents 1,000 ms of each.
+        </p>
+
+        <InlineLab
+          dsl={HEATER_LAB2_DSL}
+          title="Stage 2: PI Demand and Time-Proportioned Heater Output"
+          step="Stage 2 of 3"
+          height={560}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive exercise: watch the integral term at work</strong>
+          <p>
+            With SP at 60°C, change manual PV from 60°C to 50°C. Observe the initial proportional response and then increasing demand while the error persists. The SSR command should spend progressively more of each period ON. Return PV to 60°C and observe the retained demand; zero error does not necessarily mean zero output. Then set PV to 70°C and watch demand reduce. Keep the experiment running until you have also observed the upper-limit lamp at 100%.
+          </p>
         </div>
 
         <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
-          Field-Tested Rules for Industrial Tuning
+          5. Stage 3: Close the Loop and Challenge It
         </h2>
         <p>
-          When you step out onto the plant floor to tune a live heating process, remember these hard-won rules from senior instrumentation engineers:
+          Replace manual PV with a thermal plant. The controller&apos;s percentage output is multiplied by 0.8, the equivalent cooling load is subtracted, and a first-order lag with <code>tau=30000</code> models thermal inertia. Adding 20°C converts temperature rise into absolute temperature for feedback.
         </p>
+        <p>
+          The circuit calculates <code>e_scaled = G × (SP − PV)</code>, feeding that value into the PID&apos;s SP pin, and feeding zero into its PV pin. This enables interactive live gain tuning without modifying block parameters!
+        </p>
+
+        <InlineLab
+          dsl={HEATER_LAB3_DSL}
+          title="Stage 3: Thermal Feedback, Live Tuning, and Saturation Recovery"
+          step="Stage 3 of 3"
+          height={680}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Model fidelity: average power versus switching ripple</strong>
+          <p>
+            The thermal plant receives the analog duty demand as average heater power. The PWM branch shows the corresponding SSR command, but its digital pulses do not drive the plant. This intentional averaged model does not simulate switching ripple or electrical power faults. A two-second PWM period is short relative to the assumed 30-second thermal time constant, making average power useful for this lesson.
+          </p>
+        </div>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-8 mb-3">
+          Controlled Experiments to Perform
+        </h3>
         <ol className="list-decimal pl-6 space-y-3">
           <li>
-            <strong>Beware the Derivative Term (Kd):</strong> While PID algorithms include a derivative component, in 90% of industrial temperature loops, <em>Kd is set to zero</em>. Industrial thermocouples are prone to electromagnetic noise from nearby VFDs and motors. Differentiating high-frequency noise creates massive "derivative spikes" that rattle SSRs and destroy heaters.
+            <strong>Experiment A (Reachable Steady-State):</strong> Start with SP = 60°C, G = 1, and L = 0°C. Watch demand and temperature together. From a cool start (20°C), demand ramps to 100% while temperature rises gradually. Notice how it lands smoothly at 60°C with exactly 50% demand! Change SP to 70°C: steady-state demand settles at exactly 62.5% because <code>(70 − 20)/0.8 = 62.5%</code>.
           </li>
           <li>
-            <strong>Tune Integral in Time, Not Multipliers:</strong> If your PLC uses Integral Time (<em>Ti</em> in seconds or minutes per repeat), remember that <em>smaller numbers mean stronger integration</em>. If it uses Integral Gain (<em>Ki</em>), larger numbers mean stronger integration. Mistaking one for the other has melted dozens of extruder barrels.
+            <strong>Experiment B (Cooling Load Disturbance):</strong> Return SP to 60°C. Change the cooling-load input from 0°C to 10°C. Temperature initially dips, and the controller compensates by driving demand up to 62.5%. Remove the load and verify demand returns to 50%.
           </li>
           <li>
-            <strong>Always Enforce Anti-Windup:</strong> Never commission an analog temperature loop without clamping the integral accumulator to the physical actuator limits (0–100%). It is the difference between a pristine production batch and a $40,000 pile of scrap.
+            <strong>Experiment C (Anti-Windup Saturation Recovery):</strong> Set SP = 110°C (with G=1, L=0). 110°C would require 112.5% heat, which is physically impossible. The controller saturates at 100% output, and the saturation lamp turns ON. Temperature tops out near 100°C. After holding for 60 seconds, drop SP down to 60°C. Because the integrator is bounded by anti-windup clamping, the output drops out of saturation immediately without catastrophic overshoot!
           </li>
         </ol>
+
+        <div className="my-6 overflow-x-auto not-prose rounded-xl border border-zinc-200 shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-zinc-200 text-sm text-left">
+            <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 border-b border-zinc-200">Operating point</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Expected steady-state demand</th>
+                <th className="px-4 py-3 border-b border-zinc-200">Interpretation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 bg-white">
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SP 60°C, L 0°C</td>
+                <td className="px-4 py-3 text-zinc-800">50%</td>
+                <td className="px-4 py-3 text-zinc-800">Reachable normal operation</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SP 70°C, L 0°C</td>
+                <td className="px-4 py-3 text-zinc-800">62.5%</td>
+                <td className="px-4 py-3 text-zinc-800">Reachable higher temperature</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SP 60°C, L 10°C</td>
+                <td className="px-4 py-3 text-zinc-800">62.5%</td>
+                <td className="px-4 py-3 text-zinc-800">Additional load requires additional power</td>
+              </tr>
+              <tr className="hover:bg-zinc-50/80 transition-colors">
+                <td className="px-4 py-3 font-mono font-semibold text-zinc-900">SP 110°C, L 0°C</td>
+                <td className="px-4 py-3 text-zinc-800">Would require 112.5%</td>
+                <td className="px-4 py-3 text-zinc-800">Unreachable; output saturates at 100%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          6. Commissioning Checklist: What Must Be Proven on the Plant Floor
+        </h2>
+        <ul className="list-disc pl-6 space-y-3">
+          <li>
+            <strong>Prove measurement scaling:</strong> Inject known transmitter signals and verify the displayed engineering units at several points. Confirm sensor type, range, polarity, and the behavior on sensor failure.
+          </li>
+          <li>
+            <strong>Prove the direction of action at low power:</strong> Below setpoint, heating demand should increase. Above setpoint, it should decrease. Verify this through the full chain from software demand to measured heater current.
+          </li>
+          <li>
+            <strong>Identify the process before copying gains:</strong> Record the temperature response to a controlled manual power change. Estimate gain, time constant, and any dead time. Account for product loading and mixing conditions.
+          </li>
+          <li>
+            <strong>Confirm the controller convention:</strong> Determine whether the device uses integral gain or integral time, seconds or minutes, and a parallel or dependent formulation. A number copied between controllers may represent a different algorithm.
+          </li>
+          <li>
+            <strong>Match limits to available power:</strong> Confirm that 100% demand means the actual maximum permitted power. If a downstream limiter or interlock reduces delivered output, assess controller tracking or integration handling rather than assuming its internal limits account for the change.
+          </li>
+          <li>
+            <strong>Verify PWM against the installed actuator:</strong> Check cycle period, minimum practical ON/OFF time, SSR ratings, heat sinking, and actual current switching. A blinking pilot light proves the command signal, not power delivery.
+          </li>
+          <li>
+            <strong>Test the independent high-temperature shutdown:</strong> Confirm its sensor path, trip action, power-isolation device, reset behavior, and response to a failed-on power switch. Follow the approved plant protection design.
+          </li>
+          <li>
+            <strong>Test startup and restart behavior:</strong> Establish permitted output after power restoration, sensor recovery, controller enable, and transfer between manual and automatic operation.
+          </li>
+          <li>
+            <strong>Trend SP, PV, command, and delivered power together:</strong> Include operating mode and trip status. Otherwise a bad sensor, missing heater power, or output override may be mistaken for poor tuning.
+          </li>
+          <li>
+            <strong>Use a controlled saturation-recovery test:</strong> On a live installation, use an approved procedure and safe operating limits; the simulator&apos;s deliberately unreachable 110°C request is a teaching exercise, not a field test instruction.
+          </li>
+        </ul>
       </div>
     ),
     dsl: ''

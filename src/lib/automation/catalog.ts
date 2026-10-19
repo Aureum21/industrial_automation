@@ -250,7 +250,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
     'Calculates required joint angles to reach an X/Y target.', analog('X', 'Y'), analog('THETA1', 'THETA2'),
     { parameters: [number('L1', 'Link 1 Length', 100), number('L2', 'Link 2 Length', 100)] }),
   PID_CONTROLLER: block('PID_CONTROLLER', 'PID Controller', 'PID', 'Mechatronics',
-    'Full Proportional-Integral-Derivative control loop.', analog('SP', 'PV', 'EN'), analog('CV'),
+    'Full Proportional-Integral-Derivative control loop.', [pin('SP', 'analog', 'Setpoint'), pin('PV', 'analog', 'Process value'), pin('EN', 'digital', 'Enable')], analog('CV'),
     { stateful: true, parameters: [number('kp', 'Kp (Gain)', 1), number('ki', 'Ki (Integral)', 0.1), number('kd', 'Kd (Derivative)', 0.01), number('min', 'Min Output', -100), number('max', 'Max Output', 100)] }),
   TRANSFER_FUNCTION: block('TRANSFER_FUNCTION', 'Transfer Function (1st Order)', 'TF', 'Mechatronics',
     'Simulates physical lag (inertia, heating). 1 / (Ts + 1)', analog('A'), analog('Q'),
