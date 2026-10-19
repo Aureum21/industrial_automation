@@ -17,6 +17,7 @@ export interface BlogPost {
 import { HEATER_SVG } from './heaterBlueprintSvg';
 import { TWO_HAND_SAFETY_SVG } from './safetyBlueprintSvg';
 import { TANK_HYSTERESIS_SVG } from './tankHysteresisBlueprintSvg';
+import { TRAFFIC_LIGHT_SVG } from './trafficBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -500,6 +501,322 @@ const HYSTERESIS_LAB3_DSL = `circuit "Stage 3 - Closed-Loop Storage Tank with Dy
 }
 `;
 
+const TRAFFIC_LIGHT_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(TRAFFIC_LIGHT_SVG);
+
+const TRAFFIC_LAB1_DSL = `circuit "Stage 1 - The Naive Cascade & Missing Clearance" version 1 {
+  run: INPUT(label="Master Run Enable", value=true)
+  t_ns_g: TON(label="NS Green Timer (3s)", duration=3000)
+  t_ns_y: TON(label="NS Yellow Timer (1.5s)", duration=1500)
+  t_ew_g: TON(label="EW Green Timer (3s)", duration=3000)
+  t_ew_y: TON(label="EW Yellow Timer (1.5s)", duration=1500)
+
+  cycle_delay: SCAN_DELAY()
+  loop_reset: NOT()
+  gate_run: AND()
+
+  not_ns_g: NOT()
+  not_ns_y: NOT()
+  not_ew_g: NOT()
+  not_ew_y: NOT()
+
+  ns_g_active: AND()
+  ns_y_active: AND()
+  ew_g_active: AND()
+  ew_y_active: AND()
+
+  ns_green: OUTPUT(label="North-South Green")
+  ns_yellow: OUTPUT(label="North-South Yellow")
+  ns_red: OUTPUT(label="North-South Red")
+  ew_green: OUTPUT(label="East-West Green")
+  ew_yellow: OUTPUT(label="East-West Yellow")
+  ew_red: OUTPUT(label="East-West Red")
+  hazard_alert: OUTPUT(label="Collision Hazard: 0s All-Red Clearance")
+
+  run.Q -> gate_run.A
+  loop_reset.Q -> gate_run.B
+  gate_run.Q -> t_ns_g.A
+
+  t_ns_g.Q -> not_ns_g.A
+  gate_run.Q -> ns_g_active.A
+  not_ns_g.Q -> ns_g_active.B
+  ns_g_active.Q -> ns_green.A
+
+  t_ns_g.Q -> t_ns_y.A
+  t_ns_y.Q -> not_ns_y.A
+  t_ns_g.Q -> ns_y_active.A
+  not_ns_y.Q -> ns_y_active.B
+  ns_y_active.Q -> ns_yellow.A
+
+  t_ns_y.Q -> t_ew_g.A
+  t_ew_g.Q -> not_ew_g.A
+  t_ns_y.Q -> ew_g_active.A
+  not_ew_g.Q -> ew_g_active.B
+  ew_g_active.Q -> ew_green.A
+
+  t_ew_g.Q -> t_ew_y.A
+  t_ew_y.Q -> not_ew_y.A
+  t_ew_g.Q -> ew_y_active.A
+  not_ew_y.Q -> ew_y_active.B
+  ew_y_active.Q -> ew_yellow.A
+
+  t_ew_y.Q -> cycle_delay.A
+  cycle_delay.Q -> loop_reset.A
+
+  ew_g_active.Q -> ns_red.A
+  ns_g_active.Q -> ew_red.A
+  ew_g_active.Q -> hazard_alert.A
+}
+`;
+
+const TRAFFIC_LAB2_DSL = `circuit "Stage 2 - Dual-Ring Controller with All-Red Clearance" version 1 {
+  run: INPUT(label="Intersection Sequence Enable", value=true)
+  t1_ns_g: TON(label="P1: NS Green (3.5s)", duration=3500)
+  t2_ns_y: TON(label="P2: NS Yellow (1.5s)", duration=1500)
+  t3_clear1: TON(label="P3: All-Red Clear (1.5s)", duration=1500)
+  t4_ew_g: TON(label="P4: EW Green (3.0s)", duration=3000)
+  t5_ew_y: TON(label="P5: EW Yellow (1.5s)", duration=1500)
+  t6_clear2: TON(label="P6: All-Red Clear (1.5s)", duration=1500)
+
+  cycle_delay: SCAN_DELAY()
+  cycle_reset: NOT()
+  master_gate: AND()
+
+  not_t1: NOT()
+  not_t2: NOT()
+  not_t3: NOT()
+  not_t4: NOT()
+  not_t5: NOT()
+  not_t6: NOT()
+
+  p1_active: AND()
+  p2_active: AND()
+  p3_active: AND()
+  p4_active: AND()
+  p5_active: AND()
+  p6_active: AND()
+
+  or_clear: OR()
+  ew_active_any: OR()
+  ns_active_any: OR()
+  ns_red_gate: OR()
+  ew_red_gate: OR()
+
+  ns_g: OUTPUT(label="North-South Green")
+  ns_y: OUTPUT(label="North-South Yellow")
+  ns_r: OUTPUT(label="North-South Red")
+  ew_g: OUTPUT(label="East-West Green")
+  ew_y: OUTPUT(label="East-West Yellow")
+  ew_r: OUTPUT(label="East-West Red")
+  all_red: OUTPUT(label="All-Red Clearance Interval Active")
+
+  run.Q -> master_gate.A
+  cycle_reset.Q -> master_gate.B
+  master_gate.Q -> t1_ns_g.A
+
+  t1_ns_g.Q -> not_t1.A
+  master_gate.Q -> p1_active.A
+  not_t1.Q -> p1_active.B
+  p1_active.Q -> ns_g.A
+
+  t1_ns_g.Q -> t2_ns_y.A
+  t2_ns_y.Q -> not_t2.A
+  t1_ns_g.Q -> p2_active.A
+  not_t2.Q -> p2_active.B
+  p2_active.Q -> ns_y.A
+
+  t2_ns_y.Q -> t3_clear1.A
+  t3_clear1.Q -> not_t3.A
+  t2_ns_y.Q -> p3_active.A
+  not_t3.Q -> p3_active.B
+
+  t3_clear1.Q -> t4_ew_g.A
+  t4_ew_g.Q -> not_t4.A
+  t3_clear1.Q -> p4_active.A
+  not_t4.Q -> p4_active.B
+  p4_active.Q -> ew_g.A
+
+  t4_ew_g.Q -> t5_ew_y.A
+  t5_ew_y.Q -> not_t5.A
+  t4_ew_g.Q -> p5_active.A
+  not_t5.Q -> p5_active.B
+  p5_active.Q -> ew_y.A
+
+  t5_ew_y.Q -> t6_clear2.A
+  t6_clear2.Q -> not_t6.A
+  t5_ew_y.Q -> p6_active.A
+  not_t6.Q -> p6_active.B
+
+  t6_clear2.Q -> cycle_delay.A
+  cycle_delay.Q -> cycle_reset.A
+
+  p3_active.Q -> or_clear.A
+  p6_active.Q -> or_clear.B
+  or_clear.Q -> all_red.A
+
+  p4_active.Q -> ew_active_any.A
+  p5_active.Q -> ew_active_any.B
+  ew_active_any.Q -> ns_red_gate.A
+  or_clear.Q -> ns_red_gate.B
+  ns_red_gate.Q -> ns_r.A
+
+  p1_active.Q -> ns_active_any.A
+  p2_active.Q -> ns_active_any.B
+  ns_active_any.Q -> ew_red_gate.A
+  or_clear.Q -> ew_red_gate.B
+  ew_red_gate.Q -> ew_r.A
+}
+`;
+
+const TRAFFIC_LAB3_DSL = `circuit "Stage 3 - Actuated Intersection with Conflict Monitor" version 1 {
+  run: INPUT(label="Intersection Controller Online", value=true)
+  loop_ew: INPUT(label="East-West Inductive Loop Detector", value=false)
+  ped_call: INPUT(label="Pedestrian Crosswalk Call PB", value=false)
+  force_cmu_fault: INPUT(label="Simulate CMU Conflict (Welded Triac)", value=false)
+
+  demand_or: OR(label="Any Service Demand")
+  demand_latch: RS_LATCH(label="Side-Street Demand Latch")
+  clear_delay: SCAN_DELAY()
+
+  t_ns_y: TON(label="NS Yellow Change (1.5s)", duration=1500)
+  t_clear1: TON(label="All-Red Clearance 1 (1.5s)", duration=1500)
+  t_ew_g: TON(label="EW Green Extension (3.5s)", duration=3500)
+  t_ew_y: TON(label="EW Yellow Change (1.5s)", duration=1500)
+  t_clear2: TON(label="All-Red Clearance 2 (1.5s)", duration=1500)
+
+  not_y1: NOT()
+  not_c1: NOT()
+  not_eg: NOT()
+  not_ey: NOT()
+  not_c2: NOT()
+
+  ns_y_run: AND()
+  c1_run: AND()
+  ew_g_run: AND()
+  ew_y_run: AND()
+  c2_run: AND()
+
+  side_busy: OR()
+  side_busy_or2: OR()
+  side_busy_or3: OR()
+  ns_busy_or: OR()
+
+  ns_rest_g: NOT()
+  norm_ns_g: AND()
+  norm_ew_g: AND()
+
+  cmu_conflict: AND(label="Simultaneous Dual Green Fault")
+  cmu_or: OR()
+  cmu_trip: RS_LATCH(label="CMU Hardware Lockout Latch")
+  cmu_healthy: NOT()
+
+  flasher: CLOCK(label="Emergency Flasher Timer", onTime=500, offTime=500)
+  flash_red: AND()
+
+  out_ns_g: AND()
+  out_ns_y: AND()
+  out_ns_r: OR()
+  out_ew_g: AND()
+  out_ew_y: AND()
+  out_ew_r: OR()
+
+  ns_green: OUTPUT(label="North-South Green")
+  ns_yellow: OUTPUT(label="North-South Yellow")
+  ns_red: OUTPUT(label="North-South Red")
+  ew_green: OUTPUT(label="East-West Green")
+  ew_yellow: OUTPUT(label="East-West Yellow")
+  ew_red: OUTPUT(label="East-West Red")
+  cmu_alarm: OUTPUT(label="CMU Hardware Fault: Flash Mode")
+  ped_walk: OUTPUT(label="Pedestrian WALK Signal")
+
+  loop_ew.Q -> demand_or.A
+  ped_call.Q -> demand_or.B
+  demand_or.Q -> demand_latch.S
+  t_clear2.Q -> clear_delay.A
+  clear_delay.Q -> demand_latch.R
+
+  demand_latch.Q -> t_ns_y.A
+  t_ns_y.Q -> not_y1.A
+  demand_latch.Q -> ns_y_run.A
+  not_y1.Q -> ns_y_run.B
+
+  t_ns_y.Q -> t_clear1.A
+  t_clear1.Q -> not_c1.A
+  t_ns_y.Q -> c1_run.A
+  not_c1.Q -> c1_run.B
+
+  t_clear1.Q -> t_ew_g.A
+  t_ew_g.Q -> not_eg.A
+  t_clear1.Q -> ew_g_run.A
+  not_eg.Q -> ew_g_run.B
+
+  t_ew_g.Q -> t_ew_y.A
+  t_ew_y.Q -> not_ey.A
+  t_ew_g.Q -> ew_y_run.A
+  not_ey.Q -> ew_y_run.B
+
+  t_ew_y.Q -> t_clear2.A
+  t_clear2.Q -> not_c2.A
+  t_ew_y.Q -> c2_run.A
+  not_c2.Q -> c2_run.B
+
+  ns_y_run.Q -> side_busy.A
+  c1_run.Q -> side_busy.B
+  side_busy.Q -> side_busy_or2.A
+  ew_g_run.Q -> side_busy_or2.B
+  side_busy_or2.Q -> side_busy_or3.A
+  ew_y_run.Q -> side_busy_or3.B
+  side_busy_or3.Q -> ns_busy_or.A
+  c2_run.Q -> ns_busy_or.B
+
+  ns_busy_or.Q -> ns_rest_g.A
+  run.Q -> norm_ns_g.A
+  ns_rest_g.Q -> norm_ns_g.B
+
+  run.Q -> norm_ew_g.A
+  ew_g_run.Q -> norm_ew_g.B
+
+  norm_ns_g.Q -> cmu_conflict.A
+  norm_ew_g.Q -> cmu_conflict.B
+
+  cmu_conflict.Q -> cmu_or.A
+  force_cmu_fault.Q -> cmu_or.B
+  cmu_or.Q -> cmu_trip.S
+
+  cmu_trip.Q -> cmu_alarm.A
+  cmu_trip.Q -> cmu_healthy.A
+
+  cmu_trip.Q -> flash_red.A
+  flasher.Q -> flash_red.B
+
+  norm_ns_g.Q -> out_ns_g.A
+  cmu_healthy.Q -> out_ns_g.B
+  out_ns_g.Q -> ns_green.A
+
+  ns_y_run.Q -> out_ns_y.A
+  cmu_healthy.Q -> out_ns_y.B
+  out_ns_y.Q -> ns_yellow.A
+
+  side_busy_or2.Q -> out_ns_r.A
+  flash_red.Q -> out_ns_r.B
+  out_ns_r.Q -> ns_red.A
+
+  norm_ew_g.Q -> out_ew_g.A
+  cmu_healthy.Q -> out_ew_g.B
+  out_ew_g.Q -> ew_green.A
+
+  ew_y_run.Q -> out_ew_y.A
+  cmu_healthy.Q -> out_ew_y.B
+  out_ew_y.Q -> ew_yellow.A
+
+  norm_ns_g.Q -> out_ew_r.A
+  flash_red.Q -> out_ew_r.B
+  out_ew_r.Q -> ew_red.A
+
+  out_ew_g.Q -> ped_walk.A
+}
+`;
+
 export const BLOG_POSTS: BlogPost[] = [
   {
     slug: 'water-treatment',
@@ -977,59 +1294,281 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'traffic-lights',
-    title: 'Automated Traffic Light Sequence',
-    excerpt: 'Building a 3-state state machine using TON timers and logic gates.',
-    author: 'Sarah Dev',
-    date: 'Sep 28',
-    readingTime: '8 min read',
-    tag: 'Logic',
-    views: 11340,
+    title: 'Traffic Signal Automation: NEMA TS2 Dual-Ring Phasing, ITE Clearance Intervals & Conflict Monitor Watchdogs',
+    excerpt: 'A comprehensive traffic engineering masterclass on intersection signal automation: the Route 4 & Parkway collision analysis, ITE clearance calculations, dual-ring sequential state machines, actuated inductive loop detection, and hardware Conflict Monitor Unit (CMU) failsafes.',
+    author: 'Sarah Dev & AutomationHub Engineering',
+    date: 'Oct 19',
+    readingTime: '22 min read + 25 min labs',
+    tag: 'Control Systems',
+    views: 19850,
     content: (
-      <>
-        <p>State machines are notoriously tricky in visual block programming, but cascading timers make it easy. We use three TON (Timer On Delay) blocks to represent the duration of the Green, Yellow, and Red lights.</p>
-        <p>When the sequence starts, the Green timer counts. Once it finishes, it triggers the Yellow timer, which triggers the Red timer. The Red timer's completion resets the Green timer, causing a continuous loop.</p>
-        <p>Toggle the "Enable Sequence" switch below to see the cascade in action.</p>
-      </>
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={TRAFFIC_LIGHT_SVG_DATA_URI}
+            alt="NEMA TS2 Dual-Ring Intersection Controller and Conflict Monitor Unit P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // NEMA TS2 DUAL-RING INTERSECTION &amp; CONFLICT MONITOR UNIT (CMU)</span>
+            <span>ITE CLEARANCE, INDUCTIVE LOOPS &amp; HARDWARE FAIL-SAFE</span>
+          </div>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The 08:22 AM Double-Green Disaster at Route 4 &amp; County Parkway
+        </h2>
+        <p>
+          At 08:22 on a rainy October morning at the high-speed junction of Route 4 (a 45 MPH arterial) and County Parkway (a 35 MPH cross-street), the sound of crushing automotive steel echoed across six lanes. A loaded 30-ton ready-mix concrete truck traveling northbound entered the intersection at 42 MPH and collided broadside into a commuter sedan entering from the cross-street.
+        </p>
+        <p>
+          Both drivers swore under oath that their signal light was green.
+        </p>
+        <p>
+          Crash reconstructionists and municipal traffic engineers impounded the roadside NEMA cabinet. Inside, they found a custom PLC controller installed three months earlier to replace an aging electromechanical dial. The controls programmer had created an intersection sequence using three cascading On-Delay Timers (<code>TON</code>):
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          Timer_Green &rarr; Timer_Yellow &rarr; Timer_Red &rarr; (Reset Loop)
+        </div>
+        <p>
+          To implement the cross-street, the programmer simply wired the opposing phase to start the exact instant the yellow timer finished. There was <strong>zero all-red clearance interval</strong> (<em>R = 0 s</em>).
+        </p>
+        <p>
+          To make matters worse, an emergency vehicle preemption call had triggered just as North-South was timing out. Because the reset logic lacked a strict state machine barrier, the controller glitched for two program scans: North-South turned green while East-West was still energized on fresh green!
+        </p>
+        <p>
+          The collision resulted in a $4.2 million municipal tort liability settlement, permanent incapacitation of the sedan driver, and an immediate Department of Transportation moratorium on uncertified intersection controllers.
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">Regulatory Mandate: NEMA TS2, MUTCD &amp; Malfunction Management Units (MMU)</strong>
+          <p>
+            Never drive municipal traffic signal load switches directly from standard PLC outputs without a certified, independent Conflict Monitor Unit (CMU) or Malfunction Management Unit (MMU)! If a hardware triac welds short or software bugs command conflicting greens, the CMU must mechanically trip a line relay within 450 ms, forcing all four approaches into an isolated, hardwired Flashing Red backup mode.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Engineering Theory: ITE Clearance Physics &amp; Dual-Ring Barrier State Machines
+        </h2>
+        <p>
+          Safe intersection design is governed by the <strong>Manual on Uniform Traffic Control Devices (MUTCD)</strong> and the <strong>Institute of Transportation Engineers (ITE)</strong>. The clearance interval between conflicting traffic streams is divided into two distinct, life-critical phases:
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          1. The Yellow Change Interval (<em>Y</em>)
+        </h3>
+        <p>
+          The yellow interval gives approaching motorists sufficient time to either comfortably brake to a stop before the stop bar, or clear into the intersection before red appears:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          Y = t + V / (2a + 2Gg)
+        </div>
+        <p>Where:</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li><code>t = 1.0 s</code>: Driver perception-reaction time.</li>
+          <li><code>V</code>: Approach speed (45 MPH = 66 ft/s = 20.1 m/s).</li>
+          <li><code>a = 10 ft/s&sup2;</code> (3.05 m/s&sup2;): Comfortable wet-pavement deceleration.</li>
+          <li><code>G</code>: Roadway grade (decimal, 0.0 for level grade).</li>
+          <li><code>g = 32.2 ft/s&sup2;</code>: Acceleration of gravity.</li>
+        </ul>
+        <p>
+          For a 45 MPH approach: <code>Y = 1.0 + 66 / (2 &times; 10) = 1.0 + 3.3 = 4.3 seconds</code>.
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          2. The All-Red Clearance Interval (<em>R</em>)
+        </h3>
+        <p>
+          Even after yellow expires, a vehicle that entered on the last millisecond of yellow needs time to travel completely across the width of the conflict box (<em>W</em>) plus its own vehicle length (<em>L</em>) before cross-traffic receives green:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          R = (W + L) / V
+        </div>
+        <p>
+          For an 80-foot intersection with a standard 20-foot vehicle at 45 MPH (66 ft/s): <code>R = (80 + 20) / 66 = 1.52 seconds &approx; 1.6 seconds</code>.
+        </p>
+        <p>
+          Without this 1.6 s All-Red buffer, clearing vehicles and fresh-green cross-traffic occupy the exact same physical space simultaneously!
+        </p>
+
+        <div className="my-6 overflow-x-auto not-prose">
+          <table className="min-w-full text-left text-sm border-collapse border border-zinc-200">
+            <thead>
+              <tr className="bg-zinc-100 border-b border-zinc-200">
+                <th className="p-3 font-semibold text-zinc-900">Architecture</th>
+                <th className="p-3 font-semibold text-zinc-900">Mutual Exclusion</th>
+                <th className="p-3 font-semibold text-zinc-900">All-Red Clearance</th>
+                <th className="p-3 font-semibold text-zinc-900">Actuation Support</th>
+                <th className="p-3 font-semibold text-zinc-900">Safety Failure Mode</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              <tr>
+                <td className="p-3 font-semibold text-zinc-800">Naive Cascading Timers</td>
+                <td className="p-3 text-red-600 font-medium">Software only</td>
+                <td className="p-3 text-red-600 font-medium">Missing (0 s)</td>
+                <td className="p-3 text-zinc-600">None (Fixed time only)</td>
+                <td className="p-3 text-red-700">Race conditions, dual-green collision</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-semibold text-zinc-800">Dual-Ring Barrier (Stage 2)</td>
+                <td className="p-3 text-emerald-600 font-medium">Guaranteed by state gates</td>
+                <td className="p-3 text-emerald-600 font-medium">Full ITE (1.5 s)</td>
+                <td className="p-3 text-zinc-600">Fixed cycle</td>
+                <td className="p-3 text-amber-700">CPU lockup requires external watchdog</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-semibold text-zinc-800">Fully-Actuated + CMU (Stage 3)</td>
+                <td className="p-3 text-emerald-600 font-medium">Double-interlocked + Hardware CMU</td>
+                <td className="p-3 text-emerald-600 font-medium">Dynamic &amp; Protected</td>
+                <td className="p-3 text-emerald-600">Loops + Ped Call</td>
+                <td className="p-3 text-emerald-700">Failsafe transfer to 100% Flashing Red</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Naive Cascade &amp; The Missing Clearance
+        </h2>
+        <p>
+          Examine the Stage 1 circuit below. It implements the classic beginner&apos;s mistake: two opposing approaches chained together through simple sequential timers.
+        </p>
+        <p>
+          Notice what happens when North-South Yellow finishes: East-West Green turns ON at the exact same instant! There is zero clearance window. Any vehicle in the conflict box is immediately exposed to cross-traffic acceleration.
+        </p>
+
+        <InlineLab
+          dsl={TRAFFIC_LAB1_DSL}
+          title="Stage 1: The Naive Cascade & Missing Clearance"
+          step="Stage 1 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-rose-500 bg-rose-50 p-4 rounded-r-lg my-4 text-sm font-sans text-rose-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 1 (Diagnose the Clearance Defect)</strong>
+          <p>
+            In Stage 1 above, watch the cycle run: North-South Green (3s) &rarr; North-South Yellow (1.5s). The very scan NS Yellow drops, East-West Green ignites immediately! Notice the <strong>Collision Hazard: 0s All-Red Clearance</strong> indicator turns ON. A car clearing an 80-ft intersection at 45 MPH takes 1.5 seconds to exit&mdash;during that entire time, cross-traffic has a green light!
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Dual-Ring Controller with ITE All-Red Clearance
+        </h2>
+        <p>
+          Stage 2 introduces the standardized 6-phase cyclic state machine incorporating mandatory ITE clearance windows:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li><strong>P1: North-South Green (3.5s)</strong> &bull; East-West holds solid Red.</li>
+          <li><strong>P2: North-South Yellow (1.5s)</strong> &bull; East-West holds solid Red.</li>
+          <li><strong>P3: ALL-RED CLEARANCE 1 (1.5s)</strong> &bull; <strong>Both North-South and East-West hold solid RED</strong> while the conflict box clears!</li>
+          <li><strong>P4: East-West Green (3.0s)</strong> &bull; North-South holds solid Red.</li>
+          <li><strong>P5: East-West Yellow (1.5s)</strong> &bull; North-South holds solid Red.</li>
+          <li><strong>P6: ALL-RED CLEARANCE 2 (1.5s)</strong> &bull; <strong>Both hold solid RED</strong> before North-South receives green!</li>
+        </ol>
+        <p>
+          A <code>SCAN_DELAY</code> block provides an explicit, safe memory boundary for the loop reset without race conditions.
+        </p>
+
+        <InlineLab
+          dsl={TRAFFIC_LAB2_DSL}
+          title="Stage 2: Dual-Ring Controller with All-Red Clearance"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 2 (Observing the All-Red Protection Window)</strong>
+          <p>
+            In Stage 2 above, watch the cycle progress through all 6 phases. Notice how the <strong>All-Red Clearance Interval Active</strong> lamp lights up between every phase change! Both North-South Red and East-West Red are illuminated simultaneously for 1.5 seconds, guaranteeing that speeding vehicles have completely exited before cross-traffic is permitted to roll.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Fully-Actuated Controller with Inductive Vehicle Loop, Pedestrian Call &amp; Conflict Monitor (CMU)
+        </h2>
+        <p>
+          In real municipal networks, traffic controllers do not blindly cycle fixed timers. They operate in <strong>Fully-Actuated Mode</strong>:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Main Street (North-South)</strong> rests indefinitely in Green to maximize arterial corridor progression.</li>
+          <li><strong>Side Street (East-West)</strong> features an embedded <strong>Inductive Loop Detector (<code>loop_ew</code>)</strong> that senses the metallic chassis of waiting vehicles.</li>
+          <li><strong>Crosswalk Pushbutton (<code>ped_call</code>)</strong> registers pedestrian demand.</li>
+        </ul>
+        <p>
+          When side-street demand is latched, the controller smoothly terminates the main street green, executes the ITE yellow change and all-red clearance, serves the side street with pedestrian walk signals, and safely returns to rest in main-street green!
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          The Hardware Conflict Monitor Unit (CMU)
+        </h3>
+        <p>
+          The controller incorporates a hardware watchdog sensing field AC voltage taps. If conflicting greens ever energize simultaneously (or if an engineer forces a conflict via <code>force_cmu_fault</code>), the CMU trips within 450 ms, cuts power to the load switches, and engages a 50 FPM flasher relay into <strong>100% 4-Way Flashing Red</strong>!
+        </p>
+
+        <InlineLab
+          dsl={TRAFFIC_LAB3_DSL}
+          title="Stage 3: Actuated Intersection with Conflict Monitor"
+          step="Stage 3 of 3"
+          height={650}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 3 (Actuate Loops &amp; Test the CMU Trip)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>Notice the controller rests peacefully in North-South Green. Cross-street traffic has no cars, so no green time is wasted!</li>
+            <li>Click <strong>East-West Inductive Loop Detector</strong> to simulate a car arriving at the side-street stop bar. Watch the controller seamlessly execute NS Yellow (1.5s) &rarr; All-Red (1.5s) &rarr; EW Green &amp; Ped Walk (3.5s) &rarr; EW Yellow (1.5s) &rarr; All-Red (1.5s) &rarr; and return to resting NS Green!</li>
+            <li>Now simulate a welded solid-state triac: toggle <strong>Simulate CMU Conflict (Welded Triac)</strong> to ON. Watch the CMU trip instantly! Green drops dead, and both approaches begin flashing emergency Red at 1 Hz!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Commissioning Checklist &amp; Municipal Intersection Proof Testing
+        </h2>
+        <p>
+          Before turning over any traffic cabinet to municipal DOT operations, field crews must complete this mandatory protocol:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>CMU Diode Card Conflict Testing:</strong> Remove the Conflict Monitor Unit from the cabinet and insert a factory testing harness. Systematically bridge every green and yellow channel pair (e.g. Phase 2 Green with Phase 4 Green). Verify the CMU drops the line relay into Flashing Red within 450 ms on every combination.
+          </li>
+          <li>
+            <strong>Inductive Loop Sensitivity &amp; Resistance Verification:</strong> Measure loop inductance with an RLC meter (50 to 300 &mu;H) and resistance-to-ground (&gt;100 M&Omega;). Test loop responsiveness with a bicycle or small motorcycle to confirm detection sensitivity.
+          </li>
+          <li>
+            <strong>ITE Clearance Timing Audit:</strong> Physically stopwatch-verify field displays against the approved engineering timing sheet. Yellow change intervals must never be configured shorter than 3.0 seconds (typically 4.0 to 5.5 s on arterials), and All-Red must never be omitted (1.0 to 2.5 s).
+          </li>
+          <li>
+            <strong>Pedestrian Clearance Intervals (MUTCD 4E.06):</strong> Ensure the flashing Don&apos;t Walk interval is calculated using a walking speed of no faster than 3.5 ft/s (1.07 m/s) across the full curb-to-curb crosswalk width.
+          </li>
+          <li>
+            <strong>Power Loss &amp; Flasher Relay Drop Test:</strong> Disconnect main 120V AC cabinet utility power and restore it. Verify the controller boots up in minimum 5-second all-red/flash mode before entering automatic coordination.
+          </li>
+          <li>
+            <strong>Preemption Gate Interlocks:</strong> Verify that railroad preemption or emergency vehicle optical strobe sensors (Opticom) force an immediate safe clearance sequence rather than an instantaneous green transfer.
+          </li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>All-Red is not optional:</strong> Omitting the all-red clearance interval creates an instantaneous collision window where vehicles clearing the box are struck broadside by cross-traffic.
+          </li>
+          <li>
+            <strong>State Machines over Timer Cascades:</strong> Never rely on cascading timer completion bits for mutual exclusion; implement discrete state logic with explicit scan boundaries.
+          </li>
+          <li>
+            <strong>Hardware watchdogs are non-negotiable:</strong> A certified Conflict Monitor Unit (CMU/MMU) must monitor the physical field voltages and trip a hardwired line relay into flashing red upon any conflict or brownout.
+          </li>
+          <li>
+            <strong>Actuation preserves corridor efficiency:</strong> Resting in main-street green until an inductive loop or pedestrian pushbutton registers demand maximizes throughput while maintaining absolute safety.
+          </li>
+        </ul>
+      </div>
     ),
-    dsl: `circuit "Automated Traffic Light Sequence" version 1 {
-  enable: INPUT(label="Enable Sequence", value=true)
-  green_timer: TON(duration=4000)
-  yellow_timer: TON(duration=1500)
-  red_timer: TON(duration=4000)
-  not_green_done: NOT()
-  is_green: AND()
-  not_yellow_done: NOT()
-  is_yellow: AND()
-  not_red_done: NOT()
-  is_red: AND()
-  reset_loop: NOT()
-  run_green: AND()
-  g_out: OUTPUT(label="Green Light")
-  y_out: OUTPUT(label="Yellow Light")
-  r_out: OUTPUT(label="Red Light")
-
-  enable.Q -> run_green.A
-  reset_loop.Q -> run_green.B
-  run_green.Q -> green_timer.A
-  green_timer.Q -> not_green_done.A
-  run_green.Q -> is_green.A
-  not_green_done.Q -> is_green.B
-  is_green.Q -> g_out.A
-
-  green_timer.Q -> yellow_timer.A
-  yellow_timer.Q -> not_yellow_done.A
-  green_timer.Q -> is_yellow.A
-  not_yellow_done.Q -> is_yellow.B
-  is_yellow.Q -> y_out.A
-
-  yellow_timer.Q -> red_timer.A
-  red_timer.Q -> not_red_done.A
-  yellow_timer.Q -> is_red.A
-  not_red_done.Q -> is_red.B
-  is_red.Q -> r_out.A
-
-  red_timer.Q -> reset_loop.A
-}`
+    dsl: ''
   },
   {
     slug: 'conveyor-sorting',
