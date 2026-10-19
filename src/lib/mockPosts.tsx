@@ -18,6 +18,7 @@ import { HEATER_SVG } from './heaterBlueprintSvg';
 import { TWO_HAND_SAFETY_SVG } from './safetyBlueprintSvg';
 import { TANK_HYSTERESIS_SVG } from './tankHysteresisBlueprintSvg';
 import { TRAFFIC_LIGHT_SVG } from './trafficBlueprintSvg';
+import { PUMP_ALTERNATOR_SVG } from './pumpAlternatorBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -814,6 +815,203 @@ const TRAFFIC_LAB3_DSL = `circuit "Stage 3 - Actuated Intersection with Conflict
   out_ew_r.Q -> ew_red.A
 
   out_ew_g.Q -> ped_walk.A
+}
+`;
+
+const PUMP_ALTERNATOR_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(PUMP_ALTERNATOR_SVG);
+
+const PUMP_ALT_LAB1_DSL = `circuit "Stage 1 - Basic Duty Alternator" version 1 {
+  call: INPUT(label="Call for Water", value=true)
+  edge: F_TRIG(label="Cycle End (Falling Edge)")
+  toggle: PULSE_RELAY(label="Duty Flip-Flop")
+  not_toggle: NOT()
+  pumpA: AND(label="Pump A Gate")
+  pumpB: AND(label="Pump B Gate")
+  outA: OUTPUT(label="Pump A Contactor")
+  outB: OUTPUT(label="Pump B Contactor")
+  duty_b: OUTPUT(label="Next Duty: Pump B when ON")
+
+  call.Q -> edge.A
+  edge.Q -> toggle.A
+  toggle.Q -> not_toggle.A
+  toggle.Q -> duty_b.A
+
+  call.Q -> pumpA.A
+  not_toggle.Q -> pumpA.B
+  pumpA.Q -> outA.A
+
+  call.Q -> pumpB.A
+  toggle.Q -> pumpB.B
+  pumpB.Q -> outB.A
+}
+`;
+
+const PUMP_ALT_LAB2_DSL = `circuit "Stage 2 - Fault-Aware Alternator with Auto-Takeover" version 1 {
+  call: INPUT(label="Call for Water", value=true)
+  healthy_a: INPUT(label="Pump A Overload Healthy", value=true)
+  healthy_b: INPUT(label="Pump B Overload Healthy", value=true)
+
+  edge: F_TRIG(label="Cycle End Detector")
+  duty: PULSE_RELAY(label="Duty Selector")
+  duty_a: NOT()
+
+  fault_a: NOT()
+  fault_b: NOT()
+
+  duty_a_pref: AND(label="Duty A Desired")
+  duty_b_pref: AND(label="Duty B Desired")
+
+  takeover_b: AND(label="B Takes Over for Faulted A")
+  takeover_a: AND(label="A Takes Over for Faulted B")
+
+  demand_a: OR()
+  demand_b: OR()
+  takeover_or: OR(label="Any Takeover Active")
+
+  final_a: AND(label="Final Pump A Command")
+  final_b: AND(label="Final Pump B Command")
+
+  outA: OUTPUT(label="Pump A Motor Command")
+  outB: OUTPUT(label="Pump B Motor Command")
+  alarmA: OUTPUT(label="Pump A Tripped Alarm")
+  alarmB: OUTPUT(label="Pump B Tripped Alarm")
+  autoTakeover: OUTPUT(label="Standby Pump in Auto-Takeover")
+
+  call.Q -> edge.A
+  edge.Q -> duty.A
+  duty.Q -> duty_a.A
+
+  healthy_a.Q -> fault_a.A
+  healthy_b.Q -> fault_b.A
+  fault_a.Q -> alarmA.A
+  fault_b.Q -> alarmB.A
+
+  call.Q -> duty_a_pref.A
+  duty_a.Q -> duty_a_pref.B
+
+  call.Q -> duty_b_pref.A
+  duty.Q -> duty_b_pref.B
+
+  duty_a_pref.Q -> takeover_b.A
+  fault_a.Q -> takeover_b.B
+
+  duty_b_pref.Q -> takeover_a.A
+  fault_b.Q -> takeover_a.B
+
+  duty_a_pref.Q -> demand_a.A
+  takeover_a.Q -> demand_a.B
+
+  duty_b_pref.Q -> demand_b.A
+  takeover_b.Q -> demand_b.B
+
+  demand_a.Q -> final_a.A
+  healthy_a.Q -> final_a.B
+  final_a.Q -> outA.A
+
+  demand_b.Q -> final_b.A
+  healthy_b.Q -> final_b.B
+  final_b.Q -> outB.A
+
+  takeover_a.Q -> takeover_or.A
+  takeover_b.Q -> takeover_or.B
+  takeover_or.Q -> autoTakeover.A
+}
+`;
+
+const PUMP_ALT_LAB3_DSL = `circuit "Stage 3 - Duplex Lead / Lag Sequencing & Peak Assist" version 1 {
+  lead_call: INPUT(label="Lead Demand (Pressure / Low Level)", value=true)
+  lag_call: INPUT(label="Lag Demand (High Inflow / Peak Surge)", value=false)
+  healthy_a: INPUT(label="Pump A Healthy", value=true)
+  healthy_b: INPUT(label="Pump B Healthy", value=true)
+
+  edge: F_TRIG(label="Cycle End Detector")
+  duty: PULSE_RELAY(label="Lead Selector Toggle")
+  duty_a: NOT()
+
+  fault_a: NOT()
+  fault_b: NOT()
+
+  lead_req_a: AND()
+  lead_req_b: AND()
+
+  lead_takeover_b: AND(label="B Takes Lead if A Faulted")
+  lead_takeover_a: AND(label="A Takes Lead if B Faulted")
+
+  lead_run_a: OR()
+  lead_run_b: OR()
+
+  lag_active: AND(label="Lag Gate")
+  lag_req_a: AND(label="Lag Call to A (when B is Lead)")
+  lag_req_b: AND(label="Lag Call to B (when A is Lead)")
+
+  demand_a: OR()
+  demand_b: OR()
+
+  final_a: AND()
+  final_b: AND()
+
+  dual_active: AND(label="Both Pumps Running")
+
+  pumpA: OUTPUT(label="Pump A Motor (P-101A)")
+  pumpB: OUTPUT(label="Pump B Motor (P-101B)")
+  dual_mode: OUTPUT(label="Dual Pumping Mode (Peak Surge)")
+  alarm_a: OUTPUT(label="Pump A Fault Alarm")
+  alarm_b: OUTPUT(label="Pump B Fault Alarm")
+
+  lead_call.Q -> edge.A
+  edge.Q -> duty.A
+  duty.Q -> duty_a.A
+
+  healthy_a.Q -> fault_a.A
+  healthy_b.Q -> fault_b.A
+  fault_a.Q -> alarm_a.A
+  fault_b.Q -> alarm_b.A
+
+  lead_call.Q -> lead_req_a.A
+  duty_a.Q -> lead_req_a.B
+
+  lead_call.Q -> lead_req_b.A
+  duty.Q -> lead_req_b.B
+
+  lead_req_a.Q -> lead_takeover_b.A
+  fault_a.Q -> lead_takeover_b.B
+
+  lead_req_b.Q -> lead_takeover_a.A
+  fault_b.Q -> lead_takeover_a.B
+
+  lead_req_a.Q -> lead_run_a.A
+  lead_takeover_a.Q -> lead_run_a.B
+
+  lead_req_b.Q -> lead_run_b.A
+  lead_takeover_b.Q -> lead_run_b.B
+
+  lead_call.Q -> lag_active.A
+  lag_call.Q -> lag_active.B
+
+  lag_active.Q -> lag_req_b.A
+  lead_run_a.Q -> lag_req_b.B
+
+  lag_active.Q -> lag_req_a.A
+  lead_run_b.Q -> lag_req_a.B
+
+  lead_run_a.Q -> demand_a.A
+  lag_req_a.Q -> demand_a.B
+
+  lead_run_b.Q -> demand_b.A
+  lag_req_b.Q -> demand_b.B
+
+  demand_a.Q -> final_a.A
+  healthy_a.Q -> final_a.B
+  final_a.Q -> pumpA.A
+
+  demand_b.Q -> final_b.A
+  healthy_b.Q -> final_b.B
+  final_b.Q -> pumpB.A
+
+  final_a.Q -> dual_active.A
+  final_b.Q -> dual_active.B
+  dual_active.Q -> dual_mode.A
 }
 `;
 
@@ -2131,39 +2329,219 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'pump-alternator',
-    title: 'Motor Duty Cycling (Alternating Pumps)',
-    excerpt: 'Extending equipment life by alternating two identical pumps.',
-    author: 'Alex Engineer',
+    title: 'Motor Duty Cycling: Duplex Pump Alternation, Auto-Takeover & Lead/Lag Control',
+    excerpt: 'An intermediate masterclass on rotating machinery duty cycling: why naive flip-flops stall when motors trip, how to implement automatic standby takeover, and configuring duplex lead/lag assist for peak demand surges.',
+    author: 'Alex Engineer & AutomationHub Team',
     date: 'Sep 10',
-    readingTime: '9 min read',
-    tag: 'Maintenance',
-    views: 9870,
+    readingTime: '12 min read + 15 min labs',
+    tag: 'Intermediate',
+    views: 12480,
     content: (
-      <>
-        <p>In municipal water stations, two identical pumps are often installed. To ensure equal wear, they alternate cycles: Pump A runs for the first cycle, Pump B for the second, and so on.</p>
-        <p>A PULSE_RELAY (toggle flip-flop) is perfect for this. Every time the call for water ends (falling edge), the toggle switches state. Depending on the toggle state, the next call for water is routed to either Pump A or Pump B using AND gates.</p>
-      </>
-    ),
-    dsl: `circuit "Motor Duty Cycling (Alternating Pumps)" version 1 {
-  call: INPUT(label="Call for Water", value=true)
-  edge: F_TRIG()
-  toggle: PULSE_RELAY()
-  not_toggle: NOT()
-  pumpA: AND()
-  pumpB: AND()
-  outA: OUTPUT(label="Pump A")
-  outB: OUTPUT(label="Pump B")
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={PUMP_ALTERNATOR_SVG_DATA_URI}
+            alt="Duplex Pump Duty Alternation and Lead-Lag Control P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // DUPLEX PUMP DUTY CYCLING &amp; LEAD / LAG SEQUENCING</span>
+            <span>EQUAL WEAR BALANCING &amp; STANDBY AUTO-TAKEOVER</span>
+          </div>
+        </div>
 
-  call.Q -> edge.A
-  edge.Q -> toggle.A
-  toggle.Q -> not_toggle.A
-  call.Q -> pumpA.A
-  not_toggle.Q -> pumpA.B
-  pumpA.Q -> outA.A
-  call.Q -> pumpB.A
-  toggle.Q -> pumpB.B
-  pumpB.Q -> outB.A
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The Duplex Pump Dilemma: Unequal Wear vs. Fault Stalling
+        </h2>
+        <p>
+          In commercial buildings, municipal booster stations, and industrial lift stations, pumps rarely operate alone. A standard design installs two identical pumps (<strong>Pump A</strong> and <strong>Pump B</strong>) piped in parallel across common suction and discharge manifolds.
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          Why Alternate Rotating Equipment?
+        </h3>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Equalizing Wear:</strong> If Pump A runs 100% of the time while Pump B sits idle as a &quot;cold spare,&quot; Pump A accumulates thousands of operating hours and burns out its mechanical seal within a year. Meanwhile, Pump B&apos;s idle seal elastomeric faces can dry out, and its bearing grease can oxidize or separate, causing it to seize the very first time an emergency occurs!
+          </li>
+          <li>
+            <strong>Thermal Dissipation:</strong> Periodic resting gives motor windings, motor bearings, and contactor coils time to cool down below their maximum thermal rise limits.
+          </li>
+          <li>
+            <strong>Operational Verification:</strong> Running both pumps on a daily or weekly rotation proves that both starters, pressure switches, and non-return valves (NRVs) remain fully functional before a critical surge hits.
+          </li>
+        </ul>
+
+        <p>
+          However, many beginner PLC programs implement alternation using a simple, blind flip-flop:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          Cycle Finished &rarr; Toggle Bit &rarr; Alternate Next Demand
+        </div>
+        <p>
+          <strong>The Field Flaw:</strong> What happens if Pump A trips on its thermal overload relay? The blind flip-flop doesn&apos;t care&mdash;on the very next cycle, it blindly routes the call to the faulted pump. Demand goes completely unserved, the wet well fills up, and an alarm sounds, even though a perfectly healthy Pump B was sitting right next to it doing nothing!
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">Intermediate Control Rule: Alternation Must Be Fault-Aware</strong>
+          <p>
+            A duty alternator should never be just a software toggle flip-flop. Real-world duty cycling must cross-check equipment health: if the duty pump is faulted, in maintenance lockout, or fails to prove flow, the standby unit must take over immediately without human intervention.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Classic Flip-Flop Alternator
+        </h2>
+        <p>
+          In Stage 1 below, we implement the foundational duty cycling circuit using a <code>PULSE_RELAY</code> (bistable toggle flip-flop) driven by a falling-edge detector (<code>F_TRIG</code>).
+        </p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>When water demand is active (<code>Call for Water</code> = ON), the currently selected pump runs.</li>
+          <li>When water demand is satisfied (<code>Call for Water</code> turns OFF), the falling edge triggers the <code>PULSE_RELAY</code>.</li>
+          <li>The toggle state switches, steering the <em>next</em> start command to the opposite pump via mutual AND gates.</li>
+        </ul>
+
+        <InlineLab
+          dsl={PUMP_ALT_LAB1_DSL}
+          title="Stage 1: The Basic Duty Alternator"
+          step="Stage 1 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 1 (Observe the Alternation)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>Notice that Pump A is initially running because <strong>Call for Water</strong> is ON.</li>
+            <li>Toggle <strong>Call for Water</strong> to OFF (cycle complete). Watch the <strong>Duty Flip-Flop</strong> switch state and light up <strong>Next Duty: Pump B when ON</strong>.</li>
+            <li>Turn <strong>Call for Water</strong> back ON: now Pump B runs!</li>
+            <li>Notice the limitation: there is no input for motor health. If a pump burns out, the circuit still tries to run it every other cycle!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Fault-Aware Alternator with Automatic Standby Takeover
+        </h2>
+        <p>
+          To solve the blind toggle flaw, Stage 2 introduces motor health interlocks from thermal overload auxiliary contacts (<code>healthy_a</code> and <code>healthy_b</code>).
+        </p>
+
+        <h3 className="text-xl font-bold font-serif text-zinc-900 mt-6 mb-2">
+          How Automatic Takeover Works:
+        </h3>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Normal Cycle:</strong> If Pump A is selected and healthy, Pump A runs.
+          </li>
+          <li>
+            <strong>Duty Pump Faulted:</strong> If Pump A is selected but trips its overload (<code>healthy_a</code> drops to false), the <code>takeover_b</code> gate activates instantly. Demand is immediately redirected to <strong>Pump B</strong>!
+          </li>
+          <li>
+            <strong>Standby Backup:</strong> The station continues delivering water without human intervention. An alarm indicator alerts technicians to service Pump A while Pump B carries the load.
+          </li>
+        </ul>
+
+        <InlineLab
+          dsl={PUMP_ALT_LAB2_DSL}
+          title="Stage 2: Fault-Aware Standby Auto-Takeover"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 2 (Simulate a Tripped Motor Overload)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>With <strong>Call for Water</strong> active, Pump A is running normally as the duty pump.</li>
+            <li>Now toggle <strong>Pump A Overload Healthy</strong> to OFF (simulating a tripped starter thermal overload).</li>
+            <li>Watch what happens in real time: Pump A shuts down, <strong>Pump A Tripped Alarm</strong> illuminates, and Pump B immediately energizes under <strong>Standby Pump in Auto-Takeover</strong>!</li>
+            <li>The process never starves for water even during an active equipment breakdown.</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Duplex Lead / Lag Sequencing for Peak Inflow
+        </h2>
+        <p>
+          In real stormwater stations, municipal lift stations, and commercial booster systems, water demand fluctuates throughout the day. A single pump may handle 90% of operating hours, but during a heavy storm or peak morning demand, one pump cannot keep up.
+        </p>
+        <p>
+          This is where <strong>Lead / Lag Sequencing</strong> is used:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Lead Demand (<code>lead_call</code>):</strong> The primary demand switch (e.g. wet well reaches 50% level or water pressure drops below 45 PSI). The assigned <strong>Lead Pump</strong> starts and runs solo.
+          </li>
+          <li>
+            <strong>Lag Demand (<code>lag_call</code>):</strong> A secondary high-demand switch (e.g. wet well surges to 80% level or pressure drops below 35 PSI). The <strong>Lag Pump</strong> starts in parallel to assist, doubling discharge flow rate!
+          </li>
+          <li>
+            When the surge subsides and <code>lag_call</code> turns off, the Lag pump shuts down, leaving the Lead pump to finish the cycle.
+          </li>
+          <li>
+            On cycle completion, the Lead duty alternates, ensuring both pumps share the Lead role equally.
+          </li>
+        </ul>
+
+        <InlineLab
+          dsl={PUMP_ALT_LAB3_DSL}
+          title="Stage 3: Duplex Lead / Lag Sequencing & Peak Assist"
+          step="Stage 3 of 3"
+          height={600}
+        />
+
+        <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded-r-lg my-4 text-sm font-sans text-indigo-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise &mdash; Stage 3 (Duplex Lead/Lag Peak Assist)</strong>
+          <ol className="list-decimal pl-5 space-y-1 mt-1">
+            <li>With only <strong>Lead Demand</strong> active, Pump A runs alone as the Lead unit.</li>
+            <li>Now toggle <strong>Lag Demand (High Inflow / Peak Surge)</strong> to ON. Watch Pump B immediately kick on alongside Pump A, illuminating <strong>Dual Pumping Mode (Peak Surge)</strong>!</li>
+            <li>Turn <strong>Lag Demand</strong> OFF: Pump B shuts off smoothly, and Pump A continues running.</li>
+            <li>Turn <strong>Lead Demand</strong> OFF to finish the cycle. Next time you turn <strong>Lead Demand</strong> ON, Pump B starts as the Lead pump, and Pump A becomes the Lag standby!</li>
+          </ol>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Field Commissioning &amp; Maintenance Best Practices
+        </h2>
+        <p>
+          When programming duplex pump stations on the plant floor or in building automation systems, keep these five field guidelines in mind:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Alternate on Cycle Completion, Not Cycle Start:</strong> Always trigger the duty toggle on the <em>falling edge</em> of the demand call (when pumping stops). If you toggle on the rising edge, an operator cycling the power switch or a brief sensor flicker could prematurely swap the duty assignment mid-stride.
+          </li>
+          <li>
+            <strong>Stagger Lag Pump Starting:</strong> When dual pumping is required, never start both large induction motors simultaneously across-the-line. Stagger the Lag pump start by 5 to 10 seconds to avoid tripping the main building feeder breaker on cumulative motor inrush current.
+          </li>
+          <li>
+            <strong>Provide an Exercise Timer:</strong> If a duplex pump station sits idle for weeks (common in backup flood sumps or seasonal HVAC systems), configure an automated exercise timer (e.g., run each pump for 60 seconds once every 7 days). This keeps mechanical seal faces lubricated and flushes sediment out of the pump volute.
+          </li>
+          <li>
+            <strong>Non-Return Valve (NRV) Integrity:</strong> Every parallel pump branch requires a dedicated swing or silent check valve on its discharge. If check valve NRV-A fails open, Pump B will simply recirculate pressurized water backward through Pump A instead of delivering water to the system!
+          </li>
+          <li>
+            <strong>Runtime Hour Balancing vs. Cycle Alternation:</strong> Simple cycle alternation works best when run durations are relatively consistent. For applications where one run cycle might last 5 minutes and another lasts 6 hours, intermediate PLCs accumulate run hours into memory registers and assign Lead duty to whichever pump has fewer lifetime hours.
+          </li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>Duty cycling equalizes wear:</strong> Alternating runtime prevents premature mechanical seal degradation and bearing brinelling on idle backup equipment.
+          </li>
+          <li>
+            <strong>Never toggle blindly:</strong> Always include motor overload (<code>OL</code>) and disconnect switch auxiliary contacts to allow automatic standby substitution during hardware faults.
+          </li>
+          <li>
+            <strong>Lead / Lag doubles capacity:</strong> Duplex staging allows energy-efficient single-pump operation under base load while providing full parallel capacity during peak demand surges.
+          </li>
+          <li>
+            <strong>Proven simplicity:</strong> With a falling-edge trigger (<code>F_TRIG</code>), a toggle flip-flop (<code>PULSE_RELAY</code>), and basic logic gates, you can build a resilient, industry-standard duplex controller.
+          </li>
+        </ul>
+      </div>
+    ),
+    dsl: ''
   },
   {
     slug: 'esd-delays',
