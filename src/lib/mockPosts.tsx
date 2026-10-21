@@ -22,6 +22,7 @@ import { PUMP_ALTERNATOR_SVG } from './pumpAlternatorBlueprintSvg';
 import { CONVEYOR_SORTING_SVG } from './conveyorBlueprintSvg';
 import { HVAC_ECONOMIZER_SVG_DATA_URI } from './hvacBlueprintSvg';
 import { ESD_DELAYS_SVG_DATA_URI } from './esdBlueprintSvg';
+import { SOLAR_LOGGING_SVG_DATA_URI } from './solarBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -1311,6 +1312,82 @@ const ESD_LAB3_DSL = `circuit "Stage 3 - Controlled Flare Vent & Latched Safety 
   ventDelay.Q -> ventGate.A
   esdLatch.Q -> ventGate.B
   ventGate.Q -> blowdownVent.A
+}
+`;
+
+const SOLAR_LAB1_DSL = `circuit "Stage 1 - Raw Unfiltered Solar Noise" version 1 {
+  rawVolt: ANALOG_INPUT(label="Raw Solar Voltage (V)", value=22)
+  minChargeVolt: ANALOG_INPUT(label="Min Charge Threshold (24V)", value=24)
+  comp: ANALOG_COMPARATOR(operation="gte")
+  chargeRelay: OUTPUT(label="Battery Charge Contactor")
+  alarmTrip: NOT(label="Low Voltage Alarm")
+  alarmLamp: OUTPUT(label="Unfiltered Voltage Alarm")
+
+  rawVolt.Q -> comp.A
+  minChargeVolt.Q -> comp.B
+  comp.Q -> chargeRelay.A
+
+  comp.Q -> alarmTrip.A
+  alarmTrip.Q -> alarmLamp.A
+}
+`;
+
+const SOLAR_LAB2_DSL = `circuit "Stage 2 - Analog Smoothing with Moving Average" version 1 {
+  rawVolt: ANALOG_INPUT(label="Raw Solar Voltage (V)", value=28)
+  avgFilter: AVERAGE(samples=5)
+  smoothedVolt: ANALOG_OUTPUT(label="Smoothed Array Voltage (V)")
+  minChargeVolt: ANALOG_INPUT(label="Min Charge Threshold (24V)", value=24)
+  comp: ANALOG_COMPARATOR(operation="gte")
+  chargeActive: OUTPUT(label="Battery Charging Active")
+
+  rawVolt.Q -> avgFilter.A
+  avgFilter.Q -> smoothedVolt.A
+
+  avgFilter.Q -> comp.A
+  minChargeVolt.Q -> comp.B
+  comp.Q -> chargeActive.A
+}
+`;
+
+const SOLAR_LAB3_DSL = `circuit "Stage 3 - Full Solar Telemetry & Battery Charge Manager" version 1 {
+  rawVolt: ANALOG_INPUT(label="Raw PV String Voltage (V)", value=28)
+  avgFilter: AVERAGE(samples=5)
+  smoothedVolt: ANALOG_OUTPUT(label="Clean Trend Voltage (V)")
+
+  minChargeVolt: ANALOG_INPUT(label="Min Charge Threshold (24V)", value=24)
+  maxOverVolt: ANALOG_INPUT(label="Over-Voltage Limit (32V)", value=32)
+
+  isHealthyMin: ANALOG_COMPARATOR(operation="gte")
+  isSafeMax: ANALOG_COMPARATOR(operation="lte")
+  chargePermissive: AND()
+
+  enableLogging: INPUT(label="Cloud Telemetry Logging Enable", value=true)
+  logger: DATA_LOG(interval=500)
+  logActiveLamp: OUTPUT(label="Telemetry Data Logging Active")
+
+  chargeContactor: OUTPUT(label="Battery Charge Contactor (KM-101)")
+  overvoltAlarm: NOT()
+  overvoltLamp: OUTPUT(label="Over-Voltage Hazard Alarm")
+
+  rawVolt.Q -> avgFilter.A
+  avgFilter.Q -> smoothedVolt.A
+
+  avgFilter.Q -> isHealthyMin.A
+  minChargeVolt.Q -> isHealthyMin.B
+
+  avgFilter.Q -> isSafeMax.A
+  maxOverVolt.Q -> isSafeMax.B
+
+  isHealthyMin.Q -> chargePermissive.A
+  isSafeMax.Q -> chargePermissive.B
+  chargePermissive.Q -> chargeContactor.A
+
+  avgFilter.Q -> logger.A
+  enableLogging.Q -> logger.EN
+  logger.Q -> logActiveLamp.A
+
+  isSafeMax.Q -> overvoltAlarm.A
+  overvoltAlarm.Q -> overvoltLamp.A
 }
 `;
 
@@ -3430,31 +3507,206 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'solar-logging',
-    title: 'Data Logging for a Solar Panel Array',
-    excerpt: 'Smoothing and recording volatile analog signals over time.',
-    author: 'Dave Climate',
-    date: 'Sep 02',
-    readingTime: '5 min read',
-    tag: 'Renewables',
-    views: 3890,
+    title: 'Solar Array Telemetry: Analog Smoothing, Moving Averages & Data Logging',
+    excerpt: 'A beginner-friendly guide to clean sensor data: eliminating cloud-induced voltage ripple with moving average filters, preventing contactor chatter, and logging periodic microgrid telemetry.',
+    author: 'Dave Climate & AutomationHub Team',
+    date: 'Oct 21',
+    readingTime: '12 min read + 15 min labs',
+    tag: 'Renewables / IoT',
+    views: 8450,
     content: (
-      <>
-        <p>Solar panel voltage fluctuates rapidly due to passing clouds. If we log raw data directly, the chart becomes noisy and difficult to read.</p>
-        <p>By passing the analog signal through an AVERAGE block (moving average), we smooth out the transients. We then use a DATA_LOG block to record a sample every 500ms, giving us a clean, actionable dataset.</p>
-        <p>Adjust the "Solar Voltage" randomly in the simulation and observe the smoothed output.</p>
-      </>
-    ),
-    dsl: `circuit "Data Logging for a Solar Panel Array" version 1 {
-  voltage: ANALOG_INPUT(label="Raw Solar Voltage", value=12)
-  avg: AVERAGE(samples=10)
-  smoothed: ANALOG_OUTPUT(label="Smoothed Output")
-  log_enable: INPUT(label="Enable Logging", value=true)
-  logger: DATA_LOG(interval=500)
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={SOLAR_LOGGING_SVG_DATA_URI}
+            alt="Solar array telemetry and moving average signal conditioning schematic"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-amber-400 font-semibold">FIG 1.1 // REMOTE SOLAR PV MICROGRID TELEMETRY</span>
+            <span>SYSTEM: PV-STRING // 24VDC - 32VDC BUS SIGNAL CONDITIONING</span>
+          </div>
+        </div>
 
-  voltage.Q -> avg.A
-  avg.Q -> smoothed.A
-  avg.Q -> logger.A
-  log_enable.Q -> logger.EN
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The 4,000 False Alarms &amp; The Weekend Database Crash
+        </h2>
+        <p>
+          Imagine driving down a bumpy, rocky dirt road. If your car speedometer displayed the raw instant speed of each bounce every millisecond, the needle would violently blur between 20 MPH and 50 MPH! You wouldn't be able to read your speed, and your cruise control would violently jerk the throttle.
+        </p>
+        <p>
+          Modern cars solve this with <strong>digital smoothing</strong>—averaging recent readings to display a smooth, steady number.
+        </p>
+        <p>
+          In solar energy automation, sensors face the exact same problem from nature: <strong>passing clouds</strong>:
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Desert Microgrid Incident:</strong>
+          <p>
+            At an off-grid solar microgrid site in Nevada, an engineering intern configured the telemetry station to send an SMS alert whenever the solar battery charging voltage dipped below 24VDC.
+          </p>
+          <p className="mt-2">
+            On a partly cloudy Saturday afternoon, puffy cumulus clouds drifted across the desert sky. Every few seconds, the sunlight would dim for a brief moment, causing the raw voltage to dip from 28V down to 22V, and then bounce right back up.
+          </p>
+          <p className="mt-2">
+            The raw threshold comparator tripped and untripped continuously! By Sunday evening, the system had spammed over <strong>4,200 text messages</strong> to the plant manager's phone and filled the remote cellular gateway memory to 100%, causing a complete communications lockup.
+          </p>
+          <p className="mt-2 font-medium">
+            The Golden Lesson: Never connect raw, noisy analog signals directly to alarm thresholds or high-frequency loggers. Always filter transients with a Moving Average (AVERAGE) and log clean, periodic snapshots with a DATA_LOG block.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Understanding Analog Noise vs. Real Trends
+        </h2>
+        <p>
+          When monitoring physical sensors (like solar voltage, wind speed, or temperature), readings contain two components:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>The True Engineering Trend:</strong> The actual, meaningful state of the process (e.g., the sun is shining brightly at midday).</li>
+          <li><strong>High-Frequency Noise:</strong> Temporary fluctuations caused by electromagnetic interference, cable induction, or passing cloud shadows.</li>
+        </ul>
+        <p>
+          If an automation system reacts to every millisecond of noise:
+          Mechanical relays and contactors chatter violently, burning out contacts; databases get overwhelmed with useless junk; and false alarms wake up on-call technicians.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Raw Unfiltered Comparator (Contactor Chattering)
+        </h2>
+        <p>
+          Below is <strong>Stage 1</strong> of our interactive lab. The raw solar voltage is wired directly into an <code>ANALOG_COMPARATOR</code> with a 24V threshold.
+        </p>
+        <p>
+          Try adjusting the slider in the simulation below:
+        </p>
+
+        <InlineLab
+          dsl={SOLAR_LAB1_DSL}
+          title="Stage 1 - Raw Unfiltered Solar Noise"
+          step="Stage 1 of 3"
+          height={460}
+        />
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Beginner Flaw in Stage 1</strong>
+          <p>
+            In the lab above, drag <strong>Raw Solar Voltage (V)</strong> back and forth across 24V (e.g., 23V, 25V, 22V, 26V). Notice how the Battery Charge Contactor immediately clicks ON and OFF with zero delay! In a real battery room, this rapid contactor chatter creates electrical sparks, welds relay points, and triggers hundreds of nuisance alarms.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Analog Smoothing with a Moving Average Filter
+        </h2>
+        <p>
+          To solve signal chatter, we pass the raw analog signal through an <strong><code>AVERAGE</code></strong> block.
+        </p>
+        <p>
+          How a Moving Average Works:
+          The block maintains a small FIFO memory buffer of recent measurements (e.g., 5 samples):
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          Smoothed_Output = (V1 + V2 + V3 + V4 + V5) / 5
+        </div>
+        <p>
+          When a brief shadow or voltage spike occurs, its impact is diluted across the buffer. The resulting output is a clean, stable engineering value that reflects the true trend without jitter!
+        </p>
+
+        <InlineLab
+          dsl={SOLAR_LAB2_DSL}
+          title="Stage 2 - Analog Smoothing with Moving Average"
+          step="Stage 2 of 3"
+          height={480}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 2</strong>
+          <p>
+            Observe <strong>Smoothed Array Voltage (V)</strong>. When you change the raw voltage, notice how the filtered value transitions smoothly rather than jumping instantly. This gives the battery charging system a rock-solid, jitter-free signal to make smart decisions.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Full Microgrid Telemetry &amp; Battery Charge Manager
+        </h2>
+        <p>
+          In a production solar microgrid, the control logic must perform two essential tasks:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Safe Window Charging:</strong> Batteries must only charge when voltage is within safe limits (e.g., <strong>between 24V and 32V</strong>). Below 24V, sunlight is insufficient; above 32V, over-voltage threatens to boil battery electrolyte!</li>
+          <li><strong>Periodic Telemetry Logging (<code>DATA_LOG</code>):</strong> Instead of logging continuous streams of data, the <code>DATA_LOG</code> block samples the clean, smoothed voltage at a steady, configured interval (e.g., every 500ms). This produces compact, orderly datasets ready for cloud transmission via MQTT or cellular IoT.</li>
+        </ul>
+
+        <InlineLab
+          dsl={SOLAR_LAB3_DSL}
+          title="Stage 3 - Full Solar Telemetry &amp; Battery Charge Manager"
+          step="Stage 3 of 3"
+          height={560}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 3</strong>
+          <p>
+            1. At normal 28V, notice <strong>Battery Charge Contactor (KM-101)</strong> is energized and <strong>Telemetry Data Logging Active</strong> is TRUE.<br />
+            2. Increase voltage to 34V (simulate a faulty charge controller). The Over-Voltage Hazard Alarm trips and cuts the contactor instantly to protect the battery bank!<br />
+            3. Set voltage to 20V (simulate dusk or heavy overcast). The contactor disconnects safely without chattering.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Commissioning &amp; Field Calibration Checklist
+        </h2>
+        <p>
+          When deploying analog telemetry or data loggers on a remote solar installation, follow this 5-point field checkout:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2 text-sm">
+          <li><strong>Verify Instrument Cable Shielding:</strong> Ensure the shielded drain wire from the voltage transducer (<code>VT-101</code>) is grounded at <strong>one end only</strong> (at the RTU cabinet) to avoid creating ground loops.</li>
+          <li><strong>Tune the Averaging Window:</strong> Sizing the sample buffer is a balance: too few samples (e.g., 2) leaves jitter; too many samples (e.g., 50) introduces noticeable phase lag during genuine daylight transitions. 5 to 10 samples is ideal for solar PV strings.</li>
+          <li><strong>Verify Logging Frequency:</strong> Confirm that data logging intervals match your network budget. On satellite or cellular IoT skids, sampling every 500ms to 5 seconds provides high fidelity without exceeding monthly data caps.</li>
+          <li><strong>Calibrate Analog Span:</strong> Measure the physical string voltage with a calibrated Fluke multimeter. Ensure the scaled analog reading on the PLC display matches within ±0.1VDC.</li>
+          <li><strong>Test Over-Voltage Cutoff:</strong> Inject a simulated test voltage of 33VDC into the analog channel and verify the battery charge contactor drops out immediately.</li>
+        </ol>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans not-prose my-6">
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-amber-500 font-mono">01</span> Filter Before Deciding
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Always smooth volatile analog signals before feeding them into comparators or safety trips.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">02</span> Moving Averages (AVERAGE)
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Rolling FIFO buffers flatten noise while preserving genuine physical trends without high phase lag.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-cyan-500 font-mono">03</span> Save Bandwidth with DATA_LOG
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Record clean, periodic snapshots rather than flooding databases and cellular links with millisecond noise.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-red-500 font-mono">04</span> Dual Boundary Limits
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Always protect battery assets with both low-voltage dropout and high-voltage overcharge protection.
+            </p>
+          </div>
+        </div>
+      </div>
+    ),
+    dsl: ''
   }
 ];
