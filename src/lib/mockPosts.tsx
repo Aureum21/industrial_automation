@@ -21,6 +21,7 @@ import { TRAFFIC_LIGHT_SVG } from './trafficBlueprintSvg';
 import { PUMP_ALTERNATOR_SVG } from './pumpAlternatorBlueprintSvg';
 import { CONVEYOR_SORTING_SVG } from './conveyorBlueprintSvg';
 import { HVAC_ECONOMIZER_SVG_DATA_URI } from './hvacBlueprintSvg';
+import { ESD_DELAYS_SVG_DATA_URI } from './esdBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -1238,6 +1239,78 @@ const HVAC_LAB3_DSL = `circuit "Stage 3 - Full Economizer with Freeze-Stat Trip"
   compDemand.Q -> compFinal.A
   compPermissive.Q -> compFinal.B
   compFinal.Q -> compressorRun.A
+}
+`;
+
+const ESD_LAB1_DSL = `circuit "Stage 1 - The Naive Simultaneous Cut" version 1 {
+  estop: NC_INPUT(label="E-Stop Mushroom PB (NC)", value=false)
+  runCmd: INPUT(label="Process Run Command", value=true)
+  masterGate: AND()
+  feedValve: OUTPUT(label="Chemical Feed Valve (XV-101)")
+  coolPump: OUTPUT(label="Cooling Circulation Pump (P-101)")
+
+  estop.Q -> masterGate.A
+  runCmd.Q -> masterGate.B
+  masterGate.Q -> feedValve.A
+  masterGate.Q -> coolPump.A
+}
+`;
+
+const ESD_LAB2_DSL = `circuit "Stage 2 - Staged Off-Delay Cooling via TOF" version 1 {
+  estop: NC_INPUT(label="E-Stop Mushroom PB (NC)", value=false)
+  runCmd: INPUT(label="Process Run Command", value=true)
+  systemOk: AND()
+  feedValve: OUTPUT(label="Chemical Feed Valve (Instant Shut)")
+  pumpDelay: TOF(label="Cooling Run-On Timer (3.0s)", duration=3000)
+  coolPump: OUTPUT(label="Cooling Circulation Pump (Active)")
+
+  estop.Q -> systemOk.A
+  runCmd.Q -> systemOk.B
+  systemOk.Q -> feedValve.A
+
+  systemOk.Q -> pumpDelay.A
+  pumpDelay.Q -> coolPump.A
+}
+`;
+
+const ESD_LAB3_DSL = `circuit "Stage 3 - Controlled Flare Vent & Latched Safety Train" version 1 {
+  estopPb: NC_INPUT(label="E-Stop Mushroom PB (NC)", value=false)
+  resetPb: INPUT(label="Master Safety Reset PB", value=false)
+  runCmd: INPUT(label="Operator Start Request", value=true)
+
+  estopTrip: NOT(label="E-Stop Break Detector")
+  esdLatch: RS_LATCH(label="Emergency Shutdown Trip Memory")
+  esdSafe: NOT(label="Safety Loop Healthy")
+
+  systemPermissive: AND()
+  feedValve: OUTPUT(label="Feed Isolation Valve XV-101")
+
+  pumpRunTimer: TOF(label="Pump Cooldown Timer (4.0s)", duration=4000)
+  coolPump: OUTPUT(label="Cooling Pump P-101 (Active)")
+
+  ventDelay: TON(label="Vent Safe Delay (1.0s)", duration=1000)
+  ventGate: AND()
+  blowdownVent: OUTPUT(label="Flare Blowdown Vent BDV-101")
+  alarmBeacon: OUTPUT(label="EMERGENCY SHUTDOWN ALARM")
+
+  estopPb.Q -> estopTrip.A
+  estopTrip.Q -> esdLatch.S
+  resetPb.Q -> esdLatch.R
+
+  esdLatch.Q -> esdSafe.A
+  esdLatch.Q -> alarmBeacon.A
+
+  runCmd.Q -> systemPermissive.A
+  esdSafe.Q -> systemPermissive.B
+  systemPermissive.Q -> feedValve.A
+
+  systemPermissive.Q -> pumpRunTimer.A
+  pumpRunTimer.Q -> coolPump.A
+
+  esdLatch.Q -> ventDelay.A
+  ventDelay.Q -> ventGate.A
+  esdLatch.Q -> ventGate.B
+  ventGate.Q -> blowdownVent.A
 }
 `;
 
@@ -3138,33 +3211,222 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'esd-delays',
-    title: 'Emergency Shutdown Sequence (ESD)',
-    excerpt: 'Cascading delays to safely spin down hazardous processes.',
-    author: 'Emma Safety',
-    date: 'Sep 05',
-    readingTime: '6 min read',
-    tag: 'Safety',
-    views: 6540,
+    title: 'Emergency Shutdown Sequence (ESD): Staged Delays & Safe Depressurization',
+    excerpt: 'A beginner-friendly guide to industrial emergency stops: why pulling the master plug causes catastrophic thermal seizures, using TOF off-delay timers for post-trip cooling, and sequencing flare blowdown vents.',
+    author: 'Emma Safety & AutomationHub Team',
+    date: 'Oct 21',
+    readingTime: '12 min read + 15 min labs',
+    tag: 'Safety / ESD',
+    views: 8940,
     content: (
-      <>
-        <p>When an Emergency Stop (E-Stop) is pressed, you cannot always kill power to everything instantly. Some processes require valves to close immediately to starve a reaction, while cooling pumps must run for an additional 10 seconds to prevent overheating.</p>
-        <p>In this circuit, we use a normally-closed E-Stop button. When it breaks (goes false), the valves drop out immediately. The cooling pump, however, is fed through a TOF (Timer Off Delay), keeping it alive for a brief duration after the shutdown signal.</p>
-      </>
-    ),
-    dsl: `circuit "Emergency Shutdown Sequence (ESD)" version 1 {
-  estop: NC_INPUT(label="E-Stop (NC)", value=true)
-  run_cmd: INPUT(label="Normal Run Command", value=true)
-  sys_ok: AND()
-  valve: OUTPUT(label="Feed Valve")
-  pump_delay: TOF(duration=3000)
-  pump: OUTPUT(label="Cooling Pump")
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={ESD_DELAYS_SVG_DATA_URI}
+            alt="Chemical process vessel ESD valve and cooling loop blueprint"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-red-400 font-semibold">FIG 1.1 // PROCESS SKID EMERGENCY SHUTDOWN (ESD)</span>
+            <span>SYSTEM: RX-101 // IEC 61511 SIL-2 DEPRESSURIZATION TIMELINE</span>
+          </div>
+        </div>
 
-  estop.Q -> sys_ok.A
-  run_cmd.Q -> sys_ok.B
-  sys_ok.Q -> valve.A
-  sys_ok.Q -> pump_delay.A
-  pump_delay.Q -> pump.A
-}`
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The $85,000 Extruder Carbon Bake &amp; The Trapped Solvent Hazard
+        </h2>
+        <p>
+          When a beginner thinks of an Emergency Stop (E-Stop), they envision slamming the big red mushroom button and having all electrical power cut to zero in a single millisecond.
+        </p>
+        <p>
+          In the real physical world of chemical processing, rotating machinery, and high-temperature reactors, <strong>cutting all power simultaneously can cause catastrophic damage:</strong>
+        </p>
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">A Familiar Everyday Analogy: Turbocharged Car Engines</strong>
+          <p>
+            Think of high-performance turbocharged sports cars. When you push an engine hard on a racetrack, the turbocharger spins at 150,000 RPM and glows cherry red at 1,400°F (760°C).
+          </p>
+          <p className="mt-2">
+            If you suddenly turn the key off the second you park, the oil pump stops instantly. The trapped oil inside the red-hot bearing housing bakes into solid abrasive charcoal in seconds, destroying the turbocharger bearings. Instead, the engine must idle or run an auxiliary electric coolant pump for a few minutes to dissipate heat.
+          </p>
+        </div>
+
+        <p>
+          In industrial automation, the exact same principle applies:
+        </p>
+        <p>
+          At a specialty polymer plant in Louisiana, a small mechanical seal leak sprayed raw feed onto the skid floor. A startled operator panicked and pulled the main 480V disconnect handle on the wall.
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>The raw chemical feed stopped immediately (good).</li>
+          <li>But the cooling water jacket pump died instantly while the chemical reactor was at 420°F (215°C)!</li>
+          <li>Without cooling water flow, the remaining molten polymer baked into a rock-solid block of carbon, permanently fusing the $85,000 internal agitator screw to the reactor walls.</li>
+          <li>Even worse, volatile solvent vapors remained trapped at 180 PSI with no power to open the relief valves!</li>
+        </ul>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Golden Lesson:</strong>
+          <p>
+            An Emergency Shutdown must be a <strong>controlled, staged sequence</strong>: instantly starve raw feed, keep auxiliary cooling pumps alive via <strong>off-delay timers (<code>TOF</code>)</strong>, and open emergency flare blowdown vents to safely depressurize the vessel.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Why E-Stops Use Normally Closed (NC) Contacts
+        </h2>
+        <p>
+          Notice in all industrial standards (such as NFPA 79 and IEC 60204-1) that Emergency Stop pushbuttons are wired as <strong>Normally Closed (NC)</strong> contacts.
+        </p>
+        <p>
+          Why? Because of the <strong>Fail-Safe Principle</strong>:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>When the button is untouched, electrical current flows through the closed contact (<code>True</code>).</li>
+          <li>When an operator hits the mushroom button, the mechanical contacts break open, interrupting current flow (<code>False</code>).</li>
+          <li>If a rat chews through the wire, a terminal screw vibrates loose, or an electrician accidentally cuts the cable, the circuit breaks open—causing a <strong>fail-safe shutdown</strong> rather than leaving the machine unable to stop!</li>
+        </ul>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Naive Simultaneous Cut (Why Simple AND Fails)
+        </h2>
+        <p>
+          Below is <strong>Stage 1</strong> of our interactive lab, representing how naive programmers wire an emergency stop circuit: a single <code>AND</code> gate driving both the feed valve and the cooling pump simultaneously.
+        </p>
+        <p>
+          Try running the simulation below and observe what happens when you press the E-Stop button:
+        </p>
+
+        <InlineLab
+          dsl={ESD_LAB1_DSL}
+          title="Stage 1 - The Naive Simultaneous Cut"
+          step="Stage 1 of 3"
+          height={460}
+        />
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Beginner Flaw in Stage 1</strong>
+          <p>
+            Click on the <strong>E-Stop Mushroom PB (NC)</strong> button to simulate pressing it. Both <em>Chemical Feed Valve</em> and <em>Cooling Circulation Pump</em> turn OFF immediately in the exact same scan cycle! The cooling pump cuts out before the reactor can dissipate its thermal energy, triggering equipment seizure.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Staged Cooldown via TOF (Timer Off-Delay)
+        </h2>
+        <p>
+          To protect rotating bearings and prevent boiling runaway, we introduce one of the most useful blocks in industrial automation: the <strong>Timer Off-Delay (<code>TOF</code>)</strong>.
+        </p>
+        <p>
+          How a <code>TOF</code> Works:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2">
+          <li>While the input (<code>A</code>) is <strong>True</strong>, the output (<code>Q</code>) is <strong>True</strong> (the pump runs normally).</li>
+          <li>The instant the input (<code>A</code>) drops to <strong>False</strong> (the E-Stop is hit), the <code>TOF</code> starts an internal countdown clock!</li>
+          <li>The output (<code>Q</code>) <strong>stays True</strong> during the countdown (holding the cooling pump energized).</li>
+          <li>Only after the full duration expires (e.g., 3.0 seconds) does the pump finally de-energize.</li>
+        </ol>
+
+        <InlineLab
+          dsl={ESD_LAB2_DSL}
+          title="Stage 2 - Staged Off-Delay Cooling via TOF"
+          step="Stage 2 of 3"
+          height={480}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 2</strong>
+          <p>
+            Press the <strong>E-Stop Mushroom PB (NC)</strong> button. Notice that the Chemical Feed Valve shuts immediately (0 sec), but the Cooling Circulation Pump remains ACTIVE! Watch the timer hold the pump running for 3 seconds of safe post-trip cooling before gracefully turning off.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Controlled Flare Venting &amp; The Anti-Restart Latch
+        </h2>
+        <p>
+          In pressurized chemical or gas systems, shutting valves is only half the battle. Trapped pressure must be safely routed to the <strong>flare stack</strong> through a Blowdown Valve (<code>BDV-101</code>).
+        </p>
+        <p>
+          However, opening a high-pressure vent valve at the exact millisecond a pipe bursts can cause violent pressure shockwaves or extinguish flare pilot flames. Therefore:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>At T = 0.0s:</strong> Raw feed valve (<code>XV-101</code>) shuts immediately.</li>
+          <li><strong>At T = 1.0s:</strong> Blowdown vent valve (<code>BDV-101</code>) opens via a short <code>TON</code> delay, safely depressurizing the vessel to the flare header.</li>
+          <li><strong>From T = 0 to 4.0s:</strong> Cooling pump (<code>P-101</code>) runs on via <code>TOF</code> to dissipate reaction heat.</li>
+          <li><strong>The Anti-Restart Latch (<code>RS_LATCH</code>):</strong> If someone twists or pulls the red mushroom button to reset it, the plant <strong>must NEVER jump back to life on its own</strong>! An <code>RS_LATCH</code> locks the shutdown in memory until a deliberate, separate &quot;Master Safety Reset&quot; button is pressed by a trained operator.</li>
+        </ul>
+
+        <InlineLab
+          dsl={ESD_LAB3_DSL}
+          title="Stage 3 - Controlled Flare Vent &amp; Latched Safety Train"
+          step="Stage 3 of 3"
+          height={560}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 3</strong>
+          <p>
+            1. Click <strong>E-Stop Mushroom PB</strong> to trip the system. Notice that the Feed Valve shuts instantly, the Alarm sounds, the Cooling Pump keeps running for 4.0s, and after a 1.0s pause, the Flare Blowdown Vent opens!<br />
+            2. Now pull the E-Stop back out (untoggle it). Notice that the plant does NOT restart—the alarm stays latched!<br />
+            3. Click <strong>Master Safety Reset PB</strong> to clear the memory and restore the line.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Commissioning &amp; Proof-Testing Checklist
+        </h2>
+        <p>
+          When verifying an Emergency Shutdown (ESD) loop on an industrial skid, follow these 5 core proof-testing rules:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2 text-sm">
+          <li><strong>Test Broken Wire Detection:</strong> Disconnect one terminal wire from the E-Stop switch while the machine is running. The open circuit must immediately trigger a fail-safe shutdown.</li>
+          <li><strong>Verify Cooldown Run-On Time:</strong> Use a stopwatch to confirm the cooling pump runs for the full duration specified on the Process &amp; Instrumentation Diagram (P&amp;ID) after an ESD trip.</li>
+          <li><strong>Verify Anti-Restart Memory:</strong> Trip the E-Stop, release the button, and confirm that no valve or pump energizes until the operator presses the physical reset button.</li>
+          <li><strong>Inspect Spring-Return Valves:</strong> Confirm that all fail-safe valves (<code>XV-101</code>, <code>BDV-101</code>) mechanically move to their fail-safe positions if 24VDC instrument power or compressed air header pressure is lost.</li>
+          <li><strong>Audible &amp; Visual Evacuation:</strong> Confirm the high-decibel siren and high-visibility flashing strobe illuminate immediately upon trip, alerting plant personnel to clear the skid area.</li>
+        </ol>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans not-prose my-6">
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-red-500 font-mono">01</span> De-Energize to Trip
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Always use Normally Closed (NC) contacts for emergency devices so a severed wire safely stops the machine.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">02</span> Cooling Run-On (TOF)
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Use off-delay timers to carry away residual heat and prevent costly bearing seizures and polymer carbonization.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-amber-500 font-mono">03</span> Staged Flare Venting
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Depressurize vessels into flare or scrubber headers in an engineered, orderly sequence (1.0s delay) to prevent pipe shock.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-cyan-500 font-mono">04</span> Anti-Restart Interlock
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Releasing an E-Stop mushroom button must NEVER restart a machine without a separate, deliberate manual safety reset.
+            </p>
+          </div>
+        </div>
+      </div>
+    ),
+    dsl: ''
   },
   {
     slug: 'solar-logging',
