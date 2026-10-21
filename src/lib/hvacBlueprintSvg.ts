@@ -1,0 +1,269 @@
+export const HVAC_ECONOMIZER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="100%" height="100%">
+  <defs>
+    <!-- Background grid pattern -->
+    <pattern id="hvacGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#162235" stroke-width="0.8" opacity="0.65"/>
+      <path d="M 200 0 L 0 0 0 200" fill="none" stroke="#1c2d46" stroke-width="1.2" opacity="0.4"/>
+    </pattern>
+
+    <!-- Gradients -->
+    <linearGradient id="ductGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141f30" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#0e1724" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#141f30" stop-opacity="0.95"/>
+    </linearGradient>
+
+    <linearGradient id="outdoorAirGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.1"/>
+    </linearGradient>
+
+    <linearGradient id="supplyAirGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <linearGradient id="coolingCoilGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <linearGradient id="freezeCapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <filter id="neonGlowEmerald" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="neonGlowRed" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Deep Blue/Black Blueprint Canvas -->
+  <rect width="1200" height="560" fill="#070b14"/>
+  <rect width="1200" height="560" fill="url(#hvacGrid)"/>
+
+  <!-- Outer Frame Border -->
+  <rect x="18" y="18" width="1164" height="524" rx="10" fill="none" stroke="#1e293b" stroke-width="1.8"/>
+
+  <!-- ==================== HEADER BAR ==================== -->
+  <g transform="translate(40, 48)">
+    <rect x="0" y="0" width="1120" height="42" rx="6" fill="#0c1322" stroke="#1e293b" stroke-width="1"/>
+    <circle cx="20" cy="21" r="5" fill="#10b981" filter="url(#neonGlowEmerald)"/>
+    <text x="36" y="25" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="13" font-weight="bold" letter-spacing="1.5">
+      FIG 1.1 // ROOFTOP AIR HANDLING UNIT (AHU) ECONOMIZER &amp; FREE-COOLING SCHEMATIC
+    </text>
+    <rect x="860" y="10" width="244" height="22" rx="4" fill="#141f32" stroke="#334155" stroke-width="0.8"/>
+    <text x="982" y="25" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="10" font-weight="600" text-anchor="middle" letter-spacing="1">
+      SYSTEM: AHU-04 // ASHRAE 90.1
+    </text>
+  </g>
+
+  <!-- ==================== MAIN AHU HOUSING / CASING ==================== -->
+  <!-- Duct Enclosure -->
+  <g id="ahuDuct">
+    <!-- Return Air Intake Duct (Bottom-Left) -->
+    <path d="M 60 480 L 160 480 L 160 380 L 60 380 Z" fill="url(#ductGrad)" stroke="#334155" stroke-width="2"/>
+    <!-- Exhaust / Relief Air Duct (Top-Left) -->
+    <path d="M 60 120 L 160 120 L 160 220 L 60 220 Z" fill="url(#ductGrad)" stroke="#334155" stroke-width="2"/>
+    <!-- Outdoor Air Inlet Bellmouth (Left-Center) -->
+    <path d="M 40 240 L 160 240 L 160 360 L 40 360 Z" fill="url(#ductGrad)" stroke="#00f0ff" stroke-width="2" stroke-dasharray="8 4"/>
+
+    <!-- Main AHU Body Tunnel (160 to 1060) -->
+    <rect x="160" y="180" width="900" height="240" rx="4" fill="url(#ductGrad)" stroke="#475569" stroke-width="2.5"/>
+
+    <!-- Supply Air Discharge (Right) -->
+    <path d="M 1060 220 L 1150 220 L 1150 380 L 1060 380 Z" fill="url(#ductGrad)" stroke="#10b981" stroke-width="2"/>
+  </g>
+
+  <!-- ==================== FLOW PATH ARROWS ==================== -->
+  <g opacity="0.8">
+    <!-- Outside Fresh Air Stream -->
+    <path d="M 45 300 L 260 300" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4"/>
+    <polygon points="265,300 252,294 252,306" fill="#00f0ff"/>
+    <text x="70" y="290" fill="#00f0ff" font-family="ui-monospace, monospace" font-size="11" font-weight="bold">
+      OUTSIDE AIR (OA)
+    </text>
+
+    <!-- Return Air Stream -->
+    <path d="M 110 470 L 110 330 L 250 330" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4" fill="none"/>
+    <polygon points="255,330 242,324 242,336" fill="#94a3b8"/>
+    <text x="65" y="440" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="10" font-weight="bold">
+      RETURN AIR (RA)
+    </text>
+
+    <!-- Relief / Exhaust Air Stream -->
+    <path d="M 140 280 L 140 170 L 60 170" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 4" fill="none"/>
+    <polygon points="55,170 68,164 68,176" fill="#f59e0b"/>
+    <text x="65" y="155" fill="#f59e0b" font-family="ui-monospace, monospace" font-size="10" font-weight="bold">
+      EXHAUST AIR (EA)
+    </text>
+
+    <!-- Supply Air Mixed Flow -->
+    <path d="M 330 300 L 1130 300" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="10 5"/>
+    <polygon points="1135,300 1120,293 1120,307" fill="#10b981"/>
+    <text x="1065" y="285" fill="#10b981" font-family="ui-monospace, monospace" font-size="11" font-weight="bold">
+      SUPPLY AIR (SA)
+    </text>
+  </g>
+
+  <!-- ==================== DAMPERS & ACTUATORS ==================== -->
+  <!-- 1. Outdoor Air Damper (OAD-101) -->
+  <g id="oad" transform="translate(180, 245)">
+    <rect x="0" y="0" width="22" height="110" rx="3" fill="#0f172a" stroke="#00f0ff" stroke-width="1.8"/>
+    <!-- Louver blades -->
+    <line x1="3" y1="20" x2="19" y2="35" stroke="#00f0ff" stroke-width="2"/>
+    <line x1="3" y1="45" x2="19" y2="60" stroke="#00f0ff" stroke-width="2"/>
+    <line x1="3" y1="70" x2="19" y2="85" stroke="#00f0ff" stroke-width="2"/>
+    <line x1="3" y1="95" x2="19" y2="105" stroke="#00f0ff" stroke-width="2"/>
+    <!-- Motor Actuator on top -->
+    <rect x="-8" y="-32" width="38" height="26" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="11" y="-15" fill="#ffffff" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">M</text>
+    <text x="11" y="125" fill="#00f0ff" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">OAD-101</text>
+    <text x="11" y="137" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">0 - 100% MOD</text>
+  </g>
+
+  <!-- 2. Return Air Damper (RAD-101) -->
+  <g id="rad" transform="translate(170, 370)">
+    <rect x="0" y="0" width="80" height="18" rx="2" fill="#0f172a" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="15" y1="3" x2="25" y2="15" stroke="#94a3b8" stroke-width="2"/>
+    <line x1="40" y1="3" x2="50" y2="15" stroke="#94a3b8" stroke-width="2"/>
+    <line x1="65" y1="3" x2="75" y2="15" stroke="#94a3b8" stroke-width="2"/>
+    <text x="40" y="32" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">RAD-101</text>
+  </g>
+
+  <!-- 3. Exhaust Air Damper (EAD-101) -->
+  <g id="ead" transform="translate(120, 205)">
+    <rect x="0" y="0" width="18" height="60" rx="2" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+    <line x1="3" y1="12" x2="15" y2="24" stroke="#f59e0b" stroke-width="1.8"/>
+    <line x1="3" y1="32" x2="15" y2="44" stroke="#f59e0b" stroke-width="1.8"/>
+    <text x="9" y="-8" fill="#f59e0b" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">EAD-101</text>
+  </g>
+
+  <!-- ==================== MIXING PLENUM & SENSORS ==================== -->
+  <g id="plenum" transform="translate(290, 200)">
+    <!-- Mixed Air Temp Sensor (TE-103 / MAT) -->
+    <rect x="0" y="10" width="4" height="180" fill="#38bdf8" opacity="0.4"/>
+    <circle cx="2" cy="70" r="14" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="2" y="74" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="8" font-weight="bold" text-anchor="middle">MAT</text>
+    <text x="2" y="-5" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">TE-103</text>
+    <text x="2" y="210" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">MIXING PLENUM</text>
+  </g>
+
+  <!-- Outdoor Air Sensor (TE-101 / OAT) -->
+  <g id="oatSensor" transform="translate(70, 250)">
+    <circle cx="0" cy="0" r="16" fill="#0f172a" stroke="#00f0ff" stroke-width="1.8"/>
+    <text x="0" y="4" fill="#00f0ff" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">OAT</text>
+    <text x="0" y="-22" fill="#00f0ff" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">TE-101</text>
+    <text x="0" y="28" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">58°F</text>
+  </g>
+
+  <!-- Return Air Sensor (TE-102 / RAT) -->
+  <g id="ratSensor" transform="translate(70, 420)">
+    <circle cx="0" cy="0" r="16" fill="#0f172a" stroke="#94a3b8" stroke-width="1.8"/>
+    <text x="0" y="4" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">RAT</text>
+    <text x="0" y="-22" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">TE-102</text>
+    <text x="0" y="28" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">74°F</text>
+  </g>
+
+  <!-- ==================== FILTER SECTION ==================== -->
+  <g id="filters" transform="translate(370, 200)">
+    <!-- Accordion V-bank Filters -->
+    <rect x="0" y="0" width="30" height="200" fill="#0f172a" stroke="#64748b" stroke-width="1"/>
+    <path d="M 0 0 L 30 20 L 0 40 L 30 60 L 0 80 L 30 100 L 0 120 L 30 140 L 0 160 L 30 180 L 0 200" fill="none" stroke="#94a3b8" stroke-width="2"/>
+    <text x="15" y="-12" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">FILTERS</text>
+    <text x="15" y="218" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">MERV 13</text>
+  </g>
+
+  <!-- ==================== FREEZE-STAT LOW LIMIT (FZT-101) ==================== -->
+  <g id="freezestat" transform="translate(450, 195)">
+    <!-- Serpentined red capillary sensor wire across the coil face -->
+    <path d="M 0 10 Q 30 20 0 35 Q 30 50 0 65 Q 30 80 0 95 Q 30 110 0 125 Q 30 140 0 155 Q 30 170 0 185 Q 30 200 0 210"
+          fill="none" stroke="#ef4444" stroke-width="2.5" filter="url(#neonGlowRed)"/>
+    <!-- Switch housing box on top of duct -->
+    <rect x="-18" y="-38" width="44" height="28" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.8"/>
+    <text x="4" y="-20" fill="#fecaca" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">FZT</text>
+    <text x="4" y="-45" fill="#ef4444" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">FZT-101</text>
+    <text x="4" y="228" fill="#ef4444" font-family="ui-monospace, monospace" font-size="8" font-weight="bold" text-anchor="middle">FREEZE-STAT (38°F)</text>
+  </g>
+
+  <!-- ==================== HEATING & COOLING COILS ==================== -->
+  <!-- Heating Coil (HC-101) -->
+  <g id="heatCoil" transform="translate(520, 200)">
+    <rect x="0" y="0" width="36" height="200" rx="3" fill="#1e1b4b" stroke="#f97316" stroke-width="1.5"/>
+    <line x1="12" y1="10" x2="12" y2="190" stroke="#f97316" stroke-width="2" stroke-dasharray="4 4"/>
+    <line x1="24" y1="10" x2="24" y2="190" stroke="#f97316" stroke-width="2" stroke-dasharray="4 4"/>
+    <text x="18" y="-12" fill="#f97316" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">HC-101</text>
+    <text x="18" y="218" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">HEAT COIL</text>
+  </g>
+
+  <!-- Cooling Coil / DX Evaporator (CC-101) -->
+  <g id="coolCoil" transform="translate(610, 200)">
+    <rect x="0" y="0" width="46" height="200" rx="3" fill="url(#coolingCoilGrad)" stroke="#38bdf8" stroke-width="1.8"/>
+    <!-- Fin array -->
+    <path d="M 12 10 L 12 190 M 23 10 L 23 190 M 34 10 L 34 190" stroke="#bae6fd" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <text x="23" y="-12" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">CC-101</text>
+    <text x="23" y="218" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="8" font-weight="bold" text-anchor="middle">COOLING COIL</text>
+  </g>
+
+  <!-- ==================== MECHANICAL DX COMPRESSOR ==================== -->
+  <g id="compressor" transform="translate(610, 435)">
+    <rect x="-10" y="0" width="66" height="48" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+    <circle cx="23" cy="24" r="16" fill="#1e293b" stroke="#0284c7" stroke-width="1.5"/>
+    <path d="M 14 24 L 32 24 M 23 15 L 23 33" stroke="#38bdf8" stroke-width="2"/>
+    <!-- Refrigerant Pipe connecting to cooling coil -->
+    <path d="M 23 0 L 23 -35" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="4 2"/>
+    <text x="23" y="62" fill="#38bdf8" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">DX COMP-101</text>
+    <text x="23" y="74" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">MECHANICAL COOLING</text>
+  </g>
+
+  <!-- ==================== SUPPLY AIR FAN (SF-101) ==================== -->
+  <g id="supplyFan" transform="translate(770, 240)">
+    <!-- Fan Scroll Housing -->
+    <path d="M 0 60 A 60 60 0 1 1 90 100 L 120 100 L 120 20 L 60 20 A 60 60 0 0 1 0 60 Z"
+          fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+    <!-- Impeller Blades -->
+    <circle cx="50" cy="60" r="40" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="12 6"/>
+    <circle cx="50" cy="60" r="12" fill="#10b981"/>
+    <!-- Motor VFD block -->
+    <rect x="35" y="-35" width="30" height="24" rx="3" fill="#065f46" stroke="#10b981" stroke-width="1.5"/>
+    <text x="50" y="-20" fill="#ffffff" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">M</text>
+    <text x="50" y="135" fill="#10b981" font-family="ui-monospace, monospace" font-size="10" font-weight="bold" text-anchor="middle">SF-101</text>
+    <text x="50" y="148" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">SUPPLY FAN (VFD)</text>
+  </g>
+
+  <!-- ==================== DISCHARGE SENSOR & STATS ==================== -->
+  <g id="satSensor" transform="translate(980, 240)">
+    <circle cx="0" cy="60" r="16" fill="#0f172a" stroke="#10b981" stroke-width="1.8"/>
+    <text x="0" y="64" fill="#10b981" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">SAT</text>
+    <text x="0" y="38" fill="#10b981" font-family="ui-monospace, monospace" font-size="9" font-weight="bold" text-anchor="middle">TE-104</text>
+    <text x="0" y="90" fill="#64748b" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">55°F DISCHARGE</text>
+  </g>
+
+  <!-- ==================== CONTROL & LOGIC INTERFACE BOX ==================== -->
+  <g transform="translate(740, 420)">
+    <rect x="0" y="0" width="400" height="96" rx="6" fill="#0b1324" stroke="#334155" stroke-width="1"/>
+    <text x="16" y="22" fill="#10b981" font-family="ui-monospace, monospace" font-size="11" font-weight="bold">
+      ● DDC / PLC LOGIC TRUTH TABLE
+    </text>
+    <line x1="16" y1="30" x2="384" y2="30" stroke="#1e293b" stroke-width="1"/>
+    <text x="16" y="48" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9">
+      1. FREE COOL: OAT &lt; RAT AND OAT &gt; 50°F → OAD 100% (COMP OFF)
+    </text>
+    <text x="16" y="65" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="9">
+      2. MECHANICAL: OAT &gt; RAT OR OAT &gt; 68°F → OAD 15% MIN (COMP ON)
+    </text>
+    <text x="16" y="82" fill="#ef4444" font-family="ui-monospace, monospace" font-size="9" font-weight="bold">
+      3. FREEZE TRIP: FZT-101 &lt; 38°F → OAD 0% SHUT + FAN STOP + ALARM
+    </text>
+  </g>
+</svg>
+`;
+
+export const HVAC_ECONOMIZER_SVG_DATA_URI =
+  'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(HVAC_ECONOMIZER_SVG);

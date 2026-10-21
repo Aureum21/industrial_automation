@@ -20,6 +20,7 @@ import { TANK_HYSTERESIS_SVG } from './tankHysteresisBlueprintSvg';
 import { TRAFFIC_LIGHT_SVG } from './trafficBlueprintSvg';
 import { PUMP_ALTERNATOR_SVG } from './pumpAlternatorBlueprintSvg';
 import { CONVEYOR_SORTING_SVG } from './conveyorBlueprintSvg';
+import { HVAC_ECONOMIZER_SVG_DATA_URI } from './hvacBlueprintSvg';
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -1090,6 +1091,153 @@ const CONVEYOR_LAB3_DSL = `circuit "Stage 3 - Pneumatic Diverter with Jam Watchd
   run_cmd.Q -> conv_permit.A
   jam_safe.Q -> conv_permit.B
   conv_permit.Q -> motor_run.A
+}
+`;
+
+const HVAC_LAB1_DSL = `circuit "Stage 1 - The Naive Outside Air Comparator" version 1 {
+  oat: ANALOG_INPUT(label="Outdoor Air Temp (F)", value=62)
+  rat: ANALOG_INPUT(label="Return Air Temp (F)", value=74)
+  callCool: INPUT(label="Thermostat Call for Cooling", value=true)
+  comp: ANALOG_COMPARATOR(operation="lt")
+  damperLogic: AND()
+  damper: OUTPUT(label="Open Fresh Air Damper 100%")
+  notEconomize: NOT()
+  compLogic: AND()
+  compressor: OUTPUT(label="Run AC Compressor")
+
+  oat.Q -> comp.A
+  rat.Q -> comp.B
+  comp.Q -> damperLogic.A
+  callCool.Q -> damperLogic.B
+  damperLogic.Q -> damper.A
+
+  comp.Q -> notEconomize.A
+  notEconomize.Q -> compLogic.A
+  callCool.Q -> compLogic.B
+  compLogic.Q -> compressor.A
+}
+`;
+
+const HVAC_LAB2_DSL = `circuit "Stage 2 - Safe Economizer Window & Min Vent Damper" version 1 {
+  oat: ANALOG_INPUT(label="Outdoor Air Temp (F)", value=58)
+  rat: ANALOG_INPUT(label="Return Air Temp (F)", value=74)
+  minOat: ANALOG_INPUT(label="Low Limit Cutoff (F)", value=50)
+  callCool: INPUT(label="Thermostat Call for Cooling", value=true)
+  minPos: ANALOG_INPUT(label="Min Fresh Air Damper %", value=15)
+  maxPos: ANALOG_INPUT(label="Full Economizer Damper %", value=100)
+
+  isCooler: ANALOG_COMPARATOR(operation="lt")
+  isNotTooCold: ANALOG_COMPARATOR(operation="gt")
+  econWindow: AND()
+  econActive: AND()
+  damperMux: ANALOG_MUX()
+  damperOutput: ANALOG_OUTPUT(label="Damper Actuator Position (%)")
+
+  freeCoolLamp: OUTPUT(label="Free Cooling Active (No Compressor)")
+  notEcon: NOT()
+  compGate: AND()
+  compressor: OUTPUT(label="Run AC Compressor")
+
+  oat.Q -> isCooler.A
+  rat.Q -> isCooler.B
+  oat.Q -> isNotTooCold.A
+  minOat.Q -> isNotTooCold.B
+
+  isCooler.Q -> econWindow.A
+  isNotTooCold.Q -> econWindow.B
+
+  econWindow.Q -> econActive.A
+  callCool.Q -> econActive.B
+
+  minPos.Q -> damperMux.A
+  maxPos.Q -> damperMux.B
+  econActive.Q -> damperMux.S
+  damperMux.Q -> damperOutput.A
+
+  econActive.Q -> freeCoolLamp.A
+
+  econActive.Q -> notEcon.A
+  notEcon.Q -> compGate.A
+  callCool.Q -> compGate.B
+  compGate.Q -> compressor.A
+}
+`;
+
+const HVAC_LAB3_DSL = `circuit "Stage 3 - Full Economizer with Freeze-Stat Trip" version 1 {
+  fanRunning: INPUT(label="Supply Fan Running", value=true)
+  callCool: INPUT(label="Thermostat Call for Cooling", value=true)
+  oat: ANALOG_INPUT(label="Outdoor Air Temp (F)", value=56)
+  rat: ANALOG_INPUT(label="Return Air Temp (F)", value=74)
+  minOat: ANALOG_INPUT(label="Low Limit Economizer (F)", value=50)
+
+  freezeTrip: INPUT(label="FZT-101 Freeze-Stat Capillary Trip", value=false)
+  alarmReset: INPUT(label="Manual Alarm Reset PB", value=false)
+
+  minPos: ANALOG_INPUT(label="Min Position 15%", value=15)
+  maxPos: ANALOG_INPUT(label="Max Position 100%", value=100)
+  zeroPos: ANALOG_INPUT(label="Damper Zero %", value=0)
+
+  freezeAlarm: RS_LATCH(label="Freeze-Stat Trip Memory")
+  freezeSafe: NOT(label="Freeze Protection Healthy")
+
+  isCooler: ANALOG_COMPARATOR(operation="lt")
+  isNotTooCold: ANALOG_COMPARATOR(operation="gt")
+  econPermissive: AND()
+  econDemand: AND()
+  econActive: AND()
+
+  normalDamperMux: ANALOG_MUX()
+  finalDamperMux: ANALOG_MUX()
+  damperCommand: ANALOG_OUTPUT(label="Damper Actuator Position (%)")
+
+  freeCoolLamp: OUTPUT(label="Free Cooling Active (Compressor Off)")
+  alarmLamp: OUTPUT(label="COIL FREEZE ALARM - DAMPERS SHUT")
+
+  compPermissive: AND()
+  notEcon: NOT()
+  compDemand: AND()
+  compFinal: AND(label="Compressor Final Permissive")
+  compressorRun: OUTPUT(label="DX Compressor Command")
+
+  freezeTrip.Q -> freezeAlarm.S
+  alarmReset.Q -> freezeAlarm.R
+  freezeAlarm.Q -> freezeSafe.A
+  freezeAlarm.Q -> alarmLamp.A
+
+  oat.Q -> isCooler.A
+  rat.Q -> isCooler.B
+  oat.Q -> isNotTooCold.A
+  minOat.Q -> isNotTooCold.B
+
+  isCooler.Q -> econPermissive.A
+  isNotTooCold.Q -> econPermissive.B
+
+  econPermissive.Q -> econDemand.A
+  callCool.Q -> econDemand.B
+
+  econDemand.Q -> econActive.A
+  freezeSafe.Q -> econActive.B
+  econActive.Q -> freeCoolLamp.A
+
+  minPos.Q -> normalDamperMux.A
+  maxPos.Q -> normalDamperMux.B
+  econActive.Q -> normalDamperMux.S
+
+  zeroPos.Q -> finalDamperMux.A
+  normalDamperMux.Q -> finalDamperMux.B
+  freezeSafe.Q -> finalDamperMux.S
+  finalDamperMux.Q -> damperCommand.A
+
+  fanRunning.Q -> compPermissive.A
+  freezeSafe.Q -> compPermissive.B
+
+  econActive.Q -> notEcon.A
+  notEcon.Q -> compDemand.A
+  callCool.Q -> compDemand.B
+
+  compDemand.Q -> compFinal.A
+  compPermissive.Q -> compFinal.B
+  compFinal.Q -> compressorRun.A
 }
 `;
 
@@ -2316,42 +2464,219 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'hvac-economizer',
-    title: 'HVAC Economizer Logic',
-    excerpt: 'Saving energy by using outdoor air when temperatures are favorable.',
-    author: 'Dave Climate',
-    date: 'Sep 18',
-    readingTime: '4 min read',
-    tag: 'HVAC',
-    views: 5210,
+    title: 'HVAC Economizer Logic: Free Cooling, Damper Control & Freeze-Stat Safety',
+    excerpt: 'A beginner-friendly guide to commercial building climate control: harnessing free outside air to slash electricity bills, modulating fresh air dampers, and interlocking low-limit freeze-stats to protect hydronic coils.',
+    author: 'Dave Climate & AutomationHub Team',
+    date: 'Oct 21',
+    readingTime: '12 min read + 15 min labs',
+    tag: 'HVAC / Climate',
+    views: 9420,
     content: (
-      <>
-        <p>An HVAC economizer saves energy by drawing in fresh outside air when the outdoor temperature is cooler than the indoor return air, providing "free cooling."</p>
-        <p>We use an ANALOG_COMPARATOR to check if Outside Temp &lt; Return Temp. If true, and there is a call for cooling from the thermostat, the system opens the outside damper instead of running the energy-heavy compressor.</p>
-        <p>Adjust the temperatures in the simulation to see when the damper opens.</p>
-      </>
+      <div className="space-y-6">
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={HVAC_ECONOMIZER_SVG_DATA_URI}
+            alt="Rooftop Air Handling Unit (AHU) economizer airflow schematic"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 1.1 // ROOFTOP AIR HANDLING UNIT (AHU) ECONOMIZER</span>
+            <span>SYSTEM: AHU-04 // ASHRAE 90.1 FREE-COOLING SCHEMATIC</span>
+          </div>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-8 mb-4">
+          The $4,200 Power Bill &amp; The Burst Copper Pipe
+        </h2>
+        <p>
+          Imagine driving home on a crisp 58°F (14°C) autumn evening. Inside your car, the afternoon sun made the cabin uncomfortably warm. What do you do?
+        </p>
+        <p>
+          Do you turn on the high-power refrigerated air conditioning compressor, burning extra gasoline? <strong>Of course not.</strong> You simply roll down your window and let the cool evening breeze freshen the car for free!
+        </p>
+        <p>
+          In commercial facilities—such as corporate offices, schools, and shopping centers—this intuitive concept is called the <strong>HVAC Economizer Cycle</strong> or <strong>&quot;Free Cooling&quot;</strong>. Air handling units (AHUs) draw in cool outdoor air instead of running energy-hungry mechanical chillers and compressors, cutting annual commercial cooling bills by <strong>up to 40%</strong>.
+        </p>
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Costly Field Disaster:</strong>
+          <p>
+            In November at a regional community college, maintenance noticed the campus electric bill had spiked by over $4,200. During inspection, technicians discovered that the rooftop fresh air damper (<code>OAD-101</code>) was rusted shut at 10%. The building's DX air conditioning compressor had been running continuously even while outdoor temperatures hovered at a chilly 54°F!
+          </p>
+          <p className="mt-2">
+            To &quot;fix&quot; it, a junior technician wedged the damper 100% open. Two nights later, an unseasonal cold snap plunged outside temperatures to 24°F (-4°C). The Arctic air blew straight into the mixing plenum, freezing the hot-water heating coil solid. The copper pipes ruptured under hydrostatic ice pressure, flooding three classrooms with water.
+          </p>
+          <p className="mt-2 font-medium">
+            The Lesson: Economizers save massive energy, but they require safe upper and lower limits and fail-safe low-limit freeze-stat interlocks to avoid physical building catastrophe.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Understanding the 3 Main Dampers &amp; Air Streams
+        </h2>
+        <p>
+          Before diving into the logic circuits, let's understand the physical anatomy of an Air Handling Unit (AHU):
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Outdoor Air Damper (OAD):</strong> Modulates from 0% to 100% to admit outside fresh air into the unit.</li>
+          <li><strong>Return Air Damper (RAD):</strong> Recirculates conditioned air already inside the building to preserve warmth or coolness.</li>
+          <li><strong>Exhaust / Relief Air Damper (EAD):</strong> Lets excess stale air escape to prevent over-pressurizing the building like an over-inflated balloon.</li>
+        </ul>
+        <p>
+          When the Economizer activates:
+          The Outside Damper opens to 100%, the Return Damper closes proportionally, and the Exhaust Damper opens to vent stale room air.
+        </p>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 1: The Naive Outside Air Comparator (The Freeze Hazard)
+        </h2>
+        <p>
+          A common beginner mistake is writing a simple single-line rule:
+        </p>
+        <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
+          IF (Outside_Temp &lt; Return_Temp) AND Call_For_Cooling THEN<br />
+          &nbsp;&nbsp;Open_Fresh_Air_Damper = 100%<br />
+          &nbsp;&nbsp;AC_Compressor = OFF<br />
+          ELSE<br />
+          &nbsp;&nbsp;AC_Compressor = ON
+        </div>
+        <p>
+          Below is <strong>Stage 1</strong> of our interactive lab. An <code>ANALOG_COMPARATOR</code> evaluates whether Outside Temp is lower than Return Temp. Try testing it below:
+        </p>
+
+        <InlineLab
+          dsl={HVAC_LAB1_DSL}
+          title="Stage 1 - The Naive Outside Air Comparator"
+          step="Stage 1 of 3"
+          height={480}
+        />
+
+        <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
+          <strong className="block font-semibold mb-1">The Beginner Flaw in Stage 1</strong>
+          <p>
+            In the lab above, change <strong>Outdoor Air Temp</strong> to 25°F (-4°C). Notice that <strong>Open Fresh Air Damper 100%</strong> stays ON! Because 25°F is indeed less than 74°F, the simple logic blindfolded the system into blasting sub-freezing air directly over the hydronic water coils, risking pipe bursts and severe tenant discomfort!
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 2: Safe Economizer Window &amp; Minimum Ventilation Damper
+        </h2>
+        <p>
+          To fix the naive comparator, real-world Building Automation Systems (BAS) implement two fundamental rules:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li>
+            <strong>The Safe Economizer Window (Sweet Spot):</strong> Free cooling should only be allowed if outdoor air is cooler than room air <strong>AND</strong> warm enough to enter safely (typically <strong>above 50°F / 10°C</strong>). If outside is below 50°F, outdoor air must be tempered with return air!
+          </li>
+          <li>
+            <strong>Minimum Ventilation Damper Position:</strong> Even when outside air is freezing cold or boiling hot, human occupants require fresh oxygen to breathe and dilute indoor CO2 levels (per building codes like ASHRAE 62.1). Therefore, the damper must <strong>never fully close during occupied hours</strong>—it must maintain a minimum opening (typically <strong>15%</strong>).
+          </li>
+        </ul>
+        <p>
+          We implement this in <strong>Stage 2</strong> using an <code>ANALOG_MUX</code> (Analog Multiplexer):
+          When Free Cooling is OFF, the damper commands to <strong>15% (Minimum Ventilation)</strong>; when Free Cooling is ACTIVE, the damper opens to <strong>100% (Full Free Cooling)</strong>.
+        </p>
+
+        <InlineLab
+          dsl={HVAC_LAB2_DSL}
+          title="Stage 2 - Safe Economizer Window &amp; Min Vent Damper"
+          step="Stage 2 of 3"
+          height={520}
+        />
+
+        <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 rounded-r-lg my-4 text-sm font-sans text-emerald-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 2</strong>
+          <p>
+            Observe <strong>Damper Actuator Position (%)</strong>: At 58°F, the green <em>Free Cooling Active</em> lamp is lit and the damper is at 100% with the compressor OFF (saving electricity!). Now adjust <strong>Outdoor Air Temp</strong> down to 45°F. Notice how Free Cooling shuts off, the compressor stays off (since outside is cold), and the damper safely relaxes to 15% minimum ventilation!
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Stage 3: Low-Limit Freeze-Stat (FZT-101) &amp; Complete Safety Interlocks
+        </h2>
+        <p>
+          What happens if an actuator motor breaks, a linkage snaps, or a blizzard strikes while the damper is open?
+        </p>
+        <p>
+          In commercial HVAC, rotating machinery and water coils are protected by a dedicated <strong>Freeze-Stat (<code>FZT-101</code>)</strong>. This is a 20-foot vapor-filled copper capillary tube woven in a serpentine grid across the entire face of the heating and cooling coils.
+        </p>
+        <p>
+          If <strong>any 12-inch section</strong> of the capillary tube drops below <strong>38°F (3.3°C)</strong>, the internal diaphragm trips an electrical switch:
+        </p>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Spring-Returns Dampers to 0%:</strong> Overrides all logic to slam the outdoor damper completely shut.</li>
+          <li><strong>Trips the Supply Fan OFF:</strong> Prevents drawing freezing air through the ruptured coil.</li>
+          <li><strong>Latches a Safety Alarm:</strong> Holds the unit safely shut down until a certified technician physically inspects the unit and presses the manual reset button.</li>
+        </ul>
+
+        <InlineLab
+          dsl={HVAC_LAB3_DSL}
+          title="Stage 3 - Full Economizer with Freeze-Stat Trip"
+          step="Stage 3 of 3"
+          height={560}
+        />
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg my-4 text-sm font-sans text-blue-950">
+          <strong className="block font-semibold mb-1">Interactive Exercise — Stage 3</strong>
+          <p>
+            In Stage 3 above, the unit is happily free-cooling with 100% outdoor air. Now simulate a sudden frost or stuck damper by toggling <strong>FZT-101 Freeze-Stat Capillary Trip</strong> to TRUE. Notice how the RS Latch immediately locks into alarm: the damper drops to 0%, free cooling shuts off, and the compressor is locked out! Even after the trip clears, the alarm stays latched until you click <strong>Manual Alarm Reset PB</strong>.
+          </p>
+        </div>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Commissioning &amp; Field Checkout Checklist
+        </h2>
+        <p>
+          When commissioning an air handling unit economizer on a commercial rooftop, follow this 5-point field checkout:
+        </p>
+        <ol className="list-decimal pl-6 space-y-2 text-sm">
+          <li><strong>Verify Minimum Position:</strong> With the supply fan running and cooling disabled, verify the damper blades sit exactly at the designed minimum ventilation position (10% to 15%).</li>
+          <li><strong>Test Actuator Spring Return:</strong> Kill main 24VAC control power to the damper actuator. Verify the mechanical internal spring snaps the outdoor air damper completely closed (0%) in under 15 seconds.</li>
+          <li><strong>Calibrate Temperature Sensors:</strong> Cross-check the Outdoor Air Sensor (<code>TE-101</code>) and Return Air Sensor (<code>TE-102</code>) with a calibrated digital thermometer. A 2°F drift can waste thousands of kilowatt-hours per season.</li>
+          <li><strong>Physically Test the Freeze-Stat:</strong> Use freeze spray on the capillary tube of <code>FZT-101</code>. Verify that the safety circuit trips, shuts the outdoor air damper, and requires a physical manual reset.</li>
+          <li><strong>Inspect Exhaust Damper Relief:</strong> Ensure the barometric or motorized relief damper opens freely when outdoor air is at 100%, preventing building over-pressurization and whistling exterior doors.</li>
+        </ol>
+
+        <h2 className="text-2xl font-bold font-serif text-zinc-900 mt-12 mb-4">
+          Key Engineering Takeaways
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans not-prose my-6">
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">01</span> Free Cooling Economics
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Using cool outdoor air instead of running energy-heavy DX compressors can slash annual commercial cooling utility bills by up to 40%.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">02</span> The Safe Sweet Spot
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Never economize below 50°F (10°C) without mixed air preheating. Freezing outdoor air must be tempered with warm return air.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">03</span> Continuous Ventilation
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              Commercial building codes (ASHRAE 62.1) require maintaining a minimum damper opening (10-15%) during occupied hours for human oxygen &amp; CO2 control.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
+            <h4 className="font-bold text-zinc-900 mb-1 flex items-center gap-2">
+              <span className="text-emerald-500 font-mono">04</span> Hard Freeze Protection
+            </h4>
+            <p className="text-zinc-600 text-xs leading-relaxed">
+              A physical low-limit capillary switch (FZT-101) tripped at 38°F is non-negotiable to slam dampers closed and prevent catastrophic coil freezing.
+            </p>
+          </div>
+        </div>
+      </div>
     ),
-    dsl: `circuit "HVAC Economizer Logic" version 1 {
-  out_temp: ANALOG_INPUT(label="Outside Temp F", value=65)
-  in_temp: ANALOG_INPUT(label="Return Temp F", value=75)
-  call_cool: INPUT(label="Thermostat Call for Cool", value=true)
-  comp: ANALOG_COMPARATOR(operation="lt")
-  damper_logic: AND()
-  damper: OUTPUT(label="Open Fresh Air Damper")
-  not_economize: NOT()
-  comp_logic: AND()
-  compressor: OUTPUT(label="Run AC Compressor")
-
-  out_temp.Q -> comp.A
-  in_temp.Q -> comp.B
-  comp.Q -> damper_logic.A
-  call_cool.Q -> damper_logic.B
-  damper_logic.Q -> damper.A
-
-  comp.Q -> not_economize.A
-  not_economize.Q -> comp_logic.A
-  call_cool.Q -> comp_logic.B
-  comp_logic.Q -> compressor.A
-}`
+    dsl: ''
   },
   {
     slug: 'tank-hysteresis',
