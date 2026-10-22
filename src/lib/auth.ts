@@ -77,3 +77,97 @@ export function clearCurrentUser(): void {
     console.error('Failed to clear user session:', err);
   }
 }
+
+/**
+ * Sign in against Neon PostgreSQL backend (/api/auth/signin).
+ * Synchronizes session cookie and localStorage user state.
+ */
+export async function signInWithNeon(
+  emailOrUsername: string,
+  password: string
+): Promise<{ ok: boolean; user?: User; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailOrUsername, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error || 'Failed to sign in.' };
+    }
+
+    if (data.user) {
+      setCurrentUser(data.user);
+    }
+
+    return { ok: true, user: data.user };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
+  }
+}
+
+/**
+ * Sign up a new user in Neon PostgreSQL backend (/api/auth/signup).
+ */
+export async function signUpWithNeon(userData: {
+  name: string;
+  email: string;
+  password: string;
+  stationId?: string;
+  role?: string;
+  bio?: string;
+}): Promise<{ ok: boolean; user?: User; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error || 'Failed to create account.' };
+    }
+
+    if (data.user) {
+      setCurrentUser(data.user);
+    }
+
+    return { ok: true, user: data.user };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
+  }
+}
+
+/**
+ * Sign out from server session and clear local session state.
+ */
+export async function signOutWithNeon(): Promise<void> {
+  try {
+    await fetch('/api/auth/signout', { method: 'POST' });
+  } catch (err) {
+    console.warn('Signout request failed:', err);
+  } finally {
+    clearCurrentUser();
+  }
+}
+
+/**
+ * Check if the active session is valid on Neon server (/api/auth/me).
+ */
+export async function checkSessionWithNeon(): Promise<User | null> {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.ok && data.user) {
+      setCurrentUser(data.user);
+      return data.user;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

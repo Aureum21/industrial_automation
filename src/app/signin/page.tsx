@@ -18,11 +18,16 @@ import {
   Terminal,
   LogOut,
   Building,
+  Database,
 } from 'lucide-react';
 import {
   getCurrentUser,
   setCurrentUser,
   clearCurrentUser,
+  signInWithNeon,
+  signUpWithNeon,
+  signOutWithNeon,
+  checkSessionWithNeon,
   type User,
 } from '@/lib/auth';
 
@@ -34,6 +39,13 @@ function SignInContent() {
 
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [currentUser, setLocalCurrentUser] = useState<User | null>(null);
+
+  // Database Connection State
+  const [dbState, setDbState] = useState<{
+    status: 'checking' | 'connected' | 'not_configured' | 'error';
+    database?: string;
+    message?: string;
+  }>({ status: 'checking' });
 
   // Form states
   const [email, setEmail] = useState('');
@@ -54,12 +66,44 @@ function SignInContent() {
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
   useEffect(() => {
+    // 1. Check local session
     setLocalCurrentUser(getCurrentUser());
+
+    // 2. Query Neon database status
+    fetch('/api/health/db')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.status === 'CONNECTED') {
+          setDbState({
+            status: 'connected',
+            database: data.database,
+            message: `Connected to ${data.database || 'Neon Cloud'}`,
+          });
+          // Also sync user session from server cookie if available
+          checkSessionWithNeon().then((user) => {
+            if (user) setLocalCurrentUser(user);
+          });
+        } else if (data.status === 'NOT_CONFIGURED') {
+          setDbState({
+            status: 'not_configured',
+            message: 'Awaiting DATABASE_URL in environment',
+          });
+        } else {
+          setDbState({
+            status: 'error',
+            message: data.error || 'Connection error',
+          });
+        }
+      })
+      .catch(() => {
+        setDbState({ status: 'not_configured', message: 'Offline mode' });
+      });
   }, []);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     if (!email.trim() || !password) {
       setErrorMsg('Please enter both your username/email and password.');
@@ -67,36 +111,60 @@ function SignInContent() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const usernameInput = email.trim();
-      const isAlazar = usernameInput.toLowerCase().includes('alazar');
 
-      const userToSave: User = {
-        id: `usr-${Date.now().toString(36)}`,
-        name: isAlazar ? 'Alazar Wake Kore' : usernameInput,
-        email: usernameInput.includes('@') ? usernameInput : `${usernameInput.toLowerCase()}@automationhub.io`,
-        role: isAlazar
-          ? 'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)'
-          : 'Certified Controls Engineer',
-        stationId: stationId.trim() || 'TERMINAL-LOCAL-01',
-        avatar: isAlazar ? 'AW' : usernameInput.slice(0, 2).toUpperCase(),
-        joinedDate: 'Oct 2026',
-      };
+    try {
+      // Attempt live authentication via Neon PostgreSQL
+      const result = await signInWithNeon(email.trim(), password);
 
-      setCurrentUser(userToSave);
-      setLocalCurrentUser(userToSave);
+      if (result.ok && result.user) {
+        setLocalCurrentUser(result.user);
+        setIsLoading(false);
+        setSuccessMsg(`Welcome, ${result.user.name}! Connecting console...`);
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 650);
+        return;
+      }
+
+      // If database is not configured yet, fallback gracefully to local session
+      if (result.error && (result.error.includes('DATABASE_URL') || result.error.includes('not connected'))) {
+        const usernameInput = email.trim();
+        const isAlazar = usernameInput.toLowerCase().includes('alazar');
+
+        const fallbackUser: User = {
+          id: `usr-${Date.now().toString(36)}`,
+          name: isAlazar ? 'Alazar Wake Kore' : usernameInput,
+          email: usernameInput.includes('@') ? usernameInput : `${usernameInput.toLowerCase()}@automationhub.io`,
+          role: isAlazar
+            ? 'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)'
+            : 'Certified Controls Engineer',
+          stationId: stationId.trim() || 'TERMINAL-LOCAL-01',
+          avatar: isAlazar ? 'AW' : usernameInput.slice(0, 2).toUpperCase(),
+          joinedDate: 'Oct 2026',
+        };
+
+        setCurrentUser(fallbackUser);
+        setLocalCurrentUser(fallbackUser);
+        setIsLoading(false);
+        setSuccessMsg(`Local session connected (Ready to link with Neon cloud).`);
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 800);
+        return;
+      }
+
       setIsLoading(false);
-      setSuccessMsg(`Welcome, ${userToSave.name}! Connecting station console...`);
-
-      setTimeout(() => {
-        router.push(redirectUrl);
-      }, 700);
-    }, 500);
+      setErrorMsg(result.error || 'Invalid credentials. Please verify your username and password.');
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMsg((err as Error).message || 'Authentication error.');
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     if (!name.trim()) {
       setErrorMsg('Please enter your full engineering name or callsign.');
@@ -116,35 +184,64 @@ function SignInContent() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const newUser: User = {
-        id: `usr-${Date.now().toString(36)}`,
+
+    try {
+      const result = await signUpWithNeon({
         name: name.trim(),
         email: email.trim(),
+        password,
         role,
         stationId: stationId.trim() || 'TERMINAL-NEW-01',
-        avatar: name
-          .split(' ')
-          .map((n) => n[0])
-          .slice(0, 2)
-          .join('')
-          .toUpperCase() || 'AU',
-        joinedDate: 'Oct 2026',
-      };
+      });
 
-      setCurrentUser(newUser);
-      setLocalCurrentUser(newUser);
+      if (result.ok && result.user) {
+        setLocalCurrentUser(result.user);
+        setIsLoading(false);
+        setSuccessMsg(`Account created in Neon Database! Welcome to AutomationHub, ${result.user.name}.`);
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 700);
+        return;
+      }
+
+      // If database is not configured yet, fallback gracefully to local session
+      if (result.error && (result.error.includes('DATABASE_URL') || result.error.includes('not connected'))) {
+        const fallbackUser: User = {
+          id: `usr-${Date.now().toString(36)}`,
+          name: name.trim(),
+          email: email.trim(),
+          role,
+          stationId: stationId.trim() || 'TERMINAL-NEW-01',
+          avatar:
+            name
+              .split(' ')
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase() || 'AU',
+          joinedDate: 'Oct 2026',
+        };
+
+        setCurrentUser(fallbackUser);
+        setLocalCurrentUser(fallbackUser);
+        setIsLoading(false);
+        setSuccessMsg(`Account created locally (Ready to link with Neon cloud).`);
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 800);
+        return;
+      }
+
       setIsLoading(false);
-      setSuccessMsg(`Account created! Welcome to AutomationHub, ${newUser.name}.`);
-
-      setTimeout(() => {
-        router.push(redirectUrl);
-      }, 700);
-    }, 650);
+      setErrorMsg(result.error || 'Failed to create account.');
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMsg((err as Error).message || 'Signup failed.');
+    }
   };
 
-  const handleSignOut = () => {
-    clearCurrentUser();
+  const handleSignOut = async () => {
+    await signOutWithNeon();
     setLocalCurrentUser(null);
     setSuccessMsg('You have safely disconnected from the control console.');
     setTimeout(() => setSuccessMsg(null), 3000);
@@ -171,6 +268,26 @@ function SignInContent() {
           <div className="flex items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-widest text-emerald-400">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             ENGINEER ACCESS CONSOLE // STATION AUTH
+          </div>
+
+          {/* Neon Database Live Indicator */}
+          <div className="mt-3 flex items-center justify-center">
+            {dbState.status === 'connected' ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[11px] font-mono text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                <Database size={12} className="text-emerald-400 animate-pulse" />
+                <span>Neon PostgreSQL Live: {dbState.database || 'royal-leaf-98510202'}</span>
+              </div>
+            ) : dbState.status === 'checking' ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                <span>Checking Neon Database...</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/40 border border-amber-500/30 text-[11px] font-mono text-amber-300">
+                <Database size={12} className="text-amber-400" />
+                <span>Neon Driver Ready (Awaiting DATABASE_URL)</span>
+              </div>
+            )}
           </div>
         </div>
 
