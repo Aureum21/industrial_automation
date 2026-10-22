@@ -201,7 +201,15 @@ export default function BlogsPage() {
 
                   <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-zinc-400">
                     <span>
-                      <strong className="text-zinc-200">Author:</strong> {featuredPost.author}
+                      <strong className="text-zinc-200">Author:</strong>{' '}
+                      <a
+                        href="https://www.linkedin.com/in/alazar-wake-45915a276/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:text-emerald-300 underline decoration-emerald-500/40 hover:decoration-emerald-400 transition"
+                      >
+                        {featuredPost.author} ↗
+                      </a>
                     </span>
                     <span>•</span>
                     <span>
@@ -357,7 +365,15 @@ export default function BlogsPage() {
 
                 {/* Footer metadata */}
                 <div className="pt-4 border-t border-zinc-800/70 flex items-center justify-between font-mono text-[11px] text-zinc-500">
-                  <div className="truncate max-w-[170px]">
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open('https://www.linkedin.com/in/alazar-wake-45915a276/', '_blank');
+                    }}
+                    className="truncate max-w-[240px] hover:text-emerald-400 transition cursor-pointer"
+                    title={post.author}
+                  >
                     <span className="text-zinc-600">&gt;</span> {post.author}
                   </div>
                   <div className="flex items-center gap-2 text-zinc-400 group-hover:text-emerald-400 transition-colors shrink-0">

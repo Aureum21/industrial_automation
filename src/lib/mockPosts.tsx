@@ -1,11 +1,16 @@
 import React from 'react';
 import InlineLab from '@/components/lab/InlineLab';
 
+export const AUTHOR_NAME =
+  'Authored by Alazar Wake Kore — Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
+export const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/alazar-wake-45915a276/';
+
 export interface BlogPost {
   slug: string;
   title: string;
   excerpt: string;
   author: string;
+  authorUrl?: string;
   date: string;
   readingTime: string;
   tag: string;
@@ -1396,7 +1401,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'water-treatment',
     title: 'Building an Industrial Water Treatment Simulator: Intake Permissives, Basin Hysteresis & Automated Pump Alternation',
     excerpt: 'A comprehensive masterclass on municipal and industrial water treatment SCADA: diagnosing cavitation disasters, interlocking intake permissives, eliminating basin short-cycling with hysteresis, and automating pump duty alternation.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Oct 15',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
@@ -1559,7 +1564,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'industrial-heater-pi-pwm-anti-windup',
     title: 'When 100% Heat Is Not Enough: PI Control, PWM, and Anti-Windup',
     excerpt: 'Build an industrial heater controller in three interactive FBD labs: proportional demand, PI with PWM, and a closed-loop thermal plant with live tuning and saturation-recovery experiments.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Oct 8',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
@@ -1870,7 +1875,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'traffic-lights',
     title: 'Traffic Signal Automation: NEMA TS2 Dual-Ring Phasing, ITE Clearance Intervals & Conflict Monitor Watchdogs',
     excerpt: 'A comprehensive traffic engineering masterclass on intersection signal automation: the Route 4 & Parkway collision analysis, ITE clearance calculations, dual-ring sequential state machines, actuated inductive loop detection, and hardware Conflict Monitor Unit (CMU) failsafes.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Oct 1',
     readingTime: '22 min read + 25 min labs',
     tag: 'Control Systems',
@@ -2148,7 +2153,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'conveyor-sorting',
     title: 'Automated Conveyor Sorting: Shift-Register Tracking, Diverter Timing & Jam Watchdogs',
     excerpt: 'An intermediate masterclass on packaging and material handling automation: why fixed timers fail when multiple cartons queue up, implementing multi-zone shift register tracking, and engineering pneumatic diverters with jam-detection interlocks.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Sep 24',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
@@ -2371,7 +2376,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'two-hand-safety',
     title: 'The $240,000 Tie-Down Disaster: Engineering ISO 13851 Type III C Two-Hand Safety Controls',
     excerpt: 'A deep masterclass in functional safety: diagnosing why naive AND-gate circuits cause catastrophic press amputations, implementing the strict 500 ms synchronism window with anti-tie-down and anti-repeat, and engineering Category 4 / PL e dual-channel monitored safety valves.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Sep 17',
     readingTime: '18 min read + 20 min labs',
     tag: 'Safety',
@@ -2616,7 +2621,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'hvac-economizer',
     title: 'HVAC Economizer Logic: Free Cooling, Damper Control & Freeze-Stat Safety',
     excerpt: 'A beginner-friendly guide to commercial building climate control: harnessing free outside air to slash electricity bills, modulating fresh air dampers, and interlocking low-limit freeze-stats to protect hydronic coils.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Sep 10',
     readingTime: '12 min read + 15 min labs',
     tag: 'HVAC / Climate',
@@ -2832,7 +2837,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'tank-hysteresis',
     title: 'The 40-Second Motor Burnout: Tank Level Hysteresis, Schmitt Triggers & Anti-Short-Cycling',
     excerpt: 'A deep masterclass on process vessel level control: diagnosing why single-threshold comparators cause catastrophic contactor chattering, implementing mathematical hysteresis bands with Schmitt triggers, and building dynamic closed-loop tank models with surface slosh filtering.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Sep 3',
     readingTime: '18 min read + 20 min labs',
     tag: 'Control Systems',
@@ -3074,7 +3079,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'pump-alternator',
     title: 'Motor Duty Cycling: Duplex Pump Alternation, Auto-Takeover & Lead/Lag Control',
     excerpt: 'An intermediate masterclass on rotating machinery duty cycling: why naive flip-flops stall when motors trip, how to implement automatic standby takeover, and configuring duplex lead/lag assist for peak demand surges.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Aug 27',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
@@ -3290,7 +3295,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'esd-delays',
     title: 'Emergency Shutdown Sequence (ESD): Staged Delays & Safe Depressurization',
     excerpt: 'A beginner-friendly guide to industrial emergency stops: why pulling the master plug causes catastrophic thermal seizures, using TOF off-delay timers for post-trip cooling, and sequencing flare blowdown vents.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Aug 20',
     readingTime: '12 min read + 15 min labs',
     tag: 'Safety / ESD',
@@ -3509,7 +3514,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'solar-logging',
     title: 'Solar Array Telemetry: Analog Smoothing, Moving Averages & Data Logging',
     excerpt: 'A beginner-friendly guide to clean sensor data: eliminating cloud-induced voltage ripple with moving average filters, preventing contactor chatter, and logging periodic microgrid telemetry.',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Aug 13',
     readingTime: '12 min read + 15 min labs',
     tag: 'Renewables / IoT',

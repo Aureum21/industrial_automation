@@ -9,7 +9,7 @@ import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import Link from 'next/link';
-import { Edit } from 'lucide-react';
+import { Edit, ExternalLink } from 'lucide-react';
 
 export default function PostPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -73,12 +73,21 @@ export default function PostPage() {
         </h1>
         
         <div className="flex items-center gap-4 mb-10 pb-8 border-b border-gray-100">
-          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-500">
-            {post.author[0]}
+          <div className="w-12 h-12 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-sm font-bold text-emerald-800 shrink-0 font-mono">
+            AW
           </div>
           <div>
-            <div className="font-medium text-gray-900">{post.author}</div>
-            <div className="text-sm text-gray-500 flex gap-2">
+            <a
+              href="https://www.linkedin.com/in/alazar-wake-45915a276/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-gray-950 hover:text-emerald-700 transition inline-flex items-center gap-1.5 group text-sm sm:text-base leading-snug"
+              title="Open LinkedIn Profile"
+            >
+              <span>{post.author}</span>
+              <ExternalLink size={14} className="text-gray-400 group-hover:text-emerald-600 shrink-0" />
+            </a>
+            <div className="text-xs text-gray-500 flex gap-2 mt-1.5 font-mono">
               <span>{post.readingTime}</span>
               <span>·</span>
               <span>{post.date}</span>

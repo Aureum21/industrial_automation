@@ -35,12 +35,13 @@ import {
   type ExternalSection,
 } from '@/lib/blogStorage';
 import { getCurrentUser, type User as AuthUser } from '@/lib/auth';
+import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
 
 const SAMPLE_TEMPLATE_JSON = {
   slug: 'vacuum-degasser-control',
   title: 'Vacuum Degasser Sequence: Dual-Ejector Automation & Cavitation Safeguards',
   excerpt: 'A comprehensive engineering guide on sequencing multi-stage steam ejectors, condenser interlocks, and vacuum vessel pressure regulation.',
-  author: 'ALAZAR',
+  author: AUTHOR_NAME,
   date: 'Oct 15',
   readingTime: '12 min read',
   tag: 'Vacuum Systems',
@@ -102,7 +103,7 @@ function WriteContent() {
     slug: '',
     title: '',
     excerpt: '',
-    author: 'ALAZAR',
+    author: AUTHOR_NAME,
     date: 'Oct 15',
     readingTime: '15 min read + 20 min labs',
     tag: 'Process Control',
@@ -157,7 +158,7 @@ function WriteContent() {
       slug: 'new-schematic-' + Date.now().toString(36),
       title: 'New Industrial Masterclass',
       excerpt: 'A comprehensive technical overview of industrial automation logic and controls.',
-      author: currentUser?.name || 'ALAZAR',
+      author: currentUser?.name || AUTHOR_NAME,
       date: 'Oct 15',
       readingTime: '15 min read + 20 min labs',
       tag: 'Process Control',
@@ -199,7 +200,7 @@ function WriteContent() {
     const clampedViews = Math.min(20, Math.max(1, Number(postToSave.views) || 1));
     const finalizedPost: ExternalBlogPost = {
       ...postToSave,
-      author: postToSave.author || 'ALAZAR',
+      author: postToSave.author || AUTHOR_NAME,
       views: clampedViews,
     };
 
@@ -286,7 +287,7 @@ function WriteContent() {
     if (!parsedPost) return;
     const postWithAuthor: ExternalBlogPost = {
       ...parsedPost,
-      author: 'ALAZAR',
+      author: AUTHOR_NAME,
       views: parsedPost.views && parsedPost.views <= 20 ? parsedPost.views : 14,
     };
     saveCustomPost(postWithAuthor);
@@ -392,8 +393,17 @@ function WriteContent() {
                   Editor Publications &amp; Works
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                  Manage, modify, and proof-test masterclasses authored under{' '}
-                  <strong className="text-emerald-400">ALAZAR</strong>. Changes save instantly to your live platform.
+                  Manage, modify, and proof-test masterclasses authored by{' '}
+                  <a
+                    href={AUTHOR_LINKEDIN}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 hover:text-emerald-300 font-bold underline decoration-dotted inline-flex items-center gap-1"
+                  >
+                    Alazar Wake Kore
+                    <ExternalLink size={12} />
+                  </a>
+                  . Changes save instantly to your live platform.
                 </p>
               </div>
               <div className="text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
@@ -792,7 +802,7 @@ function WriteContent() {
                 </div>
                 <p className="text-xs text-zinc-400">{parsedPost.excerpt}</p>
                 <div className="text-[11px] font-mono text-zinc-500">
-                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: ALAZAR
+                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: Alazar Wake Kore
                 </div>
               </div>
             )}

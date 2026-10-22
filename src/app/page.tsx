@@ -137,7 +137,17 @@ export default function Home() {
                     
                     <div className="pt-4 border-t border-zinc-800/60 flex items-center justify-between font-mono text-xs text-zinc-500">
                       <div className="flex flex-col gap-1">
-                        <span><span className="text-zinc-600">&gt; AUTH:</span> {article.author}</span>
+                        <span
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.open('https://www.linkedin.com/in/alazar-wake-45915a276/', '_blank');
+                          }}
+                          className="hover:text-emerald-400 transition cursor-pointer truncate max-w-[220px]"
+                          title={article.author}
+                        >
+                          <span className="text-zinc-600">&gt; AUTH:</span> {article.author}
+                        </span>
                         <span><span className="text-zinc-600">&gt; DATE:</span> {article.date}</span>
                       </div>
                       <div className="text-right">

@@ -23,7 +23,6 @@ import {
   getCurrentUser,
   setCurrentUser,
   clearCurrentUser,
-  DEMO_USERS,
   type User,
 } from '@/lib/auth';
 
@@ -62,37 +61,37 @@ function SignInContent() {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!email || !password) {
-      setErrorMsg('Please enter both your engineering email and password.');
+    if (!email.trim() || !password) {
+      setErrorMsg('Please enter both your username/email and password.');
       return;
     }
 
     setIsLoading(true);
     setTimeout(() => {
-      // Find matching demo user or create session user
-      const matched = DEMO_USERS.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-      );
+      const usernameInput = email.trim();
+      const isAlazar = usernameInput.toLowerCase().includes('alazar');
 
-      const userToSave: User = matched || {
+      const userToSave: User = {
         id: `usr-${Date.now().toString(36)}`,
-        name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        email: email.trim(),
-        role: 'Certified Controls Engineer',
+        name: isAlazar ? 'Alazar Wake Kore' : usernameInput,
+        email: usernameInput.includes('@') ? usernameInput : `${usernameInput.toLowerCase()}@automationhub.io`,
+        role: isAlazar
+          ? 'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)'
+          : 'Certified Controls Engineer',
         stationId: stationId.trim() || 'TERMINAL-LOCAL-01',
-        avatar: email.slice(0, 2).toUpperCase(),
+        avatar: isAlazar ? 'AW' : usernameInput.slice(0, 2).toUpperCase(),
         joinedDate: 'Oct 2026',
       };
 
       setCurrentUser(userToSave);
       setLocalCurrentUser(userToSave);
       setIsLoading(false);
-      setSuccessMsg(`Welcome, ${userToSave.name}! Initializing console...`);
+      setSuccessMsg(`Welcome, ${userToSave.name}! Connecting station console...`);
 
       setTimeout(() => {
         router.push(redirectUrl);
       }, 700);
-    }, 600);
+    }, 500);
   };
 
   const handleSignUp = (e: React.FormEvent) => {
@@ -142,20 +141,6 @@ function SignInContent() {
         router.push(redirectUrl);
       }, 700);
     }, 650);
-  };
-
-  const handleQuickDemoSignIn = (user: User) => {
-    setIsLoading(true);
-    setErrorMsg(null);
-    setTimeout(() => {
-      setCurrentUser(user);
-      setLocalCurrentUser(user);
-      setIsLoading(false);
-      setSuccessMsg(`Logged in as ${user.name} (${user.role})`);
-      setTimeout(() => {
-        router.push(redirectUrl);
-      }, 600);
-    }, 400);
   };
 
   const handleSignOut = () => {
@@ -285,18 +270,18 @@ function SignInContent() {
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono text-zinc-400 mb-1.5 uppercase tracking-wider">
-                  Engineering Email / ID
+                  Username or Email
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
-                    <Mail size={16} />
+                    <UserIcon size={16} />
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="engineer@plant.com"
-                    autoComplete="email"
+                    placeholder="Enter your username or email"
+                    autoComplete="username"
                     required
                     className="w-full pl-10 pr-4 py-2.5 bg-zinc-950/80 border border-zinc-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-sm text-white placeholder-zinc-600 outline-none transition-all"
                   />
@@ -306,14 +291,14 @@ function SignInContent() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider">
-                    Access Key / Password
+                    Password
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(true)}
                     className="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
-                    Forgot Key?
+                    Forgot Password?
                   </button>
                 </div>
                 <div className="relative">
@@ -511,44 +496,6 @@ function SignInContent() {
               </button>
             </form>
           )}
-
-          {/* Quick 1-Click Demo Logins */}
-          <div className="mt-8 pt-6 border-t border-zinc-800">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                <Terminal size={12} className="text-emerald-400" />
-                Quick 1-Click Demo Profiles
-              </span>
-              <span className="text-[10px] text-zinc-500 font-mono">No password</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {DEMO_USERS.map((demo) => (
-                <button
-                  key={demo.id}
-                  type="button"
-                  onClick={() => handleQuickDemoSignIn(demo)}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-zinc-800/80 bg-zinc-950/60 hover:bg-zinc-800/60 hover:border-emerald-500/40 transition-all text-left group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-7 h-7 rounded-md bg-zinc-800 group-hover:bg-emerald-500/20 border border-zinc-700 group-hover:border-emerald-500/40 text-emerald-300 font-mono text-[11px] font-bold flex items-center justify-center transition-colors">
-                      {demo.avatar}
-                    </span>
-                    <div>
-                      <div className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">
-                        {demo.name}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[200px]">
-                        {demo.role}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-xs font-mono text-emerald-400/80 group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all">
-                    Sign in →
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Security footer disclaimer */}
