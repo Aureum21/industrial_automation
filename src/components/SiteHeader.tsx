@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Edit, LogOut, User as UserIcon } from 'lucide-react';
+import { Edit, LogOut, User as UserIcon, Cpu } from 'lucide-react';
 import { getCurrentUser, clearCurrentUser, AUTH_CHANGE_EVENT, type User } from '@/lib/auth';
 
 export default function SiteHeader() {
@@ -38,12 +38,27 @@ export default function SiteHeader() {
           </Link>
         </div>
 
-        <nav className="flex items-center gap-4 sm:gap-6">
+        <nav className="flex items-center gap-3 sm:gap-5">
+          <Link
+            href="/library"
+            className="text-sm font-medium text-gray-700 hover:text-black transition"
+          >
+            Library
+          </Link>
+
+          <Link
+            href="/lab"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-black transition"
+          >
+            <Cpu size={15} className="text-emerald-600" />
+            <span>Logic Lab</span>
+          </Link>
+
           <Link
             href="/write"
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-black transition"
+            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition"
           >
-            <Edit size={18} strokeWidth={1.5} />
+            <Edit size={16} strokeWidth={1.5} />
             <span className="hidden sm:inline">Write</span>
           </Link>
 
