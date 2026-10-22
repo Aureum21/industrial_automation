@@ -171,3 +171,29 @@ export async function checkSessionWithNeon(): Promise<User | null> {
     return null;
   }
 }
+
+/**
+ * Updates the user's password in Neon PostgreSQL (/api/auth/change-password).
+ */
+export async function changePasswordWithNeon(payload: {
+  currentPassword: string;
+  newPassword: string;
+  emailOrUsername?: string;
+}): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error || 'Failed to update password.' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
+  }
+}
