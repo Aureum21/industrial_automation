@@ -2,7 +2,7 @@ import React from 'react';
 import InlineLab from '@/components/lab/InlineLab';
 
 export const AUTHOR_NAME =
-  'Authored by Alazar Wake Kore — Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
+  'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
 export const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/alazar-wake-45915a276/';
 
 export interface BlogPost {

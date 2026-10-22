@@ -312,7 +312,7 @@ export function convertExternalToBlogPost(external: ExternalBlogPost): BlogPost 
     excerpt: external.excerpt,
     author:
       external.author ||
-      'Authored by Alazar Wake Kore — Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)',
+      'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)',
     date: external.date,
     readingTime: external.readingTime,
     tag: external.tag,
@@ -372,7 +372,7 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
   const excerpt = meta.excerpt || 'An interactive industrial automation article.';
   const author =
     meta.author ||
-    'Authored by Alazar Wake Kore — Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
+    'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
   const date = meta.date || 'Oct 15';
   const readingTime = meta.readingTime || '10 min read';
   const tag = meta.tag || 'Automation';
