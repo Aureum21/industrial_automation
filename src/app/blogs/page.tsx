@@ -52,7 +52,23 @@ export default function BlogsPage() {
   const [sortBy, setSortBy] = useState<'views' | 'date' | 'readingTime' | 'title'>('views');
 
   useEffect(() => {
-    setPosts(getAllPosts());
+    const localPosts = getAllPosts();
+    setPosts(localPosts);
+
+    // Fetch live actual read counts from Neon PostgreSQL database
+    fetch('/api/views')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.views) {
+          setPosts((prev) =>
+            prev.map((p) => ({
+              ...p,
+              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Filter posts

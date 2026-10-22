@@ -18,11 +18,46 @@ export default function PostPage() {
   
   const [post, setPost] = useState<BlogPost | undefined>(() => BLOG_POSTS.find(p => p.slug === slug));
   const [user, setUser] = useState<User | null>(null);
+  const [liveViews, setLiveViews] = useState<number | null>(null);
 
   useEffect(() => {
     setUser(getCurrentUser());
     const found = getPostBySlug(slug);
-    if (found) setPost(found);
+    if (found) {
+      setPost(found);
+      setLiveViews(found.views ?? 1);
+    }
+
+    // Record real visitor read count in Neon PostgreSQL
+    const sessionKey = 'has_read_' + slug;
+    const alreadyReadThisSession = typeof window !== 'undefined' && sessionStorage.getItem(sessionKey);
+
+    if (!alreadyReadThisSession) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(sessionKey, '1');
+      }
+      fetch('/api/views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.ok && typeof data.views === 'number') {
+            setLiveViews(data.views);
+          }
+        })
+        .catch(() => {});
+    } else {
+      fetch('/api/views')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.ok && data.views && typeof data.views[slug] === 'number') {
+            setLiveViews(data.views[slug]);
+          }
+        })
+        .catch(() => {});
+    }
   }, [slug]);
   
   const document = useMemo(() => {
@@ -87,10 +122,14 @@ export default function PostPage() {
               <span>{post.author}</span>
               <ExternalLink size={14} className="text-gray-400 group-hover:text-emerald-600 shrink-0" />
             </a>
-            <div className="text-xs text-gray-500 flex gap-2 mt-1.5 font-mono">
+            <div className="text-xs text-gray-500 flex flex-wrap items-center gap-2 mt-1.5 font-mono">
               <span>{post.readingTime}</span>
               <span>·</span>
               <span>{post.date}</span>
+              <span>·</span>
+              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded font-semibold flex items-center gap-1 shadow-xs">
+                ⚡ {liveViews ?? post.views ?? 1} reads
+              </span>
             </div>
           </div>
         </div>

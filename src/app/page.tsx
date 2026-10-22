@@ -21,6 +21,19 @@ export default function Home() {
 
   useEffect(() => {
     setAllPosts(getAllPosts());
+    fetch('/api/views')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.views) {
+          setAllPosts((prev) =>
+            prev.map((p) => ({
+              ...p,
+              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const sortedPosts = useMemo(() => {

@@ -131,6 +131,21 @@ function WriteContent() {
     const posts = getEditablePosts();
     setPublications(posts);
 
+    // Fetch live read counts from Neon PostgreSQL
+    fetch('/api/views')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.views) {
+          setPublications((prev) =>
+            prev.map((p) => ({
+              ...p,
+              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+
     // If navigated with ?edit=slug, open that post directly
     if (editSlugParam) {
       const match = getEditablePost(editSlugParam);
@@ -143,6 +158,19 @@ function WriteContent() {
   const refreshPublications = () => {
     const updated = getEditablePosts();
     setPublications(updated);
+    fetch('/api/views')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.views) {
+          setPublications((prev) =>
+            prev.map((p) => ({
+              ...p,
+              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   };
 
   const startEditing = (post: ExternalBlogPost) => {
@@ -196,12 +224,11 @@ function WriteContent() {
       return;
     }
 
-    // Clamp views to <= 20
-    const clampedViews = Math.min(20, Math.max(1, Number(postToSave.views) || 1));
     const finalizedPost: ExternalBlogPost = {
       ...postToSave,
       author: postToSave.author || AUTHOR_NAME,
-      views: clampedViews,
+      date: postToSave.date || 'Oct 15',
+      views: Number(postToSave.views) || 1,
     };
 
     saveCustomPost(finalizedPost);
@@ -629,33 +656,6 @@ function WriteContent() {
                         value={editingPost.author}
                         onChange={(e) => setEditingPost({ ...editingPost, author: e.target.value })}
                         className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-white font-mono text-sm focus:border-emerald-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Publish Date</label>
-                      <input
-                        type="text"
-                        value={editingPost.date}
-                        onChange={(e) => setEditingPost({ ...editingPost, date: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-white font-mono text-sm focus:border-emerald-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Read Count (Max 20)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={editingPost.views ?? 14}
-                        onChange={(e) =>
-                          setEditingPost({
-                            ...editingPost,
-                            views: Math.min(20, Math.max(1, parseInt(e.target.value) || 1)),
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-emerald-400 font-mono text-sm focus:border-emerald-500 outline-none"
                       />
                     </div>
 

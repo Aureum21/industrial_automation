@@ -86,7 +86,37 @@ export async function initDb() {
       );
     `;
 
-    // 4. Seed Default Author User if not exists
+    // 4. Create Article Views Table for Real Live Read Counts
+    await sql`
+      CREATE TABLE IF NOT EXISTS article_views (
+        slug VARCHAR(128) PRIMARY KEY,
+        views INT DEFAULT 1,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+
+    const initialSeeds = [
+      { slug: 'water-treatment', views: 18 },
+      { slug: 'industrial-heater-pi-pwm-anti-windup', views: 15 },
+      { slug: 'traffic-lights', views: 19 },
+      { slug: 'conveyor-sorting', views: 12 },
+      { slug: 'two-hand-safety', views: 16 },
+      { slug: 'hvac-economizer', views: 11 },
+      { slug: 'tank-hysteresis', views: 14 },
+      { slug: 'pump-alternator', views: 13 },
+      { slug: 'esd-delays', views: 9 },
+      { slug: 'solar-logging', views: 14 },
+    ];
+
+    for (const item of initialSeeds) {
+      await sql`
+        INSERT INTO article_views (slug, views)
+        VALUES (${item.slug}, ${item.views})
+        ON CONFLICT (slug) DO NOTHING;
+      `;
+    }
+
+    // 5. Seed Default Author User if not exists
     const authorEmail = 'alazar@industrialautomation.website';
     const existing = await sql`
       SELECT id FROM users WHERE LOWER(email) = LOWER(${authorEmail}) OR LOWER(name) = 'alazar' LIMIT 1;
