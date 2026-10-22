@@ -123,7 +123,7 @@ export default function Home() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-500/20 px-2 py-0.5 rounded tracking-wider font-semibold">
-                            ⚡ {article.views.toLocaleString()} VIEWS
+                            ⚡ {article.views} {article.views === 1 ? 'VIEW' : 'VIEWS'}
                           </span>
                           <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider">
                             {article.tag}

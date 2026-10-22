@@ -188,7 +188,7 @@ export default function BlogsPage() {
                       {featuredPost.tag}
                     </span>
                     <span className="text-xs font-mono text-emerald-400">
-                      ⚡ {(featuredPost.views ?? 0).toLocaleString()} Views
+                      ⚡ {featuredPost.views ?? 0} {(featuredPost.views ?? 0) === 1 ? 'View' : 'Views'}
                     </span>
                   </div>
 
@@ -342,7 +342,7 @@ export default function BlogsPage() {
                       {post.tag}
                     </span>
                     <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded font-semibold">
-                      ⚡ {(post.views ?? 0).toLocaleString()}
+                      ⚡ {post.views ?? 0} {(post.views ?? 0) === 1 ? 'read' : 'reads'}
                     </span>
                   </div>
 

@@ -302,11 +302,11 @@ export function convertExternalToBlogPost(external: ExternalBlogPost): BlogPost 
     slug: external.slug,
     title: external.title,
     excerpt: external.excerpt,
-    author: external.author,
+    author: external.author || 'ALAZAR',
     date: external.date,
     readingTime: external.readingTime,
     tag: external.tag,
-    views: external.views ?? 1000,
+    views: external.views && external.views <= 20 ? external.views : 14,
     content: renderSectionsToReact(external.sections),
     dsl: '',
   };
@@ -360,11 +360,11 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
   const slug = meta.slug || 'untitled-post-' + Date.now();
   const title = meta.title || 'Untitled Post';
   const excerpt = meta.excerpt || 'An interactive industrial automation article.';
-  const author = meta.author || 'Automation Engineer';
-  const date = meta.date || 'Recent';
+  const author = meta.author || 'ALAZAR';
+  const date = meta.date || 'Oct 15';
   const readingTime = meta.readingTime || '10 min read';
   const tag = meta.tag || 'Automation';
-  const views = Number(meta.views) || 1200;
+  const views = Number(meta.views) && Number(meta.views) <= 20 ? Number(meta.views) : 14;
 
   // Split body by ```fbd code blocks
   const sections: ExternalSection[] = [];

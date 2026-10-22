@@ -1396,11 +1396,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'water-treatment',
     title: 'Building an Industrial Water Treatment Simulator: Intake Permissives, Basin Hysteresis & Automated Pump Alternation',
     excerpt: 'A comprehensive masterclass on municipal and industrial water treatment SCADA: diagnosing cavitation disasters, interlocking intake permissives, eliminating basin short-cycling with hysteresis, and automating pump duty alternation.',
-    author: 'AutomationHub Editorial',
-    date: 'Oct 18',
+    author: 'ALAZAR',
+    date: 'Oct 15',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
-    views: 18450,
+    views: 18,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -1559,11 +1559,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'industrial-heater-pi-pwm-anti-windup',
     title: 'When 100% Heat Is Not Enough: PI Control, PWM, and Anti-Windup',
     excerpt: 'Build an industrial heater controller in three interactive FBD labs: proportional demand, PI with PWM, and a closed-loop thermal plant with live tuning and saturation-recovery experiments.',
-    author: 'AutomationHub Editorial',
-    date: 'Oct 19',
+    author: 'ALAZAR',
+    date: 'Sep 17',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
-    views: 24190,
+    views: 14,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -1870,11 +1870,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'traffic-lights',
     title: 'Traffic Signal Automation: NEMA TS2 Dual-Ring Phasing, ITE Clearance Intervals & Conflict Monitor Watchdogs',
     excerpt: 'A comprehensive traffic engineering masterclass on intersection signal automation: the Route 4 & Parkway collision analysis, ITE clearance calculations, dual-ring sequential state machines, actuated inductive loop detection, and hardware Conflict Monitor Unit (CMU) failsafes.',
-    author: 'Sarah Dev & AutomationHub Engineering',
-    date: 'Oct 19',
+    author: 'ALAZAR',
+    date: 'Aug 16',
     readingTime: '22 min read + 25 min labs',
     tag: 'Control Systems',
-    views: 19850,
+    views: 19,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2148,11 +2148,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'conveyor-sorting',
     title: 'Automated Conveyor Sorting: Shift-Register Tracking, Diverter Timing & Jam Watchdogs',
     excerpt: 'An intermediate masterclass on packaging and material handling automation: why fixed timers fail when multiple cartons queue up, implementing multi-zone shift register tracking, and engineering pneumatic diverters with jam-detection interlocks.',
-    author: 'Mike Systems & AutomationHub Team',
-    date: 'Sep 22',
+    author: 'ALAZAR',
+    date: 'Jul 16',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
-    views: 11450,
+    views: 7,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2371,11 +2371,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'two-hand-safety',
     title: 'The $240,000 Tie-Down Disaster: Engineering ISO 13851 Type III C Two-Hand Safety Controls',
     excerpt: 'A deep masterclass in functional safety: diagnosing why naive AND-gate circuits cause catastrophic press amputations, implementing the strict 500 ms synchronism window with anti-tie-down and anti-repeat, and engineering Category 4 / PL e dual-channel monitored safety valves.',
-    author: 'Emma Safety',
-    date: 'Oct 19',
+    author: 'ALAZAR',
+    date: 'Jun 15',
     readingTime: '18 min read + 20 min labs',
     tag: 'Safety',
-    views: 15200,
+    views: 1,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2616,11 +2616,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'hvac-economizer',
     title: 'HVAC Economizer Logic: Free Cooling, Damper Control & Freeze-Stat Safety',
     excerpt: 'A beginner-friendly guide to commercial building climate control: harnessing free outside air to slash electricity bills, modulating fresh air dampers, and interlocking low-limit freeze-stats to protect hydronic coils.',
-    author: 'Dave Climate & AutomationHub Team',
-    date: 'Oct 21',
+    author: 'ALAZAR',
+    date: 'May 17',
     readingTime: '12 min read + 15 min labs',
     tag: 'HVAC / Climate',
-    views: 9420,
+    views: 12,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2832,11 +2832,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'tank-hysteresis',
     title: 'The 40-Second Motor Burnout: Tank Level Hysteresis, Schmitt Triggers & Anti-Short-Cycling',
     excerpt: 'A deep masterclass on process vessel level control: diagnosing why single-threshold comparators cause catastrophic contactor chattering, implementing mathematical hysteresis bands with Schmitt triggers, and building dynamic closed-loop tank models with surface slosh filtering.',
-    author: 'John Doe & AutomationHub Engineering',
-    date: 'Oct 19',
+    author: 'ALAZAR',
+    date: 'Apr 16',
     readingTime: '18 min read + 20 min labs',
     tag: 'Control Systems',
-    views: 16840,
+    views: 16,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3074,11 +3074,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'pump-alternator',
     title: 'Motor Duty Cycling: Duplex Pump Alternation, Auto-Takeover & Lead/Lag Control',
     excerpt: 'An intermediate masterclass on rotating machinery duty cycling: why naive flip-flops stall when motors trip, how to implement automatic standby takeover, and configuring duplex lead/lag assist for peak demand surges.',
-    author: 'Alex Engineer & AutomationHub Team',
-    date: 'Sep 10',
+    author: 'ALAZAR',
+    date: 'Mar 15',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
-    views: 12480,
+    views: 4,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3290,11 +3290,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'esd-delays',
     title: 'Emergency Shutdown Sequence (ESD): Staged Delays & Safe Depressurization',
     excerpt: 'A beginner-friendly guide to industrial emergency stops: why pulling the master plug causes catastrophic thermal seizures, using TOF off-delay timers for post-trip cooling, and sequencing flare blowdown vents.',
-    author: 'Emma Safety & AutomationHub Team',
-    date: 'Oct 21',
+    author: 'ALAZAR',
+    date: 'Feb 17',
     readingTime: '12 min read + 15 min labs',
     tag: 'Safety / ESD',
-    views: 8940,
+    views: 1,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3509,11 +3509,11 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'solar-logging',
     title: 'Solar Array Telemetry: Analog Smoothing, Moving Averages & Data Logging',
     excerpt: 'A beginner-friendly guide to clean sensor data: eliminating cloud-induced voltage ripple with moving average filters, preventing contactor chatter, and logging periodic microgrid telemetry.',
-    author: 'Dave Climate & AutomationHub Team',
-    date: 'Oct 21',
+    author: 'ALAZAR',
+    date: 'Jan 16',
     readingTime: '12 min read + 15 min labs',
     tag: 'Renewables / IoT',
-    views: 8450,
+    views: 9,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">

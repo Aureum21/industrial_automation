@@ -14,12 +14,12 @@ export interface User {
 export const DEMO_USERS: User[] = [
   {
     id: 'usr-001',
-    name: 'Marcus Vance',
-    email: 'marcus.vance@automationhub.io',
-    role: 'Lead Automation Architect',
+    name: 'ALAZAR',
+    email: 'alazar@automationhub.io',
+    role: 'Lead Automation Architect & Author',
     stationId: 'PLC-STATION-ALPHA',
-    avatar: 'MV',
-    bio: '20+ years developing fault-tolerant SCADA and DCS architectures for water and petrochemical plants.',
+    avatar: 'AL',
+    bio: 'Lead Automation Architect & author specializing in industrial control systems, deterministic PLC logic, and distributed SCADA telemetry.',
     joinedDate: 'Jan 2024',
   },
   {

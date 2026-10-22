@@ -17,11 +17,11 @@ const SAMPLE_TEMPLATE_JSON = {
   slug: 'vacuum-degasser-control',
   title: 'Vacuum Degasser Sequence: Dual-Ejector Automation & Cavitation Safeguards',
   excerpt: 'A comprehensive engineering guide on sequencing multi-stage steam ejectors, condenser interlocks, and vacuum vessel pressure regulation.',
-  author: 'Marcus Vance',
-  date: 'Oct 18',
+  author: 'ALAZAR',
+  date: 'Oct 15',
   readingTime: '12 min read',
   tag: 'Vacuum Systems',
-  views: 3400,
+  views: 12,
   heroImage: '/water_treatment_pid.jpg',
   sections: [
     {
@@ -132,7 +132,12 @@ export default function WritePage() {
 
   const handlePublish = () => {
     if (!parsedPost) return;
-    saveCustomPost(parsedPost);
+    const postWithAuthor: ExternalBlogPost = {
+      ...parsedPost,
+      author: 'ALAZAR',
+      views: parsedPost.views && parsedPost.views <= 20 ? parsedPost.views : 14,
+    };
+    saveCustomPost(postWithAuthor);
     setIsPublished(true);
   };
 
