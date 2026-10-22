@@ -33,11 +33,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Query user by email or name (case-insensitive)
+    // Query user by email, full name, or username/first name (case-insensitive)
     const rows = await sql`
       SELECT id, name, email, password_hash, role, station_id, avatar, bio, created_at
       FROM users
-      WHERE LOWER(email) = LOWER(${identifier}) OR LOWER(name) = LOWER(${identifier})
+      WHERE LOWER(email) = LOWER(${identifier}) 
+         OR LOWER(name) = LOWER(${identifier})
+         OR LOWER(SPLIT_PART(name, ' ', 1)) = LOWER(${identifier})
       LIMIT 1;
     `;
 
