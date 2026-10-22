@@ -5,12 +5,13 @@ import InlineLab from '@/components/lab/InlineLab';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
+import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 
 export type ExternalSection =
   | { type: 'markdown'; content: string }
   | { type: 'image'; src: string; caption?: string; alt?: string }
   | { type: 'lab'; dsl: string; title: string; step?: string; height?: number }
-  | { type: 'callout'; variant?: 'info' | 'warning' | 'success'; title?: string; text: string };
+  | { type: 'callout'; variant?: 'info' | 'warning' | 'success' | 'error'; title?: string; text: string };
 
 export interface ExternalBlogPost {
   slug: string;
@@ -283,7 +284,14 @@ export function renderSectionsToReact(sections: ExternalSection[]): React.ReactN
         if (sec.type === 'callout') {
           const isSuccess = sec.variant === 'success';
           const isWarning = sec.variant === 'warning';
-          const bg = isSuccess ? 'bg-emerald-50 border-emerald-500 text-emerald-950' : isWarning ? 'bg-amber-50 border-amber-500 text-amber-950' : 'bg-blue-50 border-blue-500 text-blue-950';
+          const isError = sec.variant === 'error';
+          const bg = isSuccess
+            ? 'bg-emerald-50 border-emerald-500 text-emerald-950'
+            : isWarning
+            ? 'bg-amber-50 border-amber-500 text-amber-950'
+            : isError
+            ? 'bg-red-50 border-red-500 text-red-950'
+            : 'bg-blue-50 border-blue-500 text-blue-950';
           return (
             <div key={`sec-${i}`} className={`border-l-4 p-4 rounded-r-lg my-4 text-sm font-sans ${bg}`}>
               {sec.title && <strong className="block font-semibold mb-1">{sec.title}</strong>}
@@ -468,4 +476,35 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
     return all.find(p => p.slug === 'industrial-heater-pi-pwm-anti-windup');
   }
   return undefined;
+}
+
+export function getEditablePosts(): ExternalBlogPost[] {
+  if (typeof window === 'undefined') return DEFAULT_MASTERCLASSES;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+    const customList: ExternalBlogPost[] = raw ? JSON.parse(raw) : [];
+    const customSlugs = new Set(customList.map(p => p.slug));
+    const defaults = DEFAULT_MASTERCLASSES.filter(p => !customSlugs.has(p.slug));
+    return [...customList, ...defaults];
+  } catch {
+    return DEFAULT_MASTERCLASSES;
+  }
+}
+
+export function getEditablePost(slug: string): ExternalBlogPost | undefined {
+  const all = getEditablePosts();
+  return all.find(p => p.slug === slug);
+}
+
+export function deleteCustomPost(slug: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+    if (!raw) return;
+    const existing: ExternalBlogPost[] = JSON.parse(raw);
+    const filtered = existing.filter(p => p.slug !== slug);
+    localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
+  } catch (e) {
+    console.error('Failed to delete custom post:', e);
+  }
 }

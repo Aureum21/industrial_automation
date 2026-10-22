@@ -4,10 +4,12 @@ import { useParams } from 'next/navigation';
 import LabWorkspace from '@/components/lab/LabWorkspace';
 import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
 import { getPostBySlug } from '@/lib/blogStorage';
+import { getCurrentUser, type User } from '@/lib/auth';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import Link from 'next/link';
+import { Edit } from 'lucide-react';
 
 export default function PostPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -15,8 +17,10 @@ export default function PostPage() {
   const slug = params.slug as string;
   
   const [post, setPost] = useState<BlogPost | undefined>(() => BLOG_POSTS.find(p => p.slug === slug));
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    setUser(getCurrentUser());
     const found = getPostBySlug(slug);
     if (found) setPost(found);
   }, [slug]);
@@ -45,7 +49,25 @@ export default function PostPage() {
 
   return (
     <main className="bg-white min-h-screen text-gray-900 pb-32">
-      <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-16">
+      <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-12 sm:mt-16">
+        {user && (user.name === post.author || user.name.toUpperCase() === 'ALAZAR' || user.role.includes('Architect')) && (
+          <div className="mb-8 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-emerald-900 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                <strong>AUTHOR STATION:</strong> Verified as {user.name}
+              </span>
+            </div>
+            <Link
+              href={`/write?edit=${post.slug}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs"
+            >
+              <Edit size={13} />
+              <span>Edit This Publication</span>
+            </Link>
+          </div>
+        )}
+
         <h1 className="text-4xl sm:text-5xl font-serif font-extrabold tracking-tight mb-8 leading-tight">
           {post.title}
         </h1>

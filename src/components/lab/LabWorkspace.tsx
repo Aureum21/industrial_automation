@@ -14,6 +14,8 @@ import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
 import Oscilloscope from './oscilloscope/Oscilloscope';
+import AuthRequiredModal from './AuthRequiredModal';
+import { getCurrentUser } from '@/lib/auth';
 
 
 const nodeTypes = { circuit: CircuitNode };
@@ -37,6 +39,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
   const [syncKey, setSyncKey] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
 
@@ -203,6 +206,23 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     setNotice('Circuit exported. The file stores wiring and settings; simulation memory starts fresh when loaded.');
   };
 
+  const handleToggleRun = () => {
+    if (!running && !getCurrentUser()) {
+      setShowAuthModal(true);
+      return;
+    }
+    setRunning(value => !value);
+  };
+
+  const handleStep = () => {
+    if (!getCurrentUser()) {
+      setShowAuthModal(true);
+      return;
+    }
+    engine.tick(100);
+    sync();
+  };
+
   const selectedCount = nodes.filter(node => node.selected).length + edges.filter(edge => edge.selected).length;
 
   const changeMode = (newMode: 'visual' | 'code' | 'hmi') => {
@@ -249,8 +269,8 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
       <div className="flex items-center gap-2">
         {!readOnly && <button className="lab-button" onClick={() => setLibraryOpen(value => !value)} aria-expanded={libraryOpen}>Components</button>}
-        <button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button>
-        <button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button>
+        <button className={`lab-button ${running ? '' : 'primary'}`} onClick={handleToggleRun}>{running ? 'Ⅱ Pause' : '▶ Run'}</button>
+        <button className="lab-button" disabled={running} onClick={handleStep}>Step +100 ms</button>
         <button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button>
         <span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span>
       </div>
@@ -306,6 +326,17 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
           </div>
         </div>
       </div>
+    )}
+    {showAuthModal && (
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthenticated={() => {
+          setShowAuthModal(false);
+          setRunning(true);
+          setNotice('Authenticated as ALAZAR. Simulation running.');
+        }}
+      />
     )}
   </main>;
 }
