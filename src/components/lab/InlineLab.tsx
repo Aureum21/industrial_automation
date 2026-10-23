@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Check, CheckCircle2, Maximize2, Minimize2, Cpu } from 'lucide-react';
+import { Check, CheckCircle2, Maximize2, Minimize2, Cpu, Zap } from 'lucide-react';
 import LabWorkspace from './LabWorkspace';
+import ArduinoExportModal from './ArduinoExportModal';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
@@ -18,6 +19,7 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
+  const [showArduinoModal, setShowArduinoModal] = useState(false);
 
   // Stage ID for tracking
   const stageId = useMemo(() => {
@@ -92,6 +94,19 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Arduino Export Button */}
+          {document && (
+            <button
+              type="button"
+              onClick={() => setShowArduinoModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-all shadow-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/30"
+              title="Export this exercise circuit as an Arduino sketch (.ino)"
+            >
+              <Zap size={13} className="text-amber-500" />
+              <span className="hidden sm:inline">Arduino (.ino)</span>
+            </button>
+          )}
+
           {/* Verification Status Button */}
           <button
             type="button"
@@ -148,6 +163,14 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
           </div>
         )}
       </div>
+
+      {showArduinoModal && document && (
+        <ArduinoExportModal
+          isOpen={showArduinoModal}
+          onClose={() => setShowArduinoModal(false)}
+          doc={document}
+        />
+      )}
     </div>
   );
 }

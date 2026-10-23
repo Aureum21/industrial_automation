@@ -14,6 +14,7 @@ import Sidebar from '@/components/Sidebar';
 import CircuitNode, { type CircuitFlowNode } from './CircuitNode';
 import HmiCanvas from './HmiCanvas';
 import Oscilloscope from './oscilloscope/Oscilloscope';
+import ArduinoExportModal from './ArduinoExportModal';
 
 
 const nodeTypes = { circuit: CircuitNode };
@@ -77,6 +78,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   const [timeScrub, setTimeScrub] = useState<number | null>(null);
   const [syncKey, setSyncKey] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showArduinoModal, setShowArduinoModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const flowWrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
@@ -363,6 +365,13 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
           </div>
           <button className="lab-button" onClick={save}>Save</button>
           <button className="lab-button" onClick={exportFile}>Export</button>
+          <button
+            className="lab-button flex items-center gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 font-medium"
+            onClick={() => setShowArduinoModal(true)}
+            title="Export circuit as a standalone, non-blocking Arduino sketch (.ino)"
+          >
+            <span>⚡</span> Arduino (.ino)
+          </button>
           <button className="lab-button" onClick={() => fileRef.current?.click()}>Import</button>
           <button className="lab-button" onClick={() => setShowNewDialog(true)}>New circuit</button>
         </div>
@@ -431,6 +440,13 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
           </div>
         </div>
       </div>
+    )}
+    {showArduinoModal && (
+      <ArduinoExportModal
+        isOpen={showArduinoModal}
+        onClose={() => setShowArduinoModal(false)}
+        doc={engine.toDocument(name, widgets)}
+      />
     )}
   </main>;
 }
