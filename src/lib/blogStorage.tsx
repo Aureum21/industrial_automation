@@ -438,8 +438,49 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
   };
 }
 
-export function saveCustomPost(external: ExternalBlogPost): void {
-  if (typeof window === 'undefined') return;
+export const CORE_MASTERCLASS_SLUGS = new Set([
+  'water-treatment',
+  'hydraulic-press-safety-interlock',
+  'dual-pump-alternator',
+  'industrial-heater-pi-pwm-anti-windup',
+  'solar-tracker-mppt-hysteresis',
+  'hvac-chiller-economizer',
+  'conveyor-bottle-sorter',
+  'traffic-intersection-controller',
+  'emergency-shutdown-esd-matrix',
+  'tank-level-cascade-pid',
+]);
+
+export function isAuthorUser(user?: { name?: string; email?: string } | null): boolean {
+  if (!user) {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem('automationhub_authenticated_user');
+      if (!raw) return false;
+      user = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+  }
+  if (!user) return false;
+  const email = (user.email || '').toLowerCase();
+  const name = (user.name || '').toLowerCase();
+  return (
+    email === 'alazar@industrialautomation.website' ||
+    email.startsWith('alazar') ||
+    name.includes('alazar')
+  );
+}
+
+export function saveCustomPost(external: ExternalBlogPost): { ok: boolean; error?: string } {
+  if (typeof window === 'undefined') return { ok: false };
+  if (CORE_MASTERCLASS_SLUGS.has(external.slug) && !isAuthorUser()) {
+    console.warn(`[Security] Unauthorized attempt to modify core masterclass "${external.slug}" blocked.`);
+    return {
+      ok: false,
+      error: 'Permission denied: The 10 core masterclasses can only be modified by author Alazar Wake Kore.',
+    };
+  }
   try {
     const existingRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
     const existingList: ExternalBlogPost[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -454,8 +495,10 @@ export function saveCustomPost(external: ExternalBlogPost): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(external),
     }).catch(err => console.warn('Neon cloud article sync deferred:', err));
+    return { ok: true };
   } catch (e) {
     console.error('Failed to save custom post:', e);
+    return { ok: false, error: (e as Error).message };
   }
 }
 
@@ -534,11 +577,18 @@ export function getEditablePost(slug: string): ExternalBlogPost | undefined {
   return all.find(p => p.slug === slug);
 }
 
-export function deleteCustomPost(slug: string): void {
-  if (typeof window === 'undefined') return;
+export function deleteCustomPost(slug: string): { ok: boolean; error?: string } {
+  if (typeof window === 'undefined') return { ok: false };
+  if (CORE_MASTERCLASS_SLUGS.has(slug) && !isAuthorUser()) {
+    console.warn(`[Security] Unauthorized attempt to delete core masterclass "${slug}" blocked.`);
+    return {
+      ok: false,
+      error: 'Permission denied: The 10 core masterclasses cannot be deleted.',
+    };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
-    if (!raw) return;
+    if (!raw) return { ok: true };
     const existing: ExternalBlogPost[] = JSON.parse(raw);
     const filtered = existing.filter(p => p.slug !== slug);
     localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
@@ -549,7 +599,9 @@ export function deleteCustomPost(slug: string): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug }),
     }).catch(() => {});
+    return { ok: true };
   } catch (e) {
     console.error('Failed to delete custom post:', e);
+    return { ok: false, error: (e as Error).message };
   }
 }

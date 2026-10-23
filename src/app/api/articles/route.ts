@@ -1,7 +1,64 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getDb, initDb, isDbConfigured } from '@/lib/db';
 import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
 import type { ExternalBlogPost } from '@/lib/blogStorage';
+
+async function verifyAuthorSession(): Promise<{ authorized: boolean; error?: string; status?: number }> {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('station_session');
+
+    if (!sessionCookie || !sessionCookie.value) {
+      return {
+        authorized: false,
+        error: 'Authentication required. Please sign in as Alazar Wake Kore to modify masterclasses.',
+        status: 401,
+      };
+    }
+
+    const sql = getDb();
+    if (!sql) {
+      return { authorized: false, error: 'Database connection unavailable.', status: 500 };
+    }
+
+    const rows = await sql`
+      SELECT u.id, u.name, u.email
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.id = ${sessionCookie.value} AND s.expires_at > NOW()
+      LIMIT 1;
+    `;
+
+    if (!rows || rows.length === 0) {
+      return {
+        authorized: false,
+        error: 'Session expired or invalid. Please sign in again as Alazar Wake Kore.',
+        status: 401,
+      };
+    }
+
+    const user = rows[0] as { id: string; name: string; email: string };
+    const email = (user.email || '').toLowerCase();
+    const name = (user.name || '').toLowerCase();
+    const isAlazar =
+      email === 'alazar@industrialautomation.website' ||
+      email.startsWith('alazar') ||
+      name.includes('alazar');
+
+    if (!isAlazar) {
+      return {
+        authorized: false,
+        error: 'Access denied: Only the primary author (Alazar Wake Kore) has permissions to modify published masterclasses.',
+        status: 403,
+      };
+    }
+
+    return { authorized: true };
+  } catch (err) {
+    return { authorized: false, error: (err as Error).message, status: 500 };
+  }
+}
 
 export async function GET() {
   if (!isDbConfigured()) {
@@ -57,6 +114,15 @@ export async function POST(req: Request) {
     const sql = getDb();
     if (!sql) {
       return NextResponse.json({ ok: false, error: 'Database unavailable' }, { status: 500 });
+    }
+
+    // Security interlock: Only authenticated author (Alazar Wake Kore) can save or edit
+    const authCheck = await verifyAuthorSession();
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { ok: false, error: authCheck.error },
+        { status: authCheck.status || 403 }
+      );
     }
 
     const author = post.author || AUTHOR_NAME;
@@ -124,6 +190,15 @@ export async function DELETE(req: Request) {
     await initDb();
     const sql = getDb();
     if (!sql) return NextResponse.json({ ok: false, error: 'Database unavailable' }, { status: 500 });
+
+    // Security interlock: Only authenticated author (Alazar Wake Kore) can delete
+    const authCheck = await verifyAuthorSession();
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { ok: false, error: authCheck.error },
+        { status: authCheck.status || 403 }
+      );
+    }
 
     await sql`
       DELETE FROM articles WHERE slug = ${slug};
