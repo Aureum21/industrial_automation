@@ -139,7 +139,7 @@ export default function Home() {
             dsl={heroCircuitDsl}
             title="Intake Permissive Interlock (Try toggling LSL-101 Suction)"
             step="INTERACTIVE DEMO"
-            height={440}
+            height={460}
           />
         </div>
       </section>

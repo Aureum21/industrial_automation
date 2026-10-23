@@ -82,8 +82,8 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
   const nodesInitialized = useNodesInitialized();
 
-  const centerView = useCallback((duration = 250) => {
-    void fitView({ padding: 0.2, duration, maxZoom: 1, minZoom: 0.2 });
+  const centerView = useCallback((duration = 200) => {
+    void fitView({ padding: 0.16, duration, maxZoom: 0.95, minZoom: 0.1 });
   }, [fitView]);
 
   const sync = useCallback((scrubTime: number | null = null) => {
@@ -133,8 +133,10 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
       id: block.id,
       type: 'circuit',
       position: block.position,
-      initialWidth: 210,
-      initialHeight: 180,
+      width: 220,
+      height: 190,
+      initialWidth: 220,
+      initialHeight: 190,
       data: {
         blockType: block.type,
         label: block.label,
@@ -164,8 +166,10 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
       setNotice(message);
       setPending(null);
       sync();
-      requestAnimationFrame(() => centerView(200));
-      setTimeout(() => centerView(200), 80);
+      requestAnimationFrame(() => centerView(0));
+      setTimeout(() => centerView(0), 40);
+      setTimeout(() => centerView(150), 120);
+      setTimeout(() => centerView(200), 300);
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
   }, [engine, makeNode, centerView, sync]);
 
@@ -173,19 +177,25 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   loadRef.current = load;
   const loadedCircuitKeyRef = useRef<string | null>(null);
 
-  // Auto-center whenever nodes have been measured by React Flow
+  // Auto-center whenever nodes are initialized or change
   useEffect(() => {
-    if (nodesInitialized && nodes.length > 0) {
+    if (nodes.length > 0) {
       requestAnimationFrame(() => centerView(0));
-      const timer = setTimeout(() => centerView(200), 60);
-      return () => clearTimeout(timer);
+      const t1 = setTimeout(() => centerView(0), 50);
+      const t2 = setTimeout(() => centerView(150), 150);
+      const t3 = setTimeout(() => centerView(200), 350);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
   }, [nodesInitialized, nodes.length, centerView]);
 
   // Auto-center when toggling between fullscreen and minimized
   useEffect(() => {
-    const timer1 = setTimeout(() => centerView(250), 120);
-    const timer2 = setTimeout(() => centerView(150), 320);
+    const timer1 = setTimeout(() => centerView(150), 80);
+    const timer2 = setTimeout(() => centerView(200), 250);
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
@@ -197,13 +207,15 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     const el = flowWrapperRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     let resizeTimer: NodeJS.Timeout;
-    const observer = new ResizeObserver(() => {
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry || entry.contentRect.width === 0 || entry.contentRect.height === 0) return;
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         if (nodes.length > 0) {
-          centerView(200);
+          centerView(150);
         }
-      }, 100);
+      }, 50);
     });
     observer.observe(el);
     return () => {
@@ -377,7 +389,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} connectionLineType={ConnectionLineType.Bezier} onNodesChange={readOnly ? undefined : onNodesChange} onEdgesChange={readOnly ? undefined : onEdgesChange} onConnect={readOnly ? undefined : connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
             setEdges(previous => [...previous, { id: wire.id, source: wire.fromBlockId, sourceHandle: wire.fromPin, target: wire.toBlockId, targetHandle: wire.toPin, type: 'default', style: { stroke: '#9ca3af', strokeWidth: 1.5 } }]); setNotice('Connection added.');
-          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { if (readOnly) return; event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 1, padding: 0.18 }} minZoom={0.15} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }} nodesDraggable={!readOnly} nodesConnectable={!readOnly} elementsSelectable={!readOnly}>
+          })} isValidConnection={connection => engine.validateConnection(toWire({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null }, 'preview')) === null} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }} onDrop={event => { if (readOnly) return; event.preventDefault(); const type = event.dataTransfer.getData('application/fieldnotes-block'); const definition = getBlockDefinition(type); if (definition?.status === 'ready') addBlock(definition.type, screenToFlowPosition({ x: event.clientX, y: event.clientY })); }} deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']} fitView fitViewOptions={{ maxZoom: 0.95, padding: 0.16, minZoom: 0.1 }} minZoom={0.1} maxZoom={2} colorMode="light" proOptions={{ hideAttribution: false }} nodesDraggable={!readOnly} nodesConnectable={!readOnly} elementsSelectable={!readOnly}>
             <Background color="#e5e7eb" gap={24} size={1} variant={BackgroundVariant.Dots} />
             <Controls />
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
@@ -395,10 +407,12 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
         )}
         {mode === 'visual' && !nodes.length && <div className="pointer-events-none absolute inset-0 grid place-items-center z-10"><div className="max-w-xs text-center"><p className="font-mono text-xs tracking-widest text-green-600">YOUR NEXT EXPERIMENT</p><h2 className="mt-4 text-2xl font-semibold">Start with a signal.</h2><p className="mt-3 text-sm leading-6 text-gray-400">Add an input from the component library, connect a block, and press Run.</p></div></div>}
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-gray-200 bg-gray-50/90 px-3 py-2 text-[10px] text-gray-500"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-slate-500'}`} />{running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED'}<span className="ml-4 text-gray-400">100 ms / scan</span></div>
-        <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} timeMs={timeMs} syncKey={syncKey} />
+        {(!readOnly || isFullscreen) && <Oscilloscope engine={engine} onScrub={handleScrub} scrubTime={timeScrub} timeMs={timeMs} syncKey={syncKey} />}
       </div>
     </div>
-    <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-white px-4 py-2 text-[10px]"><p role="status" className={diagnostics.length ? 'text-amber-500 font-semibold' : notice.includes('Invalid DSL') ? 'text-red-500 font-semibold' : 'text-gray-500'}>{diagnostics[0] ?? notice}</p><span className="font-mono text-gray-400">{nodes.length} blocks · {edges.length} wires {!readOnly && <span className="ml-3 hidden sm:inline">Select + Delete · Green: digital · Cyan: analog</span>}</span></div>
+    {!readOnly && (
+      <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-white px-4 py-2 text-[10px]"><p role="status" className={diagnostics.length ? 'text-amber-500 font-semibold' : notice.includes('Invalid DSL') ? 'text-red-500 font-semibold' : 'text-gray-500'}>{diagnostics[0] ?? notice}</p><span className="font-mono text-gray-400">{nodes.length} blocks · {edges.length} wires <span className="ml-3 hidden sm:inline">Select + Delete · Green: digital · Cyan: analog</span></span></div>
+    )}
     <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" aria-label="Import circuit file" onChange={async event => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; try { if (file.size > 2_000_000) throw new Error('Circuit files must be smaller than 2 MB.'); requestLoad(parseCircuitDocument(await file.text()), `Imported ${file.name}.`); } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to read this file.'); } }} />
     {pending && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true" aria-labelledby="replace-title"><div className="max-w-sm rounded-xl border border-green-200 bg-white p-6"><h2 id="replace-title" className="text-lg font-semibold">Replace this circuit?</h2><p className="mt-3 text-sm leading-6 text-gray-500">There are unsaved changes. Save your current circuit or export a copy before replacing it.</p><div className="mt-5 flex flex-wrap gap-2"><button autoFocus className="lab-button" onClick={() => setPending(null)}>Keep editing</button><button className="lab-button" onClick={save}>Save current</button><button className="lab-button primary" onClick={() => load(pending.document, pending.label)}>Replace</button></div></div></div>}
     {showNewDialog && (
