@@ -139,9 +139,9 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
       )}
 
       {/* Simulation Workspace Canvas */}
-      <div className="flex-grow bg-[#0b1118] relative w-full h-full overflow-hidden">
+      <div className="flex-1 min-h-0 bg-[#0b1118] relative w-full overflow-hidden">
         {document ? (
-          <LabWorkspace readOnly document={document} />
+          <LabWorkspace readOnly document={document} isFullscreen={isFullscreen} />
         ) : (
           <div className="flex items-center justify-center h-full text-zinc-500 font-mono text-xs">
             Compiling circuit schematic...

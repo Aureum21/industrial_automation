@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ConnectionLineType, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, useNodesInitialized, ConnectionLineType, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LogicEngine } from '@/lib/LogicEngine';
 import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
@@ -19,10 +19,50 @@ import Oscilloscope from './oscilloscope/Oscilloscope';
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
 
-function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialDocument?: CircuitDocument }) {
+function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boolean; initialDocument?: CircuitDocument; isFullscreen?: boolean }) {
   const [engine] = useState(() => new LogicEngine());
-  const [nodes, setNodes] = useState<CircuitFlowNode[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [nodes, setNodes] = useState<CircuitFlowNode[]>(() => {
+    if (initialDocument) {
+      try {
+        engine.load(initialDocument);
+        return initialDocument.blocks.map(b => ({
+          id: b.id,
+          type: 'circuit',
+          position: b.position,
+          initialWidth: 210,
+          initialHeight: 180,
+          data: {
+            blockType: b.type,
+            label: b.label,
+            tag: b.tag ?? '',
+            params: b.params,
+            inputValue: b.value ?? false,
+            outputs: { ...engine.blocks.get(b.id)?.outputs },
+            onInput: () => {},
+            onTag: () => {},
+            onParam: () => {},
+          },
+        }));
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+  const [edges, setEdges] = useState<Edge[]>(() => {
+    if (initialDocument) {
+      return initialDocument.connections.map(wire => ({
+        id: wire.id,
+        source: wire.fromBlockId,
+        sourceHandle: wire.fromPin,
+        target: wire.toBlockId,
+        targetHandle: wire.toPin,
+        type: 'default',
+        style: { stroke: '#9ca3af', strokeWidth: 1.5 }
+      }));
+    }
+    return [];
+  });
   const [name, setName] = useState('Untitled circuit');
   const [running, setRunning] = useState(false);
   const [timeMs, setTimeMs] = useState(0);
@@ -38,7 +78,13 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   const [syncKey, setSyncKey] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const flowWrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
+  const nodesInitialized = useNodesInitialized();
+
+  const centerView = useCallback((duration = 250) => {
+    void fitView({ padding: 0.2, duration, maxZoom: 1, minZoom: 0.2 });
+  }, [fitView]);
 
   const sync = useCallback((scrubTime: number | null = null) => {
     let getOutputs = (id: string) => engine.blocks.get(id)?.outputs;
@@ -82,7 +128,27 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   const onTag = useCallback((id: string, tag: string) => mutate(() => engine.setTag(id, tag)), [engine, mutate]);
   const onParam = useCallback((id: string, key: string, value: ParameterValue) => mutate(() => engine.setParam(id, key, value)), [engine, mutate]);
 
-  const makeNode = useCallback((block: CircuitBlock): CircuitFlowNode => ({ id: block.id, type: 'circuit', position: block.position, data: { blockType: block.type, label: block.label, tag: block.tag ?? '', params: block.params, inputValue: block.value ?? false, outputs: { ...engine.blocks.get(block.id)?.outputs }, onInput, onTag, onParam } }), [engine, onInput, onTag, onParam]);
+  const makeNode = useCallback(
+    (block: CircuitBlock): CircuitFlowNode => ({
+      id: block.id,
+      type: 'circuit',
+      position: block.position,
+      initialWidth: 210,
+      initialHeight: 180,
+      data: {
+        blockType: block.type,
+        label: block.label,
+        tag: block.tag ?? '',
+        params: block.params,
+        inputValue: block.value ?? false,
+        outputs: { ...engine.blocks.get(block.id)?.outputs },
+        onInput,
+        onTag,
+        onParam,
+      },
+    }),
+    [engine, onInput, onTag, onParam]
+  );
 
   const load = useCallback((document: CircuitDocument, message: string) => {
     try {
@@ -98,13 +164,53 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
       setNotice(message);
       setPending(null);
       sync();
-      requestAnimationFrame(() => { void fitView({ padding: 0.18, duration: 200, maxZoom: 1 }); });
+      requestAnimationFrame(() => centerView(200));
+      setTimeout(() => centerView(200), 80);
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
-  }, [engine, makeNode, fitView, sync]);
+  }, [engine, makeNode, centerView, sync]);
 
   const loadRef = useRef(load);
   loadRef.current = load;
   const loadedCircuitKeyRef = useRef<string | null>(null);
+
+  // Auto-center whenever nodes have been measured by React Flow
+  useEffect(() => {
+    if (nodesInitialized && nodes.length > 0) {
+      requestAnimationFrame(() => centerView(0));
+      const timer = setTimeout(() => centerView(200), 60);
+      return () => clearTimeout(timer);
+    }
+  }, [nodesInitialized, nodes.length, centerView]);
+
+  // Auto-center when toggling between fullscreen and minimized
+  useEffect(() => {
+    const timer1 = setTimeout(() => centerView(250), 120);
+    const timer2 = setTimeout(() => centerView(150), 320);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [isFullscreen, centerView]);
+
+  // Auto-center when container dimensions change (resize observer)
+  useEffect(() => {
+    const el = flowWrapperRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let resizeTimer: NodeJS.Timeout;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (nodes.length > 0) {
+          centerView(200);
+        }
+      }, 100);
+    });
+    observer.observe(el);
+    return () => {
+      clearTimeout(resizeTimer);
+      observer.disconnect();
+    };
+  }, [centerView, nodes.length]);
 
   useEffect(() => {
     if (initialDocument) {
@@ -252,6 +358,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
         <button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button>
         <button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button>
         <button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button>
+        <button className="lab-button" onClick={() => centerView(200)} title="Center circuit in view">⛶ Center</button>
         <span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span>
       </div>
       <div className="flex items-center gap-2">
@@ -261,7 +368,7 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
     </div>
     <div className="relative flex min-h-0 flex-1">
       {!readOnly && libraryOpen && mode === 'visual' && <Sidebar onAdd={addBlock} />}
-      <div className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
+      <div ref={flowWrapperRef} className="relative min-w-0 flex-1 flex flex-col h-full bg-white overflow-hidden">
         {mode === 'visual' ? (
           <ReactFlow<CircuitFlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} connectionLineType={ConnectionLineType.Bezier} onNodesChange={readOnly ? undefined : onNodesChange} onEdgesChange={readOnly ? undefined : onEdgesChange} onConnect={readOnly ? undefined : connection => mutate(() => {
             const wire = toWire(connection, crypto.randomUUID()); engine.addConnection(wire);
@@ -310,4 +417,4 @@ function Workspace({ readOnly, initialDocument }: { readOnly?: boolean; initialD
   </main>;
 }
 
-export default function LabWorkspace({ readOnly, document }: { readOnly?: boolean; document?: CircuitDocument }) { return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} /></ReactFlowProvider>; }
+export default function LabWorkspace({ readOnly, document, isFullscreen }: { readOnly?: boolean; document?: CircuitDocument; isFullscreen?: boolean }) { return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} isFullscreen={isFullscreen} /></ReactFlowProvider>; }

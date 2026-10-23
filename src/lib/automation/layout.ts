@@ -3,11 +3,11 @@ import type { CircuitDocument } from './types.ts';
 
 export function applyLayout(document: CircuitDocument): void {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 200 });
+  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 160 });
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const block of document.blocks) {
-    g.setNode(block.id, { width: 160, height: 100 });
+    g.setNode(block.id, { width: 220, height: 190 });
   }
 
   for (const conn of document.connections) {

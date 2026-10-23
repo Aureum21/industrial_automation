@@ -280,7 +280,7 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
               </button>
             </div>
             <div className="h-[560px] relative w-full overflow-hidden">
-              <LabWorkspace readOnly document={singleLabDoc} />
+              <LabWorkspace readOnly document={singleLabDoc} isFullscreen={isFullscreen} />
             </div>
           </div>
         )}
