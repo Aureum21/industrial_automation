@@ -26,6 +26,12 @@ import {
   Lock,
   LogIn,
   ShieldAlert,
+  Cpu,
+  ArrowUp,
+  ArrowDown,
+  Play,
+  FolderOpen,
+  Check,
 } from 'lucide-react';
 import {
   parseUploadedFileContent,
@@ -43,6 +49,11 @@ import {
 import { checkSessionWithNeon, getCurrentUser, type User as AuthUser } from '@/lib/auth';
 import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
 import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
+import InlineLab from '@/components/lab/InlineLab';
+import { stringifyCircuitDSL, parseCircuitDSL } from '@/lib/automation/dsl';
+import { BLOCK_CATALOG } from '@/lib/automation/catalog';
+import { getExample, EXAMPLES } from '@/lib/automation/examples';
+import { STORAGE_KEY as LAB_STORAGE_KEY } from '@/lib/automation/documents';
 
 const SAMPLE_TEMPLATE_JSON = {
   slug: 'vacuum-degasser-control',
@@ -112,11 +123,11 @@ function WriteContent() {
     slug: '',
     title: '',
     excerpt: '',
-    author: AUTHOR_NAME,
+    author: '',
     date: 'Oct 15',
     readingTime: '15 min read + 20 min labs',
     tag: 'Process Control',
-    views: 14,
+    views: 1,
     sections: [
       {
         type: 'markdown',
@@ -124,6 +135,18 @@ function WriteContent() {
       },
     ],
   });
+
+  // Determines whether the current user can edit the post currently in the editor
+  const isPostEditable = useMemo(() => {
+    if (!currentUser) return false;
+    if (editingPost.slug && CORE_MASTERCLASS_SLUGS.has(editingPost.slug)) {
+      return isAuthor;
+    }
+    return true;
+  }, [currentUser, editingPost.slug, isAuthor]);
+
+  // Tracks which lab sections have their live interactive simulation preview toggled on
+  const [previewingLabs, setPreviewingLabs] = useState<Record<number, boolean>>({});
 
   const [editorRawJson, setEditorRawJson] = useState<string>('');
   const [editorMode, setEditorMode] = useState<'fields' | 'json'>('fields');
@@ -222,7 +245,23 @@ function WriteContent() {
   };
 
   const startNewArticle = () => {
-    const authorName = currentUser?.name || (isAuthor ? AUTHOR_NAME : 'Engineer');
+    const authorName = currentUser?.name || 'Engineer';
+    let defaultDsl = '';
+    try {
+      defaultDsl = stringifyCircuitDSL(getExample('start-stop'));
+    } catch {
+      defaultDsl = `circuit "Stage 1: Permissive Interlock" version 1 {
+  start: INPUT(label="Start Pushbutton", value=false)
+  stop: INPUT(label="Stop Pushbutton", value=true)
+  latch: RS_LATCH(label="Motor Run Latch")
+  motor: OUTPUT(label="Motor Contactor M1")
+
+  start.Q -> latch.S
+  stop.Q -> latch.R
+  latch.Q -> motor.A
+}`;
+    }
+
     const newDoc: ExternalBlogPost = {
       slug: 'schematic-' + Date.now().toString(36),
       title: 'New Industrial Masterclass',
@@ -244,6 +283,13 @@ function WriteContent() {
           variant: 'warning',
           title: 'Engineering Permissive Notice',
           text: 'Hardware safety interlocks must precede software logic triggers.',
+        },
+        {
+          type: 'lab',
+          title: 'Stage 1: Motor Start / Stop Interlock',
+          step: 'Stage 1 of 3',
+          dsl: defaultDsl,
+          height: 480,
         },
       ],
     };
@@ -332,10 +378,32 @@ function WriteContent() {
   };
 
   // Section modifiers for fields mode
-  const updateSectionContent = (index: number, content: string) => {
+  const updateMarkdownSection = (index: number, content: string) => {
     const updated = [...editingPost.sections];
     if (updated[index].type === 'markdown') {
       updated[index] = { ...updated[index], content };
+      setEditingPost({ ...editingPost, sections: updated });
+    }
+  };
+
+  const updateCalloutSection = (
+    index: number,
+    patch: { title?: string; text?: string; variant?: 'info' | 'warning' | 'success' | 'error' }
+  ) => {
+    const updated = [...editingPost.sections];
+    if (updated[index].type === 'callout') {
+      updated[index] = { ...updated[index], ...patch };
+      setEditingPost({ ...editingPost, sections: updated });
+    }
+  };
+
+  const updateLabSection = (
+    index: number,
+    patch: { title?: string; step?: string; dsl?: string; height?: number }
+  ) => {
+    const updated = [...editingPost.sections];
+    if (updated[index].type === 'lab') {
+      updated[index] = { ...updated[index], ...patch };
       setEditingPost({ ...editingPost, sections: updated });
     }
   };
@@ -345,15 +413,104 @@ function WriteContent() {
     setEditingPost({ ...editingPost, sections: updated });
   };
 
+  const moveSection = (index: number, direction: 'up' | 'down') => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= editingPost.sections.length) return;
+    const updated = [...editingPost.sections];
+    const temp = updated[index];
+    updated[index] = updated[target];
+    updated[target] = temp;
+    setEditingPost({ ...editingPost, sections: updated });
+  };
+
   const addMarkdownSection = () => {
-    const updated = [
+    const updated: ExternalSection[] = [
       ...editingPost.sections,
       {
-        type: 'markdown' as const,
-        content: '### New Section\n\nAdd technical documentation or field analysis here.',
+        type: 'markdown',
+        content: '### New Section Heading\n\nExplain your operational control concepts, ladder rungs, or sensor topologies here.',
       },
     ];
     setEditingPost({ ...editingPost, sections: updated });
+  };
+
+  const addCalloutSection = () => {
+    const updated: ExternalSection[] = [
+      ...editingPost.sections,
+      {
+        type: 'callout',
+        variant: 'warning',
+        title: 'Safety Interlock Permissive',
+        text: 'All emergency stop conditions and hardware relays must be verified before proceeding.',
+      },
+    ];
+    setEditingPost({ ...editingPost, sections: updated });
+  };
+
+  const addLabSection = (presetId = 'start-stop') => {
+    let dsl = '';
+    let labTitle = 'Control Interlock';
+    try {
+      dsl = stringifyCircuitDSL(getExample(presetId));
+      labTitle = getExample(presetId).name;
+    } catch {
+      dsl = `circuit "Stage 1: Permissive Interlock" version 1 {
+  start: INPUT(label="Start Pushbutton", value=false)
+  stop: INPUT(label="Stop Pushbutton", value=true)
+  latch: RS_LATCH(label="Motor Run Latch")
+  motor: OUTPUT(label="Motor Contactor M1")
+
+  start.Q -> latch.S
+  stop.Q -> latch.R
+  latch.Q -> motor.A
+}`;
+    }
+
+    const labCount = editingPost.sections.filter((s) => s.type === 'lab').length + 1;
+    const updated: ExternalSection[] = [
+      ...editingPost.sections,
+      {
+        type: 'lab',
+        title: `Stage ${labCount}: ${labTitle}`,
+        step: `Stage ${labCount} of ${Math.max(3, labCount)}`,
+        dsl,
+        height: 480,
+      },
+    ];
+    setEditingPost({ ...editingPost, sections: updated });
+  };
+
+  const importActiveCircuitFromLab = (index: number) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(LAB_STORAGE_KEY);
+      if (!raw) {
+        alert('No active circuit found in your Visual Lab workspace. Open /lab to design or wire a circuit, then return here to import it!');
+        return;
+      }
+      const doc = JSON.parse(raw);
+      const dsl = stringifyCircuitDSL(doc);
+      updateLabSection(index, { dsl, title: doc.name || 'Imported Lab Circuit' });
+      alert(`Successfully imported "${doc.name || 'Visual Circuit'}" from your Logic Lab workspace!`);
+    } catch (err) {
+      alert('Failed to parse circuit from Logic Lab: ' + (err as Error).message);
+    }
+  };
+
+  const handleCircuitFileUpload = (index: number, file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = (e.target?.result as string) || '';
+        const doc = JSON.parse(content);
+        const dsl = stringifyCircuitDSL(doc);
+        updateLabSection(index, { dsl, title: doc.name || 'Uploaded Circuit' });
+        alert(`Loaded "${doc.name || file.name}" into this lab!`);
+      } catch (err) {
+        alert('Invalid circuit JSON file: ' + (err as Error).message);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Upload Tab Handlers
@@ -738,14 +895,16 @@ function WriteContent() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleRevertCustom(editingPost.slug)}
-                  className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] font-mono text-xs transition shadow-xs"
-                  title="Revert custom changes to default baseline"
-                >
-                  Revert to Default
-                </button>
+                {isAuthor && CORE_MASTERCLASS_SLUGS.has(editingPost.slug) && (
+                  <button
+                    type="button"
+                    onClick={() => handleRevertCustom(editingPost.slug)}
+                    className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] font-mono text-xs transition shadow-xs"
+                    title="Revert custom changes to default baseline"
+                  >
+                    Revert to Default
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleExportPost(editingPost)}
@@ -787,14 +946,14 @@ function WriteContent() {
               <div className="space-y-3">
                 <div className="text-xs font-mono text-[#86868b] flex justify-between">
                   <span>Structured Article Schema (JSON):</span>
-                  <span>Press Save above to commit updates</span>
+                  <span>{isPostEditable ? 'Press Save above to commit updates' : 'Read-Only Core Article Schema'}</span>
                 </div>
                 <textarea
                   value={editorRawJson}
-                  readOnly={!isAuthor}
+                  readOnly={!isPostEditable}
                   onChange={(e) => setEditorRawJson(e.target.value)}
                   className={`w-full h-[600px] font-mono text-xs p-4 rounded-2xl bg-[#1d1d1f] border border-zinc-700 text-emerald-300 outline-none leading-relaxed shadow-inner ${
-                    isAuthor ? 'focus:border-[#0071e3]' : 'opacity-90 cursor-default'
+                    isPostEditable ? 'focus:border-[#0071e3]' : 'opacity-90 cursor-default'
                   }`}
                 />
               </div>
@@ -804,7 +963,7 @@ function WriteContent() {
                 {/* Metadata Fields Card */}
                 <div className="p-6 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4">
                   <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
-                    Publication Metadata {!isAuthor && '(Locked: Read-Only)'}
+                    Publication Metadata {!isPostEditable && '(Locked: Core Masterclass authored by Alazar Wake Kore)'}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -813,11 +972,12 @@ function WriteContent() {
                       <input
                         type="text"
                         value={editingPost.title}
-                        readOnly={!isAuthor}
+                        readOnly={!isPostEditable}
                         onChange={(e) => setEditingPost({ ...editingPost, title: e.target.value })}
-                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm outline-none ${
-                          isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
+                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm outline-none transition ${
+                          isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                         }`}
+                        placeholder="e.g. Dual-Pump Sequencing & Cavitation Trip Automation"
                       />
                     </div>
 
@@ -826,24 +986,26 @@ function WriteContent() {
                       <input
                         type="text"
                         value={editingPost.slug}
-                        readOnly={!isAuthor}
+                        readOnly={!isPostEditable}
                         onChange={(e) => setEditingPost({ ...editingPost, slug: e.target.value })}
-                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#0071e3] font-mono text-sm outline-none ${
-                          isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
+                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#0071e3] font-mono text-sm outline-none transition ${
+                          isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                         }`}
+                        placeholder="e.g. dual-pump-sequencing"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono text-[#86868b] mb-1">Author</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Author Name / Credentials</label>
                       <input
                         type="text"
                         value={editingPost.author}
-                        readOnly={!isAuthor}
+                        readOnly={!isPostEditable}
                         onChange={(e) => setEditingPost({ ...editingPost, author: e.target.value })}
-                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-sm outline-none ${
-                          isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
+                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-sm outline-none transition ${
+                          isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                         }`}
+                        placeholder="Your Name and Engineering Specialization"
                       />
                     </div>
 
@@ -852,98 +1014,368 @@ function WriteContent() {
                       <input
                         type="text"
                         value={editingPost.tag}
-                        readOnly={!isAuthor}
+                        readOnly={!isPostEditable}
                         onChange={(e) => setEditingPost({ ...editingPost, tag: e.target.value })}
-                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] text-sm outline-none ${
-                          isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
+                        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] text-sm outline-none transition ${
+                          isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                         }`}
+                        placeholder="e.g. Process Control, Safety / ESD, Renewables"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-[#86868b] mb-1">Excerpt / Summary</label>
+                    <label className="block text-xs font-mono text-[#86868b] mb-1">Excerpt / Technical Summary</label>
                     <textarea
                       rows={3}
                       value={editingPost.excerpt}
-                      readOnly={!isAuthor}
+                      readOnly={!isPostEditable}
                       onChange={(e) => setEditingPost({ ...editingPost, excerpt: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#424245] text-xs sm:text-sm outline-none leading-relaxed ${
-                        isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
+                      className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#424245] text-xs sm:text-sm outline-none leading-relaxed transition ${
+                        isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                       }`}
+                      placeholder="A comprehensive technical breakdown of industrial automation logic, permissive conditions, and fail-safes."
                     />
                   </div>
                 </div>
 
                 {/* Sections Editor */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
-                      Article Sections &amp; Markdown Prose ({editingPost.sections.length})
-                    </h3>
-                    {isAuthor && (
-                      <button
-                        type="button"
-                        onClick={addMarkdownSection}
-                        className="inline-flex items-center gap-1 text-xs font-mono text-[#0071e3] hover:underline"
-                      >
-                        <PlusCircle size={14} />
-                        <span>Add Text Section</span>
-                      </button>
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <div>
+                      <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
+                        Article Sections ({editingPost.sections.length})
+                      </h3>
+                      <p className="text-[11px] text-[#86868b] mt-0.5">
+                        Build your masterclass by interleaving markdown prose, warning callouts, and interactive circuits.
+                      </p>
+                    </div>
+
+                    {isPostEditable && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={addMarkdownSection}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] shadow-xs transition"
+                          title="Add Markdown Prose"
+                        >
+                          <PlusCircle size={13} className="text-[#0071e3]" />
+                          <span>+ Text Section</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => addLabSection('start-stop')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-xs font-mono text-emerald-800 shadow-xs transition font-semibold"
+                          title="Add Interactive Logic Lab"
+                        >
+                          <Cpu size={13} className="text-emerald-600" />
+                          <span>+ Interactive Lab</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={addCalloutSection}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-xs font-mono text-amber-800 shadow-xs transition"
+                          title="Add Engineering Notice / Callout"
+                        >
+                          <AlertTriangle size={13} className="text-amber-600" />
+                          <span>+ Warning Callout</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {editingPost.sections.map((section, idx) => (
                     <div
                       key={idx}
-                      className="p-5 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-2.5"
+                      className="p-5 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4"
                     >
-                      <div className="flex items-center justify-between text-xs font-mono text-[#86868b]">
-                        <span className="font-bold text-[#1d1d1f]">
-                          SECTION {idx + 1} // TYPE: {section.type.toUpperCase()}
-                        </span>
-                        {isAuthor && section.type === 'markdown' && (
-                          <button
-                            type="button"
-                            onClick={() => removeSection(idx)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                            title="Remove section"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                      {/* Section Card Header */}
+                      <div className="flex items-center justify-between text-xs font-mono text-[#86868b] pb-2 border-b border-[#e5e5ea]">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] flex items-center justify-center text-[10px] font-bold">
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-[#1d1d1f] uppercase tracking-wider">
+                            {section.type === 'lab' ? '⚡ INTERACTIVE LOGIC LAB' : section.type === 'callout' ? '⚠️ SAFETY / PERMISSIVE CALLOUT' : '📝 MARKDOWN PROSE'}
+                          </span>
+                        </div>
+
+                        {isPostEditable && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => moveSection(idx, 'up')}
+                              className="p-1 rounded-lg hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] disabled:opacity-30 disabled:hover:bg-transparent"
+                              title="Move section up"
+                            >
+                              <ArrowUp size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === editingPost.sections.length - 1}
+                              onClick={() => moveSection(idx, 'down')}
+                              className="p-1 rounded-lg hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] disabled:opacity-30 disabled:hover:bg-transparent"
+                              title="Move section down"
+                            >
+                              <ArrowDown size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeSection(idx)}
+                              className="p-1 rounded-lg hover:bg-red-50 text-[#86868b] hover:text-red-600 ml-1 transition"
+                              title="Remove section"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         )}
                       </div>
 
-                      {section.type === 'markdown' ? (
-                        <textarea
-                          rows={6}
-                          value={section.content}
-                          readOnly={!isAuthor}
-                          onChange={(e) => updateSectionContent(idx, e.target.value)}
-                          className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-xs outline-none leading-relaxed ${
-                            isAuthor ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default'
-                          }`}
-                        />
-                      ) : section.type === 'callout' ? (
-                        <div className="p-3.5 bg-amber-50/80 rounded-xl text-xs space-y-1 border border-amber-200">
-                          <strong className="text-amber-800 block font-mono">{section.title}</strong>
-                          <p className="text-amber-900">{section.text}</p>
+                      {/* MARKDOWN SECTION */}
+                      {section.type === 'markdown' && (
+                        <div className="space-y-1.5">
+                          <textarea
+                            rows={6}
+                            value={section.content}
+                            readOnly={!isPostEditable}
+                            onChange={(e) => updateMarkdownSection(idx, e.target.value)}
+                            className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-xs outline-none leading-relaxed transition ${
+                              isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
+                            }`}
+                            placeholder="Write your technical explanation, incident details, or schematics narrative using Markdown..."
+                          />
                         </div>
-                      ) : section.type === 'lab' ? (
-                        <div className="p-3.5 bg-[#f5f5f7] rounded-xl text-xs space-y-2 border border-[#e5e5ea]">
-                          <div className="flex items-center justify-between font-mono text-emerald-700">
-                            <strong>⚡ InlineLab: {section.title}</strong>
-                            <span>{section.step}</span>
+                      )}
+
+                      {/* CALLOUT SECTION */}
+                      {section.type === 'callout' && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-mono text-[#86868b] mb-1">Callout Title</label>
+                              <input
+                                type="text"
+                                value={section.title || ''}
+                                readOnly={!isPostEditable}
+                                onChange={(e) => updateCalloutSection(idx, { title: e.target.value })}
+                                className="w-full px-3 py-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] outline-none"
+                                placeholder="e.g. Critical Safety Permissive"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-mono text-[#86868b] mb-1">Variant Type</label>
+                              <select
+                                value={section.variant || 'warning'}
+                                disabled={!isPostEditable}
+                                onChange={(e) => updateCalloutSection(idx, { variant: e.target.value as any })}
+                                className="w-full px-3 py-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] outline-none"
+                              >
+                                <option value="warning">Warning (Amber)</option>
+                                <option value="info">Info (Blue)</option>
+                                <option value="success">Success (Green)</option>
+                                <option value="error">Danger (Red)</option>
+                              </select>
+                            </div>
                           </div>
-                          <pre className="text-[10px] text-emerald-400 font-mono bg-[#1d1d1f] p-3 rounded-lg overflow-x-auto max-h-32">
-                            {section.dsl}
-                          </pre>
+                          <div>
+                            <label className="block text-[11px] font-mono text-[#86868b] mb-1">Notice Body</label>
+                            <textarea
+                              rows={2}
+                              value={section.text}
+                              readOnly={!isPostEditable}
+                              onChange={(e) => updateCalloutSection(idx, { text: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs text-[#1d1d1f] outline-none"
+                              placeholder="Detail the permissive condition or physical interlock requirement..."
+                            />
+                          </div>
                         </div>
-                      ) : section.type === 'image' ? (
-                        <div className="text-xs font-mono text-[#86868b]">
-                          <span>[SVG Technical Blueprint Vector Embedded]</span>
+                      )}
+
+                      {/* INTERACTIVE LAB SECTION */}
+                      {section.type === 'lab' && (
+                        <div className="space-y-4">
+                          {/* Lab Parameters Row */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-mono text-[#86868b] mb-1">Lab Title</label>
+                              <input
+                                type="text"
+                                value={section.title}
+                                readOnly={!isPostEditable}
+                                onChange={(e) => updateLabSection(idx, { title: e.target.value })}
+                                className="w-full px-3 py-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] outline-none"
+                                placeholder="e.g. Stage 1: Dual-Ejector Motive Permissive"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-mono text-[#86868b] mb-1">Stage Badge</label>
+                              <input
+                                type="text"
+                                value={section.step || ''}
+                                readOnly={!isPostEditable}
+                                onChange={(e) => updateLabSection(idx, { step: e.target.value })}
+                                className="w-full px-3 py-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] outline-none"
+                                placeholder="e.g. Stage 1 of 3"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Lab Control & Import Toolbar */}
+                          {isPostEditable && (
+                            <div className="p-3 bg-[#fbfbfd] rounded-xl border border-[#e5e5ea] flex flex-wrap items-center justify-between gap-2.5">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingLabs(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition shadow-xs ${
+                                    previewingLabs[idx]
+                                      ? 'bg-[#1d1d1f] text-white'
+                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                  }`}
+                                >
+                                  <Play size={12} />
+                                  <span>{previewingLabs[idx] ? 'Return to Code Editor' : 'Test Live Circuit ⚡'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => importActiveCircuitFromLab(idx)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] transition shadow-xs"
+                                  title="Import the active visual circuit currently wired in your Logic Lab workspace"
+                                >
+                                  <Download size={12} className="text-[#0071e3]" />
+                                  <span>Import from Visual Lab</span>
+                                </button>
+
+                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] cursor-pointer transition shadow-xs">
+                                  <FolderOpen size={12} />
+                                  <span>Upload .json</span>
+                                  <input
+                                    type="file"
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleCircuitFileUpload(idx, file);
+                                    }}
+                                  />
+                                </label>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-mono text-[#86868b]">Presets:</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLabSection(idx, { dsl: stringifyCircuitDSL(getExample('start-stop')), title: 'Motor Start/Stop Interlock' })}
+                                    className="px-2 py-1 rounded bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[10px] font-mono text-[#1d1d1f]"
+                                  >
+                                    Latch
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLabSection(idx, { dsl: stringifyCircuitDSL(getExample('and')), title: 'Two-Input Safety AND' })}
+                                    className="px-2 py-1 rounded bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[10px] font-mono text-[#1d1d1f]"
+                                  >
+                                    AND Gate
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLabSection(idx, { dsl: stringifyCircuitDSL(getExample('analog')), title: 'Analog Sensor Scaling' })}
+                                    className="px-2 py-1 rounded bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[10px] font-mono text-[#1d1d1f]"
+                                  >
+                                    Analog Scale
+                                  </button>
+                                </div>
+                                <a
+                                  href="/lab"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] font-mono text-[#0071e3] hover:underline flex items-center gap-0.5 ml-2"
+                                  title="Open Visual Logic Lab in another tab to draw circuit visually"
+                                >
+                                  Open /lab ↗
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Card Body: Live Simulation Preview vs DSL Code Editor */}
+                          {previewingLabs[idx] ? (
+                            <div className="rounded-2xl overflow-hidden border border-[#e5e5ea] shadow-sm bg-white">
+                              <div className="p-3 bg-[#f5f5f7] border-b border-[#e5e5ea] flex items-center justify-between text-xs font-mono text-emerald-800">
+                                <span>⚡ LIVE INLINE SIMULATION TEST RUNNER</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingLabs(prev => ({ ...prev, [idx]: false }))}
+                                  className="text-xs text-[#0071e3] hover:underline"
+                                >
+                                  Close Preview &amp; Edit Code
+                                </button>
+                              </div>
+                              <InlineLab
+                                dsl={section.dsl}
+                                title={section.title}
+                                step={section.step}
+                                height={section.height || 460}
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <textarea
+                                rows={8}
+                                value={section.dsl}
+                                readOnly={!isPostEditable}
+                                onChange={(e) => updateLabSection(idx, { dsl: e.target.value })}
+                                className={`w-full p-4 rounded-xl font-mono text-xs text-emerald-300 bg-[#1d1d1f] border border-zinc-700 outline-none leading-relaxed shadow-inner ${
+                                  isPostEditable ? 'focus:border-[#0071e3]' : 'opacity-90 cursor-default'
+                                }`}
+                                placeholder="circuit &quot;Stage Name&quot; version 1 { ... }"
+                              />
+
+                              {/* DSL Live Syntax Feedback Badge */}
+                              <div className="flex items-center justify-between text-[11px] font-mono">
+                                {(() => {
+                                  try {
+                                    const doc = parseCircuitDSL(section.dsl, BLOCK_CATALOG);
+                                    return (
+                                      <span className="text-emerald-700 flex items-center gap-1.5 font-semibold">
+                                        <CheckCircle size={13} />
+                                        <span>DSL Valid: {doc.blocks.length} blocks · {doc.connections.length} wires connected</span>
+                                      </span>
+                                    );
+                                  } catch (err) {
+                                    return (
+                                      <span className="text-amber-700 flex items-center gap-1.5">
+                                        <AlertTriangle size={13} />
+                                        <span>Syntax Notice: {(err as Error).message}</span>
+                                      </span>
+                                    );
+                                  }
+                                })()}
+
+                                <span className="text-[#86868b]">
+                                  Tip: Wire visually in <Link href="/lab" target="_blank" className="text-[#0071e3] underline">/lab</Link> and click &quot;Import from Visual Lab&quot;
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ) : null}
+                      )}
+
+                      {/* IMAGE SECTION */}
+                      {section.type === 'image' && (
+                        <div className="p-4 bg-[#f5f5f7] rounded-xl text-xs font-mono text-[#86868b] space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span>Technical Schematic Vector Asset:</span>
+                            <span className="text-[#1d1d1f]">{section.src}</span>
+                          </div>
+                          {section.caption && <p className="italic text-[#515154]">{section.caption}</p>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
