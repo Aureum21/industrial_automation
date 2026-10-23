@@ -9,7 +9,7 @@ import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import { getCurrentUser, type User } from '@/lib/auth';
 import type { BlogPost } from '@/lib/mockPosts';
-import { getPostBySlug } from '@/lib/blogStorage';
+import { getPostBySlug, isAuthorUser } from '@/lib/blogStorage';
 
 interface PostClientViewProps {
   slug: string;
@@ -185,8 +185,8 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
       </div>
 
       <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-10 sm:mt-14">
-        {/* Author Station Banner (If logged in as Alazar) */}
-        {user && (user.name === post.author || user.name.toLowerCase().includes('alazar')) && (
+        {/* Author Station Banner (Only when logged in as Alazar) */}
+        {user && isAuthorUser(user) && (
           <div className="mb-8 p-4 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
             <div className="flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />

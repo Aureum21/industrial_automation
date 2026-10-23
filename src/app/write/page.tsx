@@ -96,6 +96,7 @@ function WriteContent() {
   const editSlugParam = searchParams.get('edit');
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const isAuthor = useMemo(() => isAuthorUser(currentUser), [currentUser]);
   const [activeTab, setActiveTab] = useState<'publications' | 'editor' | 'upload'>('publications');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,14 +135,23 @@ function WriteContent() {
   // Load initial publications and auth
   useEffect(() => {
     // 1. Initial cached user state
-    setCurrentUser(getCurrentUser());
+    const local = getCurrentUser();
+    if (local) {
+      setCurrentUser(local);
+    }
 
     // 2. Validate live server session against Neon PostgreSQL
-    checkSessionWithNeon().then((serverUser) => {
-      if (serverUser) {
-        setCurrentUser(serverUser);
-      }
-    });
+    checkSessionWithNeon()
+      .then((serverUser) => {
+        if (serverUser) {
+          setCurrentUser(serverUser);
+        } else if (!local) {
+          setCurrentUser(null);
+        }
+      })
+      .finally(() => {
+        setIsAuthChecking(false);
+      });
 
     const posts = getEditablePosts();
     setPublications(posts);
@@ -342,10 +352,6 @@ function WriteContent() {
 
   const handlePublishUploaded = () => {
     if (!parsedPost) return;
-    if (!isAuthor && (CORE_MASTERCLASS_SLUGS.has(parsedPost.slug) || (parsedPost.author && parsedPost.author.toLowerCase().includes('alazar')))) {
-      alert('Access Restricted: The 10 core masterclasses are protected and can only be published by author Alazar Wake Kore. Please sign in as Alazar to publish.');
-      return;
-    }
     const postWithAuthor: ExternalBlogPost = {
       ...parsedPost,
       author: AUTHOR_NAME,
@@ -361,23 +367,77 @@ function WriteContent() {
     setSaveSuccessNotice(`Imported and published "${postWithAuthor.title}" successfully.`);
   };
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#fbfbfd] flex flex-col items-center justify-center text-[#1d1d1f] font-sans px-4">
+        <div className="w-8 h-8 rounded-full border-2 border-[#e5e5ea] border-t-[#0071e3] animate-spin mb-4" />
+        <p className="text-xs font-mono text-[#86868b] tracking-wider uppercase">
+          Verifying author security credentials...
+        </p>
+      </div>
+    );
+  }
+
+  // Security interlock: Non-authors CANNOT access the studio, see JSON, or inspect editors
+  if (!isAuthor) {
+    const redirectUrl = editSlugParam ? `/write?edit=${encodeURIComponent(editSlugParam)}` : '/write';
+    return (
+      <main className="min-h-[calc(100vh-64px)] bg-[#fbfbfd] flex flex-col justify-center items-center px-4 py-16 font-sans antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
+        <div className="max-w-md w-full bg-white border border-[#e5e5ea] rounded-3xl p-8 sm:p-10 shadow-sm text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center mx-auto mb-6 text-[#1d1d1f] shadow-2xs">
+            <Lock size={28} className="text-[#0071e3]" />
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[11px] font-mono text-[#86868b] uppercase tracking-wider mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span>Author Studio // Restricted Access</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-3">
+            Author Access Required
+          </h1>
+
+          <p className="text-sm text-[#515154] leading-relaxed mb-6">
+            The Authoring Studio, JSON schematics, and article editors are strictly reserved for the author, <strong className="text-[#1d1d1f]">Alazar Wake Kore</strong>.
+          </p>
+
+          {currentUser && (
+            <div className="p-3 mb-6 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-xs text-[#86868b]">
+              Signed in as <span className="font-semibold text-[#1d1d1f]">{currentUser.name}</span> ({currentUser.email || 'guest'}). This account does not have authoring privileges.
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <Link
+              href={`/signin?redirect=${encodeURIComponent(redirectUrl)}`}
+              className="w-full py-3 px-5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all"
+            >
+              <LogIn size={15} />
+              <span>{currentUser ? 'Switch Account to Alazar' : 'Sign In as Alazar'}</span>
+            </Link>
+
+            <Link
+              href="/blogs"
+              className="w-full py-3 px-5 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm flex items-center justify-center gap-2 transition"
+            >
+              <span>Browse Public Masterclasses ↗</span>
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="bg-[#fbfbfd] min-h-screen text-[#1d1d1f] pb-32 font-sans selection:bg-[#0071e3]/20 selection:text-[#0071e3]">
       {/* Top Header / Mode Switcher */}
       <div className="border-b border-[#e5e5ea] bg-white/80 backdrop-blur-xl py-4 px-6 sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            {isAuthor ? (
-              <span className="font-mono text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
-                <span>AUTHOR STATION // {currentUser?.name || 'ALAZAR WAKE KORE'}</span>
-              </span>
-            ) : (
-              <span className="font-mono text-xs font-medium text-[#86868b] bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-                <Lock size={12} className="text-amber-600" />
-                <span>READ-ONLY STUDIO // GUEST MODE</span>
-              </span>
-            )}
+            <span className="font-mono text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
+              <span>AUTHOR STATION // {currentUser?.name || 'ALAZAR WAKE KORE'}</span>
+            </span>
 
             {/* Navigation Tabs */}
             <div className="flex bg-[#f5f5f7] p-1 rounded-xl border border-[#e5e5ea]">
@@ -418,24 +478,14 @@ function WriteContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            {isAuthor ? (
-              <button
-                type="button"
-                onClick={startNewArticle}
-                className="text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
-              >
-                <PlusCircle size={14} />
-                <span>New Masterclass</span>
-              </button>
-            ) : (
-              <Link
-                href="/signin?redirect=/write"
-                className="text-xs font-mono font-medium text-white bg-[#1d1d1f] hover:bg-black px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
-              >
-                <LogIn size={13} />
-                <span>Sign In as Alazar</span>
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={startNewArticle}
+              className="text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
+            >
+              <PlusCircle size={14} />
+              <span>New Masterclass</span>
+            </button>
             <Link
               href="/blogs"
               className="text-xs font-mono text-[#1d1d1f] hover:bg-[#f5f5f7] border border-[#e5e5ea] bg-white px-3 py-1.5 rounded-xl transition shadow-xs"
@@ -447,32 +497,6 @@ function WriteContent() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        {/* Author Security Notice Banner if not logged in as Alazar */}
-        {!isAuthor && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0">
-                <Lock size={16} />
-              </span>
-              <div>
-                <div className="text-xs font-bold text-amber-900 font-mono uppercase tracking-wider">
-                  AUTHOR AUTHENTICATION REQUIRED
-                </div>
-                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                  The 10 industrial masterclasses are locked and can only be modified by primary author <strong>Alazar Wake Kore</strong>. You can inspect schematics in read-only mode, or sign in to edit.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/signin?redirect=/write"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-xs font-semibold shrink-0 shadow-xs transition"
-            >
-              <LogIn size={13} />
-              <span>Sign In as Alazar</span>
-            </Link>
-          </div>
-        )}
-
         {/* Success Alert Banner */}
         {saveSuccessNotice && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-800 text-xs sm:text-sm font-mono shadow-xs animate-in fade-in">
@@ -550,36 +574,14 @@ function WriteContent() {
                     </span>
 
                     <div className="flex items-center gap-2">
-                      {isAuthor ? (
-                        <button
-                          type="button"
-                          onClick={() => startEditing(post)}
-                          className="inline-flex items-center gap-1 text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3 py-1.5 rounded-lg transition shadow-xs"
-                        >
-                          <Edit size={12} />
-                          <span>Edit</span>
-                        </button>
-                      ) : (
-                        <>
-                          <Link
-                            href={`/signin?redirect=/write?edit=${post.slug}`}
-                            className="inline-flex items-center gap-1 text-xs font-mono font-medium text-[#86868b] hover:text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e5e5ea] border border-[#e5e5ea] px-2.5 py-1.5 rounded-lg transition"
-                            title="Sign in as Alazar to edit this masterclass"
-                          >
-                            <Lock size={11} className="text-amber-600" />
-                            <span>Locked</span>
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => startEditing(post)}
-                            className="inline-flex items-center gap-1 text-xs font-mono text-[#515154] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] border border-[#e5e5ea] px-2.5 py-1.5 rounded-lg transition"
-                            title="Inspect schematic in read-only mode"
-                          >
-                            <Eye size={12} />
-                            <span>Inspect</span>
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => startEditing(post)}
+                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3 py-1.5 rounded-lg transition shadow-xs"
+                      >
+                        <Edit size={12} />
+                        <span>Edit</span>
+                      </button>
 
                       <Link
                         href={`/post/${post.slug}`}
@@ -667,13 +669,8 @@ function WriteContent() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={!isAuthor}
                   onClick={() => handleRevertCustom(editingPost.slug)}
-                  className={`px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] font-mono text-xs transition shadow-xs ${
-                    isAuthor
-                      ? 'bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f]'
-                      : 'bg-[#f5f5f7] text-[#86868b] opacity-40 cursor-not-allowed'
-                  }`}
+                  className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] font-mono text-xs transition shadow-xs"
                   title="Revert custom changes to default baseline"
                 >
                   Revert to Default
@@ -686,47 +683,16 @@ function WriteContent() {
                   <Download size={13} />
                   <span>Export JSON</span>
                 </button>
-                {isAuthor ? (
-                  <button
-                    type="button"
-                    onClick={handleSavePost}
-                    className="px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Save size={13} />
-                    <span>Save &amp; Update Live Article</span>
-                  </button>
-                ) : (
-                  <Link
-                    href={`/signin?redirect=/write?edit=${editingPost.slug}`}
-                    className="px-4 py-1.5 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs"
-                    title="Sign in as Alazar to save edits"
-                  >
-                    <Lock size={13} />
-                    <span>Sign in as Alazar to Save</span>
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  onClick={handleSavePost}
+                  className="px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <Save size={13} />
+                  <span>Save &amp; Update Live Article</span>
+                </button>
               </div>
             </div>
-
-            {/* Read-Only Notice Banner in Editor if not logged in as Alazar */}
-            {!isAuthor && (
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-amber-900 shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <span className="p-1.5 rounded-lg bg-amber-100 text-amber-800 shrink-0">
-                    <Lock size={15} />
-                  </span>
-                  <div>
-                    <strong>READ-ONLY INSPECTION MODE:</strong> This masterclass is authored by Alazar Wake Kore. Saving edits or publishing modifications requires author authentication.
-                  </div>
-                </div>
-                <Link
-                  href={`/signin?redirect=/write?edit=${editingPost.slug}`}
-                  className="px-4 py-1.5 rounded-full bg-[#1d1d1f] hover:bg-black text-white font-sans font-semibold text-xs shrink-0 transition"
-                >
-                  Sign In to Enable Editing
-                </Link>
-              </div>
-            )}
 
             {/* LIVE PREVIEW MODE */}
             {isPreviewMode ? (

@@ -293,10 +293,10 @@ export default function Home() {
                 <ExternalLink size={13} />
               </a>
               <Link
-                href="/write"
+                href="/blogs"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-[#e5e5ea] border border-[#d2d2d7] text-[#1d1d1f] text-xs font-medium transition shadow-2xs"
               >
-                <span>Open Author Studio</span>
+                <span>Read Masterclasses</span>
                 <ArrowRight size={13} />
               </Link>
             </div>

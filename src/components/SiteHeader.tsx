@@ -5,12 +5,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Edit, LogOut, Cpu, Compass, BookOpen, Layers } from 'lucide-react';
 import { getCurrentUser, clearCurrentUser, AUTH_CHANGE_EVENT, type User } from '@/lib/auth';
+import { isAuthorUser } from '@/lib/blogStorage';
 
 export default function SiteHeader() {
   const [user, setUser] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
+    setMounted(true);
     setUser(getCurrentUser());
 
     const handleAuthChange = (e: Event) => {
@@ -31,11 +34,13 @@ export default function SiteHeader() {
     setUser(null);
   };
 
+  const isAuthor = mounted && isAuthorUser(user);
+
   const navLinks = [
     { href: '/blogs', label: 'Masterclasses' },
     { href: '/lab', label: 'Logic Lab' },
     { href: '/library', label: 'Catalog' },
-    { href: '/write', label: 'Author Studio' },
+    ...(isAuthor ? [{ href: '/write', label: 'Author Studio' }] : []),
   ];
 
   return (
