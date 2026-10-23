@@ -86,6 +86,14 @@ export async function initDb() {
       );
     `;
 
+    // Ensure author_id and author_email exist in articles table for multi-author isolation
+    await sql`
+      ALTER TABLE articles ADD COLUMN IF NOT EXISTS author_id VARCHAR(64);
+    `;
+    await sql`
+      ALTER TABLE articles ADD COLUMN IF NOT EXISTS author_email VARCHAR(255);
+    `;
+
     // 4. Create Article Views Table for Real Live Read Counts
     await sql`
       CREATE TABLE IF NOT EXISTS article_views (

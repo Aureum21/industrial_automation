@@ -11,6 +11,8 @@ export interface BlogPost {
   excerpt: string;
   author: string;
   authorUrl?: string;
+  authorId?: string;
+  authorEmail?: string;
   date: string;
   readingTime: string;
   tag: string;

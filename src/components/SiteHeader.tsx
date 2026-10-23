@@ -34,13 +34,14 @@ export default function SiteHeader() {
     setUser(null);
   };
 
-  const isAuthor = mounted && isAuthorUser(user);
+  const hasUser = mounted && Boolean(user);
+  const isLead = mounted && isAuthorUser(user);
 
   const navLinks = [
     { href: '/blogs', label: 'Masterclasses' },
     { href: '/lab', label: 'Logic Lab' },
     { href: '/library', label: 'Catalog' },
-    ...(isAuthor ? [{ href: '/write', label: 'Author Studio' }] : []),
+    ...(hasUser ? [{ href: '/write', label: isLead ? 'Author Studio' : 'Studio' }] : []),
   ];
 
   return (

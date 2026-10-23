@@ -36,11 +36,13 @@ import {
   renderSectionsToReact,
   CORE_MASTERCLASS_SLUGS,
   isAuthorUser,
+  canEditPost,
   type ExternalBlogPost,
   type ExternalSection,
 } from '@/lib/blogStorage';
 import { checkSessionWithNeon, getCurrentUser, type User as AuthUser } from '@/lib/auth';
 import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
+import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 
 const SAMPLE_TEMPLATE_JSON = {
   slug: 'vacuum-degasser-control',
@@ -132,29 +134,68 @@ function WriteContent() {
   const [parsedPost, setParsedPost] = useState<ExternalBlogPost | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const refreshPublications = (userToUse = currentUser) => {
+    if (!userToUse) return;
+    const updated = getEditablePosts(userToUse);
+    setPublications(updated);
+
+    fetch('/api/articles?scope=my')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.articles)) {
+          const isLead = isAuthorUser(userToUse);
+          if (isLead) {
+            const cloudSlugs = new Set(data.articles.map((a: ExternalBlogPost) => a.slug));
+            const defaults = DEFAULT_MASTERCLASSES.filter((p) => !cloudSlugs.has(p.slug));
+            setPublications([...data.articles, ...defaults]);
+          } else {
+            // For community authors: ONLY their articles! Alazar's articles are never mixed in.
+            setPublications(data.articles);
+          }
+        }
+      })
+      .catch(() => {});
+  };
+
   // Load initial publications and auth
   useEffect(() => {
     // 1. Initial cached user state
     const local = getCurrentUser();
     if (local) {
       setCurrentUser(local);
+      const posts = getEditablePosts(local);
+      setPublications(posts);
     }
 
     // 2. Validate live server session against Neon PostgreSQL
     checkSessionWithNeon()
       .then((serverUser) => {
-        if (serverUser) {
-          setCurrentUser(serverUser);
-        } else if (!local) {
+        const active = serverUser || local;
+        if (active) {
+          setCurrentUser(active);
+          refreshPublications(active);
+
+          // If navigated with ?edit=slug, open that post directly
+          if (editSlugParam) {
+            // Guard: non-authors cannot edit core masterclasses
+            if (CORE_MASTERCLASS_SLUGS.has(editSlugParam) && !isAuthorUser(active)) {
+              alert('Access Restricted: Core masterclasses are reserved and can only be edited by Alazar Wake Kore.');
+              router.replace('/write');
+              return;
+            }
+            const match = getEditablePost(editSlugParam, active);
+            if (match) {
+              startEditing(match);
+            }
+          }
+        } else {
           setCurrentUser(null);
+          setPublications([]);
         }
       })
       .finally(() => {
         setIsAuthChecking(false);
       });
-
-    const posts = getEditablePosts();
-    setPublications(posts);
 
     // Fetch live read counts from Neon PostgreSQL
     fetch('/api/views')
@@ -170,33 +211,7 @@ function WriteContent() {
         }
       })
       .catch(() => {});
-
-    // If navigated with ?edit=slug, open that post directly
-    if (editSlugParam) {
-      const match = getEditablePost(editSlugParam);
-      if (match) {
-        startEditing(match);
-      }
-    }
   }, [editSlugParam]);
-
-  const refreshPublications = () => {
-    const updated = getEditablePosts();
-    setPublications(updated);
-    fetch('/api/views')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && data.views) {
-          setPublications((prev) =>
-            prev.map((p) => ({
-              ...p,
-              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  };
 
   const startEditing = (post: ExternalBlogPost) => {
     setEditingPost(JSON.parse(JSON.stringify(post)));
@@ -207,15 +222,18 @@ function WriteContent() {
   };
 
   const startNewArticle = () => {
+    const authorName = currentUser?.name || (isAuthor ? AUTHOR_NAME : 'Engineer');
     const newDoc: ExternalBlogPost = {
-      slug: 'new-schematic-' + Date.now().toString(36),
+      slug: 'schematic-' + Date.now().toString(36),
       title: 'New Industrial Masterclass',
       excerpt: 'A comprehensive technical overview of industrial automation logic and controls.',
-      author: currentUser?.name || AUTHOR_NAME,
-      date: 'Oct 15',
+      author: authorName,
+      authorId: currentUser?.id,
+      authorEmail: currentUser?.email,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       readingTime: '15 min read + 20 min labs',
       tag: 'Process Control',
-      views: 14,
+      views: 1,
       sections: [
         {
           type: 'markdown',
@@ -250,19 +268,21 @@ function WriteContent() {
     }
 
     // Security check: Only author Alazar Wake Kore can modify core masterclasses
-    if (!isAuthor && (CORE_MASTERCLASS_SLUGS.has(postToSave.slug) || (postToSave.author && postToSave.author.toLowerCase().includes('alazar')))) {
-      alert('Access Restricted: The 10 core masterclasses are protected and can only be modified by author Alazar Wake Kore. Please sign in as Alazar to save.');
+    if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(postToSave.slug)) {
+      alert('Access Restricted: The 10 core masterclasses are protected and can only be modified by author Alazar Wake Kore.');
       return;
     }
 
     const finalizedPost: ExternalBlogPost = {
       ...postToSave,
-      author: postToSave.author || AUTHOR_NAME,
-      date: postToSave.date || 'Oct 15',
+      author: postToSave.author || currentUser?.name || 'Engineer',
+      authorId: postToSave.authorId || currentUser?.id,
+      authorEmail: postToSave.authorEmail || currentUser?.email,
+      date: postToSave.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       views: Number(postToSave.views) || 1,
     };
 
-    const result = saveCustomPost(finalizedPost);
+    const result = saveCustomPost(finalizedPost, currentUser);
     if (result && !result.ok) {
       alert(result.error || 'Failed to save post.');
       return;
@@ -270,8 +290,21 @@ function WriteContent() {
 
     setEditingPost(finalizedPost);
     setEditorRawJson(JSON.stringify(finalizedPost, null, 2));
-    refreshPublications();
+    refreshPublications(currentUser);
     setSaveSuccessNotice(`"${finalizedPost.title}" saved successfully! Live changes are now active.`);
+  };
+
+  const handleDeleteCustom = (slug: string) => {
+    if (CORE_MASTERCLASS_SLUGS.has(slug) && !isAuthor) {
+      alert('Access Restricted: Core masterclasses cannot be deleted.');
+      return;
+    }
+    if (confirm('Are you sure you want to delete this masterclass?')) {
+      deleteCustomPost(slug, currentUser);
+      refreshPublications(currentUser);
+      setActiveTab('publications');
+      setSaveSuccessNotice('Masterclass deleted successfully.');
+    }
   };
 
   const handleExportPost = (post: ExternalBlogPost) => {
@@ -290,9 +323,9 @@ function WriteContent() {
       return;
     }
     if (confirm('Revert all custom edits to the original default masterclass?')) {
-      deleteCustomPost(slug);
-      refreshPublications();
-      const fresh = getEditablePost(slug);
+      deleteCustomPost(slug, currentUser);
+      refreshPublications(currentUser);
+      const fresh = getEditablePost(slug, currentUser);
       if (fresh) startEditing(fresh);
       setSaveSuccessNotice('Reverted article to original baseline.');
     }
@@ -352,17 +385,23 @@ function WriteContent() {
 
   const handlePublishUploaded = () => {
     if (!parsedPost) return;
+    if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(parsedPost.slug)) {
+      alert('Access Restricted: Core masterclasses can only be modified by author Alazar Wake Kore.');
+      return;
+    }
     const postWithAuthor: ExternalBlogPost = {
       ...parsedPost,
-      author: AUTHOR_NAME,
-      views: parsedPost.views && parsedPost.views <= 20 ? parsedPost.views : 14,
+      author: parsedPost.author || currentUser?.name || 'Engineer',
+      authorId: currentUser?.id,
+      authorEmail: currentUser?.email,
+      views: parsedPost.views && parsedPost.views <= 20 ? parsedPost.views : 1,
     };
-    const result = saveCustomPost(postWithAuthor);
+    const result = saveCustomPost(postWithAuthor, currentUser);
     if (result && !result.ok) {
       alert(result.error || 'Failed to publish post.');
       return;
     }
-    refreshPublications();
+    refreshPublications(currentUser);
     startEditing(postWithAuthor);
     setSaveSuccessNotice(`Imported and published "${postWithAuthor.title}" successfully.`);
   };
@@ -378,8 +417,8 @@ function WriteContent() {
     );
   }
 
-  // Security interlock: Non-authors CANNOT access the studio, see JSON, or inspect editors
-  if (!isAuthor) {
+  // Security interlock: Must be authenticated to access Author Studio
+  if (!currentUser) {
     const redirectUrl = editSlugParam ? `/write?edit=${encodeURIComponent(editSlugParam)}` : '/write';
     return (
       <main className="min-h-[calc(100vh-64px)] bg-[#fbfbfd] flex flex-col justify-center items-center px-4 py-16 font-sans antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
@@ -389,8 +428,8 @@ function WriteContent() {
           </div>
 
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[11px] font-mono text-[#86868b] uppercase tracking-wider mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            <span>Author Studio // Restricted Access</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Author Studio // Creator Hub</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-3">
@@ -398,14 +437,8 @@ function WriteContent() {
           </h1>
 
           <p className="text-sm text-[#515154] leading-relaxed mb-6">
-            The Authoring Studio, JSON schematics, and article editors are strictly reserved for the author, <strong className="text-[#1d1d1f]">Alazar Wake Kore</strong>.
+            The Authoring Studio is available to all registered engineers. Sign in to your station account to compose, preview, and publish technical masterclasses with embedded circuit simulations.
           </p>
-
-          {currentUser && (
-            <div className="p-3 mb-6 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-xs text-[#86868b]">
-              Signed in as <span className="font-semibold text-[#1d1d1f]">{currentUser.name}</span> ({currentUser.email || 'guest'}). This account does not have authoring privileges.
-            </div>
-          )}
 
           <div className="space-y-3">
             <Link
@@ -413,14 +446,14 @@ function WriteContent() {
               className="w-full py-3 px-5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all"
             >
               <LogIn size={15} />
-              <span>{currentUser ? 'Switch Account to Alazar' : 'Sign In as Alazar'}</span>
+              <span>Sign In to Station</span>
             </Link>
 
             <Link
-              href="/blogs"
+              href={`/signup?redirect=${encodeURIComponent(redirectUrl)}`}
               className="w-full py-3 px-5 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm flex items-center justify-center gap-2 transition"
             >
-              <span>Browse Public Masterclasses ↗</span>
+              <span>Create Station Account</span>
             </Link>
           </div>
         </div>
@@ -522,89 +555,127 @@ function WriteContent() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e5e5ea]">
               <div>
                 <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight">
-                  Editor Publications &amp; Works
+                  {isAuthor ? 'Lead Author Publications & Works' : `${currentUser.name}’s Masterclasses`}
                 </h2>
                 <p className="text-xs sm:text-sm text-[#86868b] mt-1">
-                  Manage, modify, and proof-test masterclasses authored by{' '}
-                  <a
-                    href={AUTHOR_LINKEDIN}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#0071e3] hover:underline font-bold inline-flex items-center gap-1"
-                  >
-                    Alazar Wake Kore
-                    <ExternalLink size={12} />
-                  </a>
-                  . Changes save instantly to your live platform.
+                  {isAuthor ? (
+                    <>
+                      Manage, modify, and proof-test core masterclasses authored by{' '}
+                      <a
+                        href={AUTHOR_LINKEDIN}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#0071e3] hover:underline font-bold inline-flex items-center gap-1"
+                      >
+                        Alazar Wake Kore
+                        <ExternalLink size={12} />
+                      </a>
+                      . Changes save instantly to your live platform.
+                    </>
+                  ) : (
+                    'Manage, edit, and proof-test your technical masterclasses. Changes sync to the cloud and execute live circuits in the browser.'
+                  )}
                 </p>
               </div>
               <div className="text-xs font-mono text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3.5 py-2 rounded-xl shadow-xs">
-                <span className="text-[#0071e3] font-bold">10 OF 10</span> PUBLISHED ARTICLES
+                <span className="text-[#0071e3] font-bold">{publications.length}</span>{' '}
+                {publications.length === 1 ? 'PUBLISHED ARTICLE' : 'PUBLISHED ARTICLES'}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {publications.map((post) => (
-                <div
-                  key={post.slug}
-                  className="bg-white border border-[#e5e5ea] hover:border-[#0071e3]/40 rounded-2xl p-5 sm:p-6 transition-all flex flex-col justify-between group shadow-xs hover:shadow-md"
+            {publications.length === 0 ? (
+              <div className="bg-white border border-dashed border-[#d2d2d7] rounded-3xl p-10 sm:p-14 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center mx-auto mb-4 text-[#0071e3]">
+                  <BookOpen size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-[#1d1d1f] mb-2">No Published Masterclasses Yet</h3>
+                <p className="text-xs sm:text-sm text-[#86868b] max-w-md mx-auto mb-6 leading-relaxed">
+                  You haven&apos;t composed any masterclasses yet. Start your first engineering guide with interactive circuit simulations, custom ladder/FBD logic, and real-time verification.
+                </p>
+                <button
+                  type="button"
+                  onClick={startNewArticle}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-medium shadow-xs transition"
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="font-mono text-[10px] text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-0.5 rounded-full font-bold">
-                        {post.tag}
+                  <PlusCircle size={15} />
+                  <span>Start Your First Masterclass</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {publications.map((post) => (
+                  <div
+                    key={post.slug}
+                    className="bg-white border border-[#e5e5ea] hover:border-[#0071e3]/40 rounded-2xl p-5 sm:p-6 transition-all flex flex-col justify-between group shadow-xs hover:shadow-md"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="font-mono text-[10px] text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-0.5 rounded-full font-bold">
+                          {post.tag}
+                        </span>
+                        <div className="flex items-center gap-3 font-mono text-[10px] text-[#86868b]">
+                          <span>📅 {post.date}</span>
+                          <span className="text-emerald-700 font-semibold">⚡ {post.views || 1} reads</span>
+                        </div>
+                      </div>
+
+                      <h3 className="text-lg font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors leading-snug mb-2">
+                        {post.title}
+                      </h3>
+                      <p className="text-xs text-[#424245] line-clamp-2 leading-relaxed mb-4">
+                        {post.excerpt}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#e5e5ea] flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono text-[#86868b] truncate max-w-[180px]">
+                        Author: <span className="text-[#1d1d1f] font-semibold">{post.author}</span>
                       </span>
-                      <div className="flex items-center gap-3 font-mono text-[10px] text-[#86868b]">
-                        <span>📅 {post.date}</span>
-                        <span className="text-emerald-700 font-semibold">⚡ {post.views} reads</span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => startEditing(post)}
+                          className="inline-flex items-center gap-1 text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3 py-1.5 rounded-lg transition shadow-xs"
+                        >
+                          <Edit size={12} />
+                          <span>Edit</span>
+                        </button>
+
+                        <Link
+                          href={`/post/${post.slug}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-[#1d1d1f] hover:bg-[#e5e5ea] bg-[#f5f5f7] border border-[#e5e5ea] px-2.5 py-1.5 rounded-lg transition"
+                          title="View Live Post"
+                        >
+                          <ExternalLink size={12} />
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportPost(post)}
+                          className="p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition"
+                          title="Download JSON schema"
+                        >
+                          <Download size={13} />
+                        </button>
+
+                        {!CORE_MASTERCLASS_SLUGS.has(post.slug) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustom(post.slug)}
+                            className="p-1.5 rounded-lg text-[#86868b] hover:text-red-600 hover:bg-red-50 transition"
+                            title="Delete Masterclass"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
-
-                    <h3 className="text-lg font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors leading-snug mb-2">
-                      {post.title}
-                    </h3>
-                    <p className="text-xs text-[#424245] line-clamp-2 leading-relaxed mb-4">
-                      {post.excerpt}
-                    </p>
                   </div>
-
-                  <div className="pt-3 border-t border-[#e5e5ea] flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-[#86868b]">
-                      Author: <span className="text-[#1d1d1f] font-semibold">{post.author}</span>
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(post)}
-                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3 py-1.5 rounded-lg transition shadow-xs"
-                      >
-                        <Edit size={12} />
-                        <span>Edit</span>
-                      </button>
-
-                      <Link
-                        href={`/post/${post.slug}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-1 text-xs font-mono text-[#1d1d1f] hover:bg-[#e5e5ea] bg-[#f5f5f7] border border-[#e5e5ea] px-2.5 py-1.5 rounded-lg transition"
-                        title="View Live Post"
-                      >
-                        <ExternalLink size={12} />
-                      </Link>
-
-                      <button
-                        type="button"
-                        onClick={() => handleExportPost(post)}
-                        className="p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition"
-                        title="Download JSON schema"
-                      >
-                        <Download size={13} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

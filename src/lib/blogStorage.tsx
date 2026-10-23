@@ -18,6 +18,9 @@ export interface ExternalBlogPost {
   title: string;
   excerpt: string;
   author: string;
+  authorUrl?: string;
+  authorId?: string;
+  authorEmail?: string;
   date: string;
   readingTime: string;
   tag: string;
@@ -313,6 +316,9 @@ export function convertExternalToBlogPost(external: ExternalBlogPost): BlogPost 
     author:
       external.author ||
       'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)',
+    authorUrl: external.authorUrl,
+    authorId: external.authorId,
+    authorEmail: external.authorEmail,
     date: external.date,
     readingTime: external.readingTime,
     tag: external.tag,
@@ -438,63 +444,61 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
   };
 }
 
-export const CORE_MASTERCLASS_SLUGS = new Set([
-  'water-treatment',
-  'hydraulic-press-safety-interlock',
-  'dual-pump-alternator',
-  'industrial-heater-pi-pwm-anti-windup',
-  'solar-tracker-mppt-hysteresis',
-  'hvac-chiller-economizer',
-  'conveyor-bottle-sorter',
-  'traffic-intersection-controller',
-  'emergency-shutdown-esd-matrix',
-  'tank-level-cascade-pid',
-]);
+export {
+  CORE_MASTERCLASS_SLUGS,
+  isAuthorUser,
+  canEditPost,
+  getUserStorageKey,
+} from './blogPermissions';
 
-export function isAuthorUser(user?: { name?: string; email?: string } | null): boolean {
-  if (!user) {
-    if (typeof window === 'undefined') return false;
-    try {
-      const raw = localStorage.getItem('automationhub_authenticated_user');
-      if (!raw) return false;
-      user = JSON.parse(raw);
-    } catch {
-      return false;
-    }
-  }
-  if (!user) return false;
-  const email = (user.email || '').toLowerCase();
-  const name = (user.name || '').toLowerCase();
-  return (
-    email === 'alazar@industrialautomation.website' ||
-    email.startsWith('alazar') ||
-    name.includes('alazar')
-  );
-}
+import {
+  CORE_MASTERCLASS_SLUGS,
+  isAuthorUser,
+  canEditPost,
+  getUserStorageKey,
+} from './blogPermissions';
 
-export function saveCustomPost(external: ExternalBlogPost): { ok: boolean; error?: string } {
+export function saveCustomPost(
+  external: ExternalBlogPost,
+  user?: { id?: string; name?: string; email?: string } | null
+): { ok: boolean; error?: string } {
   if (typeof window === 'undefined') return { ok: false };
-  if (CORE_MASTERCLASS_SLUGS.has(external.slug) && !isAuthorUser()) {
-    console.warn(`[Security] Unauthorized attempt to modify core masterclass "${external.slug}" blocked.`);
+
+  if (!canEditPost(external, user)) {
+    console.warn(`[Security] Unauthorized attempt to modify masterclass "${external.slug}" blocked.`);
     return {
       ok: false,
-      error: 'Permission denied: The 10 core masterclasses can only be modified by author Alazar Wake Kore.',
+      error: 'Permission denied: You do not have permissions to modify this masterclass.',
     };
   }
-  try {
-    const existingRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
-    const existingList: ExternalBlogPost[] = existingRaw ? JSON.parse(existingRaw) : [];
-    // Replace if same slug, otherwise prepend
-    const filtered = existingList.filter(p => p.slug !== external.slug);
-    filtered.unshift(external);
-    localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
 
-    // Persist and sync to Neon PostgreSQL cloud database
+  try {
+    // Stamp user identity if available
+    if (user?.id && !external.authorId) external.authorId = user.id;
+    if (user?.email && !external.authorEmail) external.authorEmail = user.email;
+
+    // 1. Save to User-Scoped Isolated Storage
+    const userKey = getUserStorageKey(user?.id);
+    const existingRaw = localStorage.getItem(userKey);
+    const userList: ExternalBlogPost[] = existingRaw ? JSON.parse(existingRaw) : [];
+    const filteredUserList = userList.filter(p => p.slug !== external.slug);
+    filteredUserList.unshift(external);
+    localStorage.setItem(userKey, JSON.stringify(filteredUserList));
+
+    // 2. Also update public storage key so local preview / offline reads work
+    const publicRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+    const publicList: ExternalBlogPost[] = publicRaw ? JSON.parse(publicRaw) : [];
+    const filteredPublic = publicList.filter(p => p.slug !== external.slug);
+    filteredPublic.unshift(external);
+    localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filteredPublic));
+
+    // 3. Persist and sync to Neon PostgreSQL cloud database
     fetch('/api/articles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(external),
     }).catch(err => console.warn('Neon cloud article sync deferred:', err));
+
     return { ok: true };
   } catch (e) {
     console.error('Failed to save custom post:', e);
@@ -505,21 +509,37 @@ export function saveCustomPost(external: ExternalBlogPost): { ok: boolean; error
 /**
  * Syncs articles from Neon PostgreSQL into client-side cache
  */
-export async function syncArticlesFromCloud(): Promise<ExternalBlogPost[]> {
+export async function syncArticlesFromCloud(
+  user?: { id?: string; name?: string; email?: string } | null
+): Promise<ExternalBlogPost[]> {
   try {
     const res = await fetch('/api/articles');
     if (!res.ok) return [];
     const data = await res.json();
     if (data.ok && Array.isArray(data.articles) && data.articles.length > 0) {
       if (typeof window !== 'undefined') {
-        const existingRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
-        const existingList: ExternalBlogPost[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const publicRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+        const publicList: ExternalBlogPost[] = publicRaw ? JSON.parse(publicRaw) : [];
         const cloudSlugs = new Set(data.articles.map((a: ExternalBlogPost) => a.slug));
         const merged = [
           ...data.articles,
-          ...existingList.filter(local => !cloudSlugs.has(local.slug)),
+          ...publicList.filter(local => !cloudSlugs.has(local.slug)),
         ];
         localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(merged));
+
+        // If user is logged in, also sync their authored articles to their isolated storage
+        if (user) {
+          const isLead = isAuthorUser(user);
+          const userKey = getUserStorageKey(user.id);
+          const myArticles = data.articles.filter((a: ExternalBlogPost) => {
+            if (isLead) return true;
+            return (
+              (a.authorId && a.authorId === user.id) ||
+              (a.authorEmail && user.email && a.authorEmail.toLowerCase() === user.email.toLowerCase())
+            );
+          });
+          localStorage.setItem(userKey, JSON.stringify(myArticles));
+        }
       }
       return data.articles;
     }
@@ -559,46 +579,91 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
   return undefined;
 }
 
-export function getEditablePosts(): ExternalBlogPost[] {
-  if (typeof window === 'undefined') return DEFAULT_MASTERCLASSES;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
-    const customList: ExternalBlogPost[] = raw ? JSON.parse(raw) : [];
-    const customSlugs = new Set(customList.map(p => p.slug));
-    const defaults = DEFAULT_MASTERCLASSES.filter(p => !customSlugs.has(p.slug));
-    return [...customList, ...defaults];
-  } catch {
-    return DEFAULT_MASTERCLASSES;
+/**
+ * Returns editable posts scoped to the specific authenticated author.
+ * - Alazar (Lead Author): Sees his 10 core masterclasses + any articles he created.
+ * - Other Authors: See ONLY their own created articles. Core masterclasses are COMPLETELY excluded.
+ * - Unauthenticated: Returns empty array.
+ */
+export function getEditablePosts(
+  user?: { id?: string; name?: string; email?: string } | null
+): ExternalBlogPost[] {
+  if (typeof window === 'undefined') return [];
+  if (!user) {
+    try {
+      const raw = localStorage.getItem('automationhub_authenticated_user');
+      if (raw) user = JSON.parse(raw);
+    } catch {}
   }
+  if (!user) return [];
+
+  const isLead = isAuthorUser(user);
+  const userKey = getUserStorageKey(user.id);
+
+  let userArticles: ExternalBlogPost[] = [];
+  try {
+    const raw = localStorage.getItem(userKey);
+    userArticles = raw ? JSON.parse(raw) : [];
+  } catch {}
+
+  // If Alazar (Lead Author): Include the 10 core masterclasses
+  if (isLead) {
+    const customSlugs = new Set(userArticles.map(p => p.slug));
+    const defaults = DEFAULT_MASTERCLASSES.filter(p => !customSlugs.has(p.slug));
+    return [...userArticles, ...defaults];
+  }
+
+  // For other authors: Exclude all core masterclasses. Return ONLY their authored articles.
+  return userArticles.filter(p => !CORE_MASTERCLASS_SLUGS.has(p.slug));
 }
 
-export function getEditablePost(slug: string): ExternalBlogPost | undefined {
-  const all = getEditablePosts();
-  return all.find(p => p.slug === slug);
+export function getEditablePost(
+  slug: string,
+  user?: { id?: string; name?: string; email?: string } | null
+): ExternalBlogPost | undefined {
+  const posts = getEditablePosts(user);
+  return posts.find(p => p.slug === slug);
 }
 
-export function deleteCustomPost(slug: string): { ok: boolean; error?: string } {
+export function deleteCustomPost(
+  slug: string,
+  user?: { id?: string; name?: string; email?: string } | null
+): { ok: boolean; error?: string } {
   if (typeof window === 'undefined') return { ok: false };
-  if (CORE_MASTERCLASS_SLUGS.has(slug) && !isAuthorUser()) {
-    console.warn(`[Security] Unauthorized attempt to delete core masterclass "${slug}" blocked.`);
+
+  if (!canEditPost({ slug }, user)) {
+    console.warn(`[Security] Unauthorized attempt to delete masterclass "${slug}" blocked.`);
     return {
       ok: false,
-      error: 'Permission denied: The 10 core masterclasses cannot be deleted.',
+      error: 'Permission denied: You do not have permissions to delete this masterclass.',
     };
   }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
-    if (!raw) return { ok: true };
-    const existing: ExternalBlogPost[] = JSON.parse(raw);
-    const filtered = existing.filter(p => p.slug !== slug);
-    localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
 
-    // Also delete from Neon Cloud Database
+  try {
+    // 1. Remove from user-scoped storage
+    const userKey = getUserStorageKey(user?.id);
+    const userRaw = localStorage.getItem(userKey);
+    if (userRaw) {
+      const userList: ExternalBlogPost[] = JSON.parse(userRaw);
+      const filtered = userList.filter(p => p.slug !== slug);
+      localStorage.setItem(userKey, JSON.stringify(filtered));
+    }
+
+    // 2. Remove from public storage
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+    if (raw) {
+      const existing: ExternalBlogPost[] = JSON.parse(raw);
+      const filtered = existing.filter(p => p.slug !== slug);
+      localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
+    }
+
+    // 3. Delete from Neon Cloud Database
     fetch('/api/articles', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug }),
     }).catch(() => {});
+
     return { ok: true };
   } catch (e) {
     console.error('Failed to delete custom post:', e);
