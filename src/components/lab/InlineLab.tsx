@@ -71,22 +71,22 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
       className={
         isFullscreen
           ? 'fixed inset-0 z-[100] flex flex-col bg-white animate-in fade-in duration-200'
-          : 'my-10 -mx-4 sm:-mx-8 rounded-2xl overflow-hidden border border-[#d2d2d7] shadow-xl flex flex-col not-prose bg-[#0b1118] transition-all'
+          : 'my-10 -mx-4 sm:-mx-8 rounded-2xl overflow-hidden border border-[#e5e5ea] shadow-md flex flex-col not-prose bg-white transition-all'
       }
       style={{ height: isFullscreen ? '100vh' : `${height}px` }}
     >
       {/* Apple Hardware Style Toolbar Header */}
-      <div className="bg-[#161617] text-white px-4 sm:px-5 py-3 border-b border-[#2d2d2e] flex flex-wrap justify-between items-center gap-3 shrink-0">
+      <div className="bg-[#fbfbfd] text-[#1d1d1f] px-4 sm:px-5 py-3 border-b border-[#e5e5ea] flex flex-wrap justify-between items-center gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <span className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-400">
+          <span className="p-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-[#0071e3]">
             <Cpu size={14} />
           </span>
           {step && (
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-wider bg-[#0071e3]/10 text-[#0071e3] border border-[#0071e3]/20 px-2.5 py-0.5 rounded-full">
               {step}
             </span>
           )}
-          <span className="text-xs sm:text-sm font-semibold tracking-tight text-[#f5f5f7]">
+          <span className="text-xs sm:text-sm font-semibold tracking-tight text-[#1d1d1f]">
             {title}
           </span>
         </div>
@@ -98,19 +98,19 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
             onClick={handleVerify}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-all shadow-xs ${
               isVerified
-                ? 'bg-emerald-950/80 border border-emerald-500/40 text-emerald-300'
-                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700'
+                ? 'bg-[#ecfdf5] border border-[#a7f3d0] text-[#059669]'
+                : 'bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#e5e5ea]'
             }`}
             title="Mark this exercise stage as verified"
           >
             {isVerified ? (
               <>
-                <CheckCircle2 size={13} className="text-emerald-400" />
+                <CheckCircle2 size={13} className="text-[#059669]" />
                 <span>Verified Stage ✓</span>
               </>
             ) : (
               <>
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0071e3] animate-pulse" />
                 <span>Verify Stage</span>
               </>
             )}
@@ -119,7 +119,7 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
           {/* Fullscreen Button */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="text-zinc-400 hover:text-white transition p-1.5 hover:bg-zinc-800 rounded-lg"
+            className="text-[#86868b] hover:text-[#1d1d1f] transition p-1.5 hover:bg-[#f5f5f7] rounded-lg"
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
             {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -129,21 +129,21 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
 
       {/* Verification Notice Banner */}
       {justVerified && (
-        <div className="bg-emerald-950/90 border-b border-emerald-500/40 px-4 py-2 text-xs font-mono text-emerald-300 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
+        <div className="bg-[#ecfdf5] border-b border-[#a7f3d0] px-4 py-2 text-xs font-mono text-[#059669] flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
           <div className="flex items-center gap-2">
-            <Check size={14} className="text-emerald-400" />
+            <Check size={14} className="text-[#059669]" />
             <span>Exercise Stage Verified: Circuit logic confirmed and added to masterclass progress!</span>
           </div>
-          <span className="text-[10px] text-emerald-400/80 uppercase">Saved</span>
+          <span className="text-[10px] text-[#059669]/80 uppercase font-semibold">Saved</span>
         </div>
       )}
 
       {/* Simulation Workspace Canvas */}
-      <div className="flex-1 min-h-0 bg-[#0b1118] relative w-full overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white relative w-full overflow-hidden">
         {document ? (
           <LabWorkspace readOnly document={document} isFullscreen={isFullscreen} />
         ) : (
-          <div className="flex items-center justify-center h-full text-zinc-500 font-mono text-xs">
+          <div className="flex items-center justify-center h-full text-[#86868b] font-mono text-xs">
             Compiling circuit schematic...
           </div>
         )}

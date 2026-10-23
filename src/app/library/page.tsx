@@ -15,7 +15,6 @@ import {
   Sparkles,
   SlidersHorizontal,
   CheckCircle2,
-  ExternalLink,
   Boxes,
   HelpCircle,
   RotateCcw,
@@ -28,24 +27,24 @@ import type { BlockDefinition } from '@/lib/automation/types';
 function getCategoryMeta(category: string) {
   switch (category) {
     case 'Digital I/O':
-      return { icon: Zap, color: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/10' };
+      return { icon: Zap, color: 'text-amber-600', border: 'border-amber-200', bg: 'bg-amber-50' };
     case 'Analog I/O':
-      return { icon: Activity, color: 'text-cyan-400', border: 'border-cyan-500/30', bg: 'bg-cyan-500/10' };
+      return { icon: Activity, color: 'text-cyan-700', border: 'border-cyan-200', bg: 'bg-cyan-50' };
     case 'Timers':
-      return { icon: Clock, color: 'text-sky-400', border: 'border-sky-500/30', bg: 'bg-sky-500/10' };
+      return { icon: Clock, color: 'text-sky-700', border: 'border-sky-200', bg: 'bg-sky-50' };
     case 'Counters':
-      return { icon: Layers, color: 'text-indigo-400', border: 'border-indigo-500/30', bg: 'bg-indigo-500/10' };
+      return { icon: Layers, color: 'text-indigo-700', border: 'border-indigo-200', bg: 'bg-indigo-50' };
     case 'Logic':
-      return { icon: Cpu, color: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' };
+      return { icon: Cpu, color: 'text-[#059669]', border: 'border-emerald-200', bg: 'bg-emerald-50' };
     case 'Analog processing':
     case 'Analog & math':
-      return { icon: SlidersHorizontal, color: 'text-teal-400', border: 'border-teal-500/30', bg: 'bg-teal-500/10' };
+      return { icon: SlidersHorizontal, color: 'text-teal-700', border: 'border-teal-200', bg: 'bg-teal-50' };
     case 'Mechatronics':
-      return { icon: Gauge, color: 'text-violet-400', border: 'border-violet-500/30', bg: 'bg-violet-500/10' };
+      return { icon: Gauge, color: 'text-violet-700', border: 'border-violet-200', bg: 'bg-violet-50' };
     case 'Memory & utilities':
-      return { icon: Boxes, color: 'text-fuchsia-400', border: 'border-fuchsia-500/30', bg: 'bg-fuchsia-500/10' };
+      return { icon: Boxes, color: 'text-fuchsia-700', border: 'border-fuchsia-200', bg: 'bg-fuchsia-50' };
     default:
-      return { icon: Sparkles, color: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' };
+      return { icon: Sparkles, color: 'text-[#059669]', border: 'border-emerald-200', bg: 'bg-emerald-50' };
   }
 }
 
@@ -118,31 +117,26 @@ export default function LibraryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-zinc-100 relative overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Industrial Blueprint Background Grid */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(114,217,229,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(114,217,229,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-
-      {/* Atmospheric Ambient Glows */}
-      <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px] pointer-events-none" />
-      <div className="absolute top-1/3 left-10 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-10 w-[450px] h-[450px] bg-sky-500/5 rounded-full blur-[140px] pointer-events-none" />
+    <div className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] relative overflow-hidden font-sans antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
+      {/* Background subtle Apple dot grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(#e5e5ea_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-60" />
 
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 relative z-10">
         {/* Header Hero Section */}
-        <header className="mb-12 border-b border-zinc-800/80 pb-12">
+        <header className="mb-12 border-b border-[#e5e5ea] pb-12">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] uppercase tracking-wider mb-4 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                <Cpu size={14} />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-xs uppercase tracking-wider mb-4 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
                 <span>AutomationHub // Component Specification &amp; Signal Registry</span>
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#1d1d1f] leading-tight">
                 One Library.{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                <span className="text-[#86868b]">
                   Every Signal.
                 </span>
               </h1>
-              <p className="mt-4 text-base sm:text-lg text-zinc-400 leading-relaxed max-w-2xl">
+              <p className="mt-4 text-base sm:text-lg text-[#515154] leading-relaxed max-w-2xl font-normal">
                 Explore standardized IEC 61131-3 logic gates, analog signal conditioning, PID controllers,
                 and mechatronics. Every block executes on a deterministic 1ms simulation cycle with typed I/O pins.
               </p>
@@ -150,38 +144,35 @@ export default function LibraryPage() {
 
             {/* KPI Stat Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4 w-full lg:w-auto">
-              <div className="bg-zinc-900/60 border border-zinc-800/90 rounded-xl p-4 backdrop-blur-sm">
-                <div className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+              <div className="bg-white border border-[#e5e5ea] rounded-2xl p-5 shadow-xs">
+                <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] tracking-tight">
                   {totalCataloged}
                 </div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mt-1">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-[#86868b] mt-1">
                   Cataloged
                 </div>
               </div>
 
-              <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 backdrop-blur-sm">
-                <div className="text-2xl sm:text-3xl font-mono font-bold text-emerald-400 flex items-center gap-2">
+              <div className="bg-white border border-[#e5e5ea] rounded-2xl p-5 shadow-xs">
+                <div className="text-2xl sm:text-3xl font-bold text-[#059669] flex items-center gap-2">
                   <span>{totalReady}</span>
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
+                  <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
                 </div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-emerald-400/80 mt-1">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-[#059669] font-medium mt-1">
                   Ready in Lab
                 </div>
               </div>
 
-              <div className="bg-zinc-900/60 border border-zinc-800/90 rounded-xl p-4 backdrop-blur-sm">
-                <div className="text-2xl sm:text-3xl font-mono font-bold text-cyan-400">10</div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mt-1">
+              <div className="bg-white border border-[#e5e5ea] rounded-2xl p-5 shadow-xs">
+                <div className="text-2xl sm:text-3xl font-bold text-[#0071e3]">10</div>
+                <div className="text-[11px] font-mono uppercase tracking-wider text-[#86868b] mt-1">
                   Domains
                 </div>
               </div>
 
-              <div className="bg-zinc-900/60 border border-zinc-800/90 rounded-xl p-4 backdrop-blur-sm">
-                <div className="text-2xl sm:text-3xl font-mono font-bold text-amber-400">1 ms</div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mt-1">
+              <div className="bg-white border border-[#e5e5ea] rounded-2xl p-5 shadow-xs">
+                <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f]">1 ms</div>
+                <div className="text-[11px] font-mono uppercase tracking-wider text-[#86868b] mt-1">
                   Scan Cycle
                 </div>
               </div>
@@ -193,10 +184,10 @@ export default function LibraryPage() {
         <section className="mb-10 space-y-5" aria-label="Search and component filters">
           {/* Main Search Row */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Prominent Illuminated Search Input */}
+            {/* Prominent Search Input */}
             <div className="relative flex-1 group">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-emerald-400 group-focus-within:text-cyan-400 transition-colors">
-                <Search size={20} />
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#86868b] group-focus-within:text-[#0071e3] transition-colors">
+                <Search size={18} />
               </div>
               <input
                 type="search"
@@ -204,7 +195,7 @@ export default function LibraryPage() {
                 placeholder="Search components by name, type, pin, or function (e.g. 'PID', 'Timer', 'Analog', 'TON')..."
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="w-full rounded-xl bg-zinc-900/90 border-2 border-zinc-700/80 hover:border-zinc-600 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 text-white placeholder-zinc-400 text-sm sm:text-base py-3.5 pl-12 pr-24 outline-none transition-all shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+                className="w-full rounded-2xl bg-white border-2 border-[#e5e5ea] hover:border-[#d2d2d7] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10 text-[#1d1d1f] placeholder-[#86868b] text-sm sm:text-base py-3.5 pl-12 pr-24 outline-none transition-all shadow-xs"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
                 {query && (
@@ -212,12 +203,12 @@ export default function LibraryPage() {
                     type="button"
                     onClick={() => setQuery('')}
                     aria-label="Clear search query"
-                    className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                    className="p-1 rounded-md text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition"
                   >
                     <X size={16} />
                   </button>
                 )}
-                <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-zinc-400 bg-zinc-800 border border-zinc-700 rounded">
+                <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-[#86868b] bg-[#f5f5f7] border border-[#e5e5ea] rounded">
                   ESC
                 </span>
               </div>
@@ -227,29 +218,29 @@ export default function LibraryPage() {
             <button
               type="button"
               onClick={() => setReadyOnly(!readyOnly)}
-              className={`flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl border font-mono text-xs sm:text-sm font-medium transition-all ${
+              className={`flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border font-mono text-xs sm:text-sm font-medium transition-all shadow-xs ${
                 readyOnly
-                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.25)]'
-                  : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white border-[#e5e5ea] text-[#1d1d1f] hover:bg-[#f5f5f7] hover:border-[#d2d2d7]'
               }`}
             >
               <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  readyOnly ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'
+                className={`w-2 h-2 rounded-full ${
+                  readyOnly ? 'bg-emerald-500 animate-pulse' : 'bg-[#86868b]'
                 }`}
               />
               <span>Ready in Lab ({totalReady})</span>
             </button>
 
             {/* Signal Kind Filter */}
-            <div className="flex items-center bg-zinc-900/80 border border-zinc-800 rounded-xl p-1 font-mono text-xs">
+            <div className="flex items-center bg-[#f5f5f7] border border-[#e5e5ea] rounded-2xl p-1 font-mono text-xs shadow-2xs">
               <button
                 type="button"
                 onClick={() => setSignalFilter('all')}
-                className={`px-3 py-2 rounded-lg transition ${
+                className={`px-3.5 py-2 rounded-xl transition ${
                   signalFilter === 'all'
-                    ? 'bg-zinc-800 text-white font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-[#1d1d1f] font-semibold shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 All I/O
@@ -257,10 +248,10 @@ export default function LibraryPage() {
               <button
                 type="button"
                 onClick={() => setSignalFilter('digital')}
-                className={`px-3 py-2 rounded-lg transition ${
+                className={`px-3.5 py-2 rounded-xl transition ${
                   signalFilter === 'digital'
-                    ? 'bg-emerald-500/20 text-emerald-300 font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-[#059669] font-semibold shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 Digital
@@ -268,10 +259,10 @@ export default function LibraryPage() {
               <button
                 type="button"
                 onClick={() => setSignalFilter('analog')}
-                className={`px-3 py-2 rounded-lg transition ${
+                className={`px-3.5 py-2 rounded-xl transition ${
                   signalFilter === 'analog'
-                    ? 'bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-cyan-700 font-semibold shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 Analog
@@ -280,7 +271,7 @@ export default function LibraryPage() {
           </div>
 
           {/* Category Tabs / Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-[#e5e5ea] scrollbar-track-transparent">
             {['All components', ...CATEGORIES].map((cat) => {
               const count = categoryCounts[cat] || 0;
               const isSelected = selectedCategory === cat;
@@ -289,18 +280,18 @@ export default function LibraryPage() {
                   key={cat}
                   type="button"
                   onClick={() => setSelectedCategory(cat)}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all font-mono ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all font-mono shadow-2xs ${
                     isSelected
-                      ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300 font-bold shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                      : 'bg-zinc-900/60 border-zinc-800/90 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                      ? 'bg-[#1d1d1f] border-[#1d1d1f] text-white font-semibold'
+                      : 'bg-white border-[#e5e5ea] text-[#1d1d1f] hover:bg-[#f5f5f7] hover:border-[#d2d2d7]'
                   }`}
                 >
                   <span>{cat}</span>
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                       isSelected
-                        ? 'bg-emerald-500/30 text-emerald-200'
-                        : 'bg-zinc-800 text-zinc-400'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-[#f5f5f7] text-[#86868b]'
                     }`}
                   >
                     {count}
@@ -311,14 +302,14 @@ export default function LibraryPage() {
           </div>
 
           {/* Filter Status & Active Reset Indicator */}
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-1 border-t border-zinc-800/50">
+          <div className="flex items-center justify-between text-xs font-mono text-[#86868b] pt-2 border-t border-[#e5e5ea]">
             <div className="flex items-center gap-2">
-              <span className="text-emerald-400 font-semibold">● SHOWING:</span>
-              <span className="text-zinc-200 font-bold">{filteredBlocks.length}</span> of{' '}
-              <span className="text-zinc-400">{totalCataloged}</span> COMPONENTS
-              {readyOnly && <span className="text-emerald-400">· SIMULATABLE ONLY</span>}
+              <span className="text-[#059669] font-semibold">● SHOWING:</span>
+              <span className="text-[#1d1d1f] font-bold">{filteredBlocks.length}</span> of{' '}
+              <span>{totalCataloged}</span> COMPONENTS
+              {readyOnly && <span className="text-[#059669]">· SIMULATABLE ONLY</span>}
               {selectedCategory !== 'All components' && (
-                <span className="text-cyan-400">· {selectedCategory.toUpperCase()}</span>
+                <span className="text-[#0071e3]">· {selectedCategory.toUpperCase()}</span>
               )}
             </div>
 
@@ -326,7 +317,7 @@ export default function LibraryPage() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="flex items-center gap-1.5 text-zinc-400 hover:text-emerald-400 transition font-mono text-xs"
+                className="flex items-center gap-1.5 text-[#86868b] hover:text-[#0071e3] transition font-mono text-xs"
               >
                 <RotateCcw size={12} />
                 <span>Reset all filters</span>
@@ -338,18 +329,18 @@ export default function LibraryPage() {
         {/* Component Cards Grid */}
         <section aria-label="Component catalog results">
           {filteredBlocks.length === 0 ? (
-            <div className="my-16 flex flex-col items-center justify-center text-center p-12 rounded-2xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-sm max-w-xl mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-800/80 border border-zinc-700/80 flex items-center justify-center text-zinc-400 mb-4">
+            <div className="my-16 flex flex-col items-center justify-center text-center p-12 rounded-2xl border border-[#e5e5ea] bg-white shadow-xs max-w-xl mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center text-[#86868b] mb-4">
                 <HelpCircle size={32} />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">No components found</h2>
-              <p className="text-sm text-zinc-400 mb-6">
-                No catalog blocks match &ldquo;<span className="text-emerald-400 font-mono">{query}</span>&rdquo; with the selected filters.
+              <h2 className="text-xl font-bold text-[#1d1d1f] mb-2">No components found</h2>
+              <p className="text-sm text-[#86868b] mb-6">
+                No catalog blocks match &ldquo;<span className="text-[#0071e3] font-mono">{query}</span>&rdquo; with the selected filters.
               </p>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-sm transition shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm transition shadow-xs"
               >
                 <RotateCcw size={14} />
                 <span>Clear All Filters</span>
@@ -365,21 +356,18 @@ export default function LibraryPage() {
                 return (
                   <article
                     key={block.type}
-                    className="group relative bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-sm border border-zinc-800/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_-12px_rgba(16,185,129,0.2)] flex flex-col justify-between overflow-hidden"
+                    className="group relative bg-white border border-[#e5e5ea] hover:border-[#0071e3]/40 rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between overflow-hidden shadow-xs"
                   >
-                    {/* Hover Top Glow Line */}
-                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500/0 to-transparent group-hover:via-emerald-400 transition-all duration-300" />
-
                     <div>
                       {/* Top Header: Symbol Icon, Short Code & Status Badge */}
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2.5">
                           {/* IEC Block Icon Box */}
-                          <div className="w-10 h-10 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-emerald-400 group-hover:text-emerald-300 group-hover:border-emerald-500/40 transition-colors shadow-inner">
+                          <div className="w-10 h-10 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center text-[#1d1d1f] group-hover:border-[#0071e3]/40 transition-colors">
                             <BlockIcon type={block.type} />
                           </div>
                           <div>
-                            <span className="font-mono text-sm font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded tracking-wider">
+                            <span className="font-mono text-xs font-bold text-[#1d1d1f] bg-[#f5f5f7] border border-[#e5e5ea] px-2 py-0.5 rounded-lg tracking-wider">
                               [{block.shortName}]
                             </span>
                           </div>
@@ -387,12 +375,12 @@ export default function LibraryPage() {
 
                         {/* Status Badge */}
                         {isReady ? (
-                          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
                             Ready in Lab
                           </span>
                         ) : (
-                          <span className="font-mono text-[10px] px-2.5 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-400">
+                          <span className="font-mono text-[10px] px-2.5 py-1 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[#86868b]">
                             Roadmap · P{block.phase}
                           </span>
                         )}
@@ -401,29 +389,29 @@ export default function LibraryPage() {
                       {/* Domain / Category Tag */}
                       <div className="flex items-center gap-1.5 mb-2">
                         <CategoryIcon size={12} className={meta.color} />
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#86868b]">
                           {block.category}
                         </span>
                       </div>
 
                       {/* Block Name */}
-                      <h2 className="text-xl font-bold text-white group-hover:text-emerald-300 transition-colors mb-2.5">
+                      <h2 className="text-xl font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors mb-2.5 leading-snug">
                         {block.name}
                       </h2>
 
                       {/* Block Description */}
-                      <p className="text-xs text-zinc-400 leading-relaxed mb-6">
+                      <p className="text-xs sm:text-sm text-[#515154] leading-relaxed mb-6 font-normal">
                         {block.description}
                       </p>
                     </div>
 
                     {/* Bottom Technical Specifications */}
-                    <div className="pt-4 border-t border-zinc-800/60 space-y-3">
+                    <div className="pt-4 border-t border-[#e5e5ea] space-y-3">
                       {/* Pin Matrix */}
                       <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                         {/* IN Pins */}
-                        <div className="bg-zinc-950/50 border border-zinc-800/70 rounded-lg p-2">
-                          <div className="text-zinc-500 uppercase tracking-widest text-[9px] mb-1 font-semibold">
+                        <div className="bg-[#f5f5f7] border border-[#e5e5ea] rounded-xl p-2.5">
+                          <div className="text-[#86868b] uppercase tracking-widest text-[9px] mb-1 font-semibold">
                             Inputs ({block.inputs.length})
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -432,24 +420,24 @@ export default function LibraryPage() {
                                 <span
                                   key={pin.id}
                                   title={`${pin.label} (${pin.kind})`}
-                                  className={`px-1.5 py-0.5 rounded border ${
+                                  className={`px-1.5 py-0.5 rounded border shadow-2xs ${
                                     pin.kind === 'analog'
-                                      ? 'bg-cyan-950/60 border-cyan-500/30 text-cyan-300'
-                                      : 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
+                                      ? 'bg-white border-cyan-200 text-cyan-800'
+                                      : 'bg-white border-emerald-200 text-emerald-800'
                                   }`}
                                 >
                                   {pin.id}
                                 </span>
                               ))
                             ) : (
-                              <span className="text-zinc-600">—</span>
+                              <span className="text-[#86868b]">—</span>
                             )}
                           </div>
                         </div>
 
                         {/* OUT Pins */}
-                        <div className="bg-zinc-950/50 border border-zinc-800/70 rounded-lg p-2">
-                          <div className="text-zinc-500 uppercase tracking-widest text-[9px] mb-1 font-semibold">
+                        <div className="bg-[#f5f5f7] border border-[#e5e5ea] rounded-xl p-2.5">
+                          <div className="text-[#86868b] uppercase tracking-widest text-[9px] mb-1 font-semibold">
                             Outputs ({block.outputs.length})
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -458,17 +446,17 @@ export default function LibraryPage() {
                                 <span
                                   key={pin.id}
                                   title={`${pin.label} (${pin.kind})`}
-                                  className={`px-1.5 py-0.5 rounded border ${
+                                  className={`px-1.5 py-0.5 rounded border shadow-2xs ${
                                     pin.kind === 'analog'
-                                      ? 'bg-cyan-950/60 border-cyan-500/30 text-cyan-300'
-                                      : 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
+                                      ? 'bg-white border-cyan-200 text-cyan-800'
+                                      : 'bg-white border-emerald-200 text-emerald-800'
                                   }`}
                                 >
                                   {pin.id}
                                 </span>
                               ))
                             ) : (
-                              <span className="text-zinc-600">—</span>
+                              <span className="text-[#86868b]">—</span>
                             )}
                           </div>
                         </div>
@@ -476,19 +464,19 @@ export default function LibraryPage() {
 
                       {/* Interactive Launch Link */}
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] font-mono text-zinc-500">
-                          TYPE: <span className="text-zinc-400">{block.type}</span>
+                        <span className="text-[10px] font-mono text-[#86868b]">
+                          TYPE: <span className="text-[#1d1d1f] font-semibold">{block.type}</span>
                         </span>
                         {isReady ? (
                           <Link
                             href="/lab"
-                            className="inline-flex items-center gap-1 text-xs font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors group-hover:translate-x-0.5"
+                            className="inline-flex items-center gap-1 text-xs font-mono font-medium text-[#0071e3] hover:underline transition-colors group-hover:translate-x-0.5"
                           >
                             <span>Wire in Lab</span>
                             <ArrowRight size={12} />
                           </Link>
                         ) : (
-                          <span className="text-[10px] font-mono text-zinc-600">
+                          <span className="text-[10px] font-mono text-[#86868b]">
                             Planned Phase {block.phase}
                           </span>
                         )}
@@ -502,24 +490,24 @@ export default function LibraryPage() {
         </section>
 
         {/* Bottom Call to Action Workbench */}
-        <section className="mt-16 relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-zinc-900/80 to-cyan-950/30 p-8 sm:p-10 shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
+        <section className="mt-16 relative overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white p-8 sm:p-10 shadow-xs">
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-400 uppercase tracking-widest mb-2 font-bold">
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono text-[#059669] uppercase tracking-widest mb-2 font-bold">
                 <CheckCircle2 size={14} />
                 <span>74 Validated Logic Blocks Ready Today</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] tracking-tight">
                 Ready to wire these blocks together?
               </h2>
-              <p className="mt-2 text-sm text-zinc-400 max-w-xl">
+              <p className="mt-2 text-sm text-[#515154] max-w-xl">
                 Open the interactive visual logic editor. Drop components on the canvas, route signals with
                 live oscilloscope waveforms, and export verified JSON schematics.
               </p>
             </div>
             <Link
               href="/lab"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-sm transition shadow-[0_0_25px_rgba(16,185,129,0.35)] whitespace-nowrap"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm transition shadow-xs whitespace-nowrap"
             >
               <span>Open the Logic Lab</span>
               <ArrowRight size={16} />

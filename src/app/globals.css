@@ -15,27 +15,27 @@ body {
 * { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
 button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled), select { cursor: pointer; }
-:focus-visible { outline: 2px solid #22c55e; outline-offset: 3px; }
-::selection { background: rgba(34, 197, 94, 0.2); color: #064e3b; }
+:focus-visible { outline: 2px solid #0071e3; outline-offset: 2px; }
+::selection { background: rgba(0, 113, 227, 0.15); color: #0071e3; }
 
-.lab-workspace { height: calc(100dvh - 64px); min-height: 550px; }
-.lab-button { border: 1px solid #d1d5db; background: #ffffff; color: #374151; border-radius: 5px; padding: 7px 11px; font-size: 11px; white-space: nowrap; transition: background .15s, border-color .15s; }
-.lab-button:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; color: #111827; }
-.lab-button:disabled { opacity: .35; cursor: default; }
-.lab-button.primary { background: #22c55e; color: #ffffff; border-color: #22c55e; font-weight: 650; }
-.lab-button.primary:hover { background: #16a34a; color: #ffffff; }
-.lab-button.danger:hover:not(:disabled) { border-color: #fca5a5; color: #dc2626; }
-.circuit-node { width: 210px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 5px 20px rgba(0,0,0,0.08); pointer-events: auto; }
+.lab-workspace { height: calc(100dvh - 64px); min-height: 550px; background-color: #fbfbfd; color: #1d1d1f; }
+.lab-button { border: 1px solid #e5e5ea; background: #ffffff; color: #1d1d1f; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; white-space: nowrap; transition: all .15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+.lab-button:hover:not(:disabled) { background: #f5f5f7; border-color: #d2d2d7; color: #1d1d1f; }
+.lab-button:disabled { opacity: .4; cursor: default; }
+.lab-button.primary { background: #0071e3; color: #ffffff; border-color: #0071e3; font-weight: 600; }
+.lab-button.primary:hover { background: #0077ed; border-color: #0077ed; color: #ffffff; }
+.lab-button.danger:hover:not(:disabled) { border-color: #fca5a5; color: #dc2626; background: #fef2f2; }
+.circuit-node { width: 210px; border: 1px solid #e5e5ea; border-radius: 12px; background: #ffffff; box-shadow: 0 4px 16px rgba(0,0,0,0.06); pointer-events: auto; }
 .react-flow__node { pointer-events: all !important; }
 .circuit-node button, .circuit-node input, .circuit-node select { pointer-events: auto !important; }
-.circuit-node.is-selected { border-color: #06b6d4; box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25); }
-.circuit-node.is-active { border-color: #22c55e; }
-.circuit-node.is-active.is-selected { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4); }
-.node-field { min-width: 0; border-radius: 3px; border: 1px solid #d1d5db; background: #f9fafb; padding: 4px 5px; color: #374151; font-size: 10px; }
-.react-flow__handle.signal-handle { width: 9px; height: 9px; border: 2px solid #ffffff; background: #22c55e; }
+.circuit-node.is-selected { border-color: #0071e3; box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.25); }
+.circuit-node.is-active { border-color: #059669; }
+.circuit-node.is-active.is-selected { box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.35); }
+.node-field { min-width: 0; border-radius: 6px; border: 1px solid #e5e5ea; background: #f5f5f7; padding: 4px 6px; color: #1d1d1f; font-size: 10px; }
+.react-flow__handle.signal-handle { width: 9px; height: 9px; border: 2px solid #ffffff; background: #059669; }
 .react-flow__handle.signal-handle.analog { background: #06b6d4; border-radius: 2px; }
 .react-flow__handle.connectingto { background: #000; }
-.react-flow__edge.selected .react-flow__edge-path { stroke: #111827 !important; stroke-width: 3 !important; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: #0071e3 !important; stroke-width: 2.5 !important; }
 .react-flow__controls { box-shadow: none !important; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; }
 .react-flow__controls-button { background: #ffffff !important; fill: #6b7280 !important; border-color: #d1d5db !important; }
 .react-flow__minimap { background: #ffffff !important; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }

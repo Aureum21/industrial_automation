@@ -11,7 +11,7 @@ export default function BlogRedirect() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#070b14] flex items-center justify-center text-zinc-400 font-mono text-xs">
+    <div className="min-h-screen bg-[#fbfbfd] flex items-center justify-center text-[#86868b] font-mono text-xs">
       Navigating to Schematics &amp; Blogs Directory...
     </div>
   );

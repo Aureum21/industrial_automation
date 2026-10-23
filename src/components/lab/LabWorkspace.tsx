@@ -335,15 +335,19 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     setMode(newMode);
   };
 
-  return <main id="main-content" className="lab-workspace flex min-h-0 flex-col bg-gray-50 text-gray-900 h-full w-full relative">
+  return <main id="main-content" className="lab-workspace flex min-h-0 flex-col bg-[#fbfbfd] text-[#1d1d1f] h-full w-full relative">
     {!readOnly && (
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-3"><span className="rounded border border-green-200 bg-green-50 px-2 py-1 font-mono text-[10px] text-green-600">LAB / 01</span><input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold outline-none focus:text-green-600" /><span className="text-[10px] text-gray-400">{dirty ? 'Unsaved' : 'Workspace'}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e5ea] px-4 py-2.5 bg-white">
+        <div className="flex items-center gap-3">
+          <span className="rounded-md border border-[#e5e5ea] bg-[#f5f5f7] px-2 py-0.5 font-mono text-[10px] text-[#1d1d1f]">LAB / 01</span>
+          <input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold text-[#1d1d1f] outline-none focus:text-[#0071e3]" />
+          <span className="text-[10px] text-[#86868b]">{dirty ? 'Unsaved' : 'Workspace'}</span>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 mr-2">
-            <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
-            <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'hmi' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
-            <button className={`px-3 py-1 text-xs font-semibold rounded-sm transition ${mode === 'code' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
+          <div className="flex bg-[#f5f5f7] p-1 rounded-xl border border-[#e5e5ea] mr-2">
+            <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'visual' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
+            <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'hmi' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
+            <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'code' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
           </div>
           <button className="lab-button" onClick={save}>Save</button>
           <button className="lab-button" onClick={exportFile}>Export</button>
@@ -352,14 +356,14 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
         </div>
       </div>
     )}
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e5ea] bg-white px-4 py-2">
       <div className="flex items-center gap-2">
         {!readOnly && <button className="lab-button" onClick={() => setLibraryOpen(value => !value)} aria-expanded={libraryOpen}>Components</button>}
         <button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button>
         <button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button>
         <button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button>
         <button className="lab-button" onClick={() => centerView(200)} title="Center circuit in view">⛶ Center</button>
-        <span className="ml-2 font-mono text-[11px] text-gray-500">{(timeMs / 1000).toFixed(1)} s</span>
+        <span className="ml-2 font-mono text-[11px] text-[#86868b]">{(timeMs / 1000).toFixed(1)} s</span>
       </div>
       <div className="flex items-center gap-2">
         {!readOnly && <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>}

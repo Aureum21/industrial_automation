@@ -265,21 +265,21 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
             className={
               isFullscreen
                 ? 'fixed inset-0 z-[100] flex flex-col bg-white'
-                : 'my-12 -mx-4 sm:-mx-8 rounded-2xl overflow-hidden border border-[#e5e5ea] shadow-xl flex flex-col bg-[#0b1118]'
+                : 'my-12 -mx-4 sm:-mx-8 rounded-2xl overflow-hidden border border-[#e5e5ea] shadow-md flex flex-col bg-white'
             }
           >
-            <div className="bg-[#161617] text-white px-5 py-3 border-b border-[#2d2d2e] flex justify-between items-center shrink-0">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
+            <div className="bg-[#fbfbfd] text-[#1d1d1f] px-5 py-3 border-b border-[#e5e5ea] flex justify-between items-center shrink-0">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#059669]">
                 Interactive Simulation Lab
               </span>
               <button
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="text-[#86868b] hover:text-white transition text-xs font-mono"
+                className="text-[#86868b] hover:text-[#1d1d1f] transition text-xs font-mono"
               >
                 {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen ↗'}
               </button>
             </div>
-            <div className="h-[560px] relative w-full overflow-hidden">
+            <div className="h-[560px] relative w-full overflow-hidden bg-white">
               <LabWorkspace readOnly document={singleLabDoc} isFullscreen={isFullscreen} />
             </div>
           </div>

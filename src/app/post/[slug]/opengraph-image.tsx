@@ -22,16 +22,16 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          backgroundColor: '#070b14',
+          backgroundColor: '#fbfbfd',
           backgroundImage:
-            'radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.18) 0%, transparent 45%), radial-gradient(circle at 15% 85%, rgba(6, 182, 212, 0.15) 0%, transparent 45%)',
+            'radial-gradient(circle at 90% 10%, rgba(0, 113, 227, 0.08) 0%, transparent 45%), radial-gradient(circle at 10% 90%, rgba(5, 150, 105, 0.08) 0%, transparent 45%)',
           padding: '60px 70px',
           fontFamily: 'sans-serif',
-          color: '#ffffff',
+          color: '#1d1d1f',
           position: 'relative',
         }}
       >
-        {/* Subtle decorative circuit border */}
+        {/* Subtle decorative Apple hairline border */}
         <div
           style={{
             position: 'absolute',
@@ -39,7 +39,7 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
             left: 24,
             right: 24,
             bottom: 24,
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            border: '1px solid #e5e5ea',
             borderRadius: 24,
             pointerEvents: 'none',
           }}
@@ -53,14 +53,15 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
                 width: 44,
                 height: 44,
                 borderRadius: 12,
-                backgroundColor: '#0d1829',
-                border: '2px solid #10b981',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e5ea',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#34d399',
+                color: '#059669',
                 fontSize: 22,
                 fontWeight: 'bold',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
               }}
             >
               ⚡
@@ -69,22 +70,23 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
               <span
                 style={{
                   fontSize: 20,
-                  fontWeight: 900,
-                  letterSpacing: '1px',
-                  color: '#ffffff',
+                  fontWeight: 800,
+                  letterSpacing: '-0.5px',
+                  color: '#1d1d1f',
                 }}
               >
-                AUTOMATIONHUB
+                AutomationHub
               </span>
               <span
                 style={{
                   fontSize: 11,
                   fontFamily: 'monospace',
-                  letterSpacing: '2px',
-                  color: '#34d399',
+                  letterSpacing: '1px',
+                  color: '#86868b',
+                  fontWeight: 600,
                 }}
               >
-                DETERMINISTIC LOGIC &amp; CONTROLS
+                DETERMINISTIC CONTROLS &amp; SCADA
               </span>
             </div>
           </div>
@@ -96,10 +98,10 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
               gap: '10px',
               padding: '8px 18px',
               borderRadius: 30,
-              backgroundColor: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.4)',
-              color: '#6ee7b7',
-              fontSize: 14,
+              backgroundColor: '#f5f5f7',
+              border: '1px solid #e5e5ea',
+              color: '#0071e3',
+              fontSize: 13,
               fontFamily: 'monospace',
               fontWeight: 700,
             }}
@@ -116,9 +118,9 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
             style={{
               fontSize: title.length > 80 ? 42 : 50,
               fontWeight: 800,
-              lineHeight: 1.2,
-              letterSpacing: '-1px',
-              color: '#ffffff',
+              lineHeight: 1.15,
+              letterSpacing: '-1.5px',
+              color: '#1d1d1f',
               margin: 0,
             }}
           >
@@ -129,13 +131,12 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              color: '#94a3b8',
-              fontSize: 16,
-              fontFamily: 'monospace',
+              color: '#515154',
+              fontSize: 17,
             }}
           >
-            <span style={{ color: '#10b981' }}>▶</span>
-            <span>Includes 3 Interactive Function Block Diagram (FBD) Labs &amp; P&amp;ID Incident Diagnosis</span>
+            <span style={{ color: '#059669', fontWeight: 700 }}>▶</span>
+            <span>Interactive Function Block Diagram (FBD) Lab &amp; Root Cause Failure Diagnosis</span>
           </div>
         </div>
 
@@ -145,7 +146,7 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '1px solid #e5e5ea',
             paddingTop: '24px',
           }}
         >
@@ -155,24 +156,24 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
                 width: 52,
                 height: 52,
                 borderRadius: '50%',
-                backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                border: '2px solid #10b981',
+                backgroundColor: '#1d1d1f',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 18,
                 fontWeight: 'bold',
-                color: '#34d399',
+                color: '#ffffff',
                 fontFamily: 'monospace',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
               }}
             >
               AW
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc' }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: '#1d1d1f' }}>
                 Authored by Alazar Wake Kore
               </span>
-              <span style={{ fontSize: 13, color: '#94a3b8' }}>
+              <span style={{ fontSize: 13, color: '#86868b' }}>
                 Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)
               </span>
             </div>
@@ -185,7 +186,8 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
               gap: '8px',
               fontSize: 14,
               fontFamily: 'monospace',
-              color: '#38bdf8',
+              fontWeight: 600,
+              color: '#0071e3',
             }}
           >
             <span>industrialautomation.website</span>
