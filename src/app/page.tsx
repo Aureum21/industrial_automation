@@ -1,31 +1,36 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
-import { getAllPosts } from '@/lib/blogStorage';
-import Image from 'next/image';
-
-type Floor = 'G' | 'B1' | 'B2' | 'B3';
-type DoorState = 'open' | 'closing' | 'closed' | 'opening';
-
-const FLOOR_INDEX: Record<Floor, number> = { G: 0, B1: 1, B2: 2, B3: 3 };
-const FLOORS: Floor[] = ['G', 'B1', 'B2', 'B3'];
+import {
+  Cpu,
+  ArrowRight,
+  ExternalLink,
+  ShieldCheck,
+  Activity,
+  Layers,
+  Zap,
+  CheckCircle2,
+  Terminal,
+  BookOpen,
+  Sparkles,
+} from 'lucide-react';
+import { BLOG_POSTS, AUTHOR_NAME, AUTHOR_LINKEDIN, type BlogPost } from '@/lib/mockPosts';
+import { getAllPosts, syncArticlesFromCloud } from '@/lib/blogStorage';
+import InlineLab from '@/components/lab/InlineLab';
 
 export default function Home() {
-  const [activeFloor, setActiveFloor] = useState<Floor>('G');
-  const [doorState, setDoorState] = useState<DoorState>('open');
-  const [isMoving, setIsMoving] = useState(false);
-  const [targetFloor, setTargetFloor] = useState<Floor>('G');
-  const [showAllArticles, setShowAllArticles] = useState(false);
-  const [allPosts, setAllPosts] = useState<BlogPost[]>(BLOG_POSTS);
+  const [posts, setPosts] = useState<BlogPost[]>(BLOG_POSTS);
 
   useEffect(() => {
-    setAllPosts(getAllPosts());
+    setPosts(getAllPosts());
+
+    // Fetch live actual read counts and synced articles from Neon DB
     fetch('/api/views')
       .then((res) => res.json())
       .then((data) => {
         if (data.ok && data.views) {
-          setAllPosts((prev) =>
+          setPosts((prev) =>
             prev.map((p) => ({
               ...p,
               views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
@@ -34,263 +39,297 @@ export default function Home() {
         }
       })
       .catch(() => {});
+
+    syncArticlesFromCloud().then((cloudPosts) => {
+      if (cloudPosts.length > 0) {
+        setPosts(getAllPosts());
+      }
+    });
   }, []);
 
-  const sortedPosts = useMemo(() => {
-    return [...allPosts].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
-  }, [allPosts]);
+  const totalReads = useMemo(() => {
+    return posts.reduce((sum, p) => sum + (p.views || 1), 0);
+  }, [posts]);
 
-  const visiblePosts = showAllArticles ? sortedPosts : sortedPosts.slice(0, 6);
+  // Interactive Hero Demo Circuit (Start/Stop with Dry Suction Permissive)
+  const heroCircuitDsl = `circuit "Intake Permissive Interlock" version 1 {
+  start_btn: INPUT(label="Start Pushbutton", value=true)
+  stop_btn: INPUT(label="E-Stop / Stop", value=false)
+  permissive_suction: INPUT(label="LSL-101 Suction OK", value=true)
+  motor_latch: RS_LATCH()
+  safety_gate: AND()
+  pump_contactor: OUTPUT(label="P-101A Motor Run")
 
-  const goToFloor = (floor: Floor) => {
-    if (floor === activeFloor || doorState !== 'open') return;
-    setTargetFloor(floor);
-    setDoorState('closing');
-
-    setTimeout(() => {
-      setDoorState('closed');
-      setIsMoving(true);
-      
-      // Calculate dynamic duration based on floors traveled. 
-      // Base time 1.5s + 0.5s per floor crossed.
-      const diff = Math.abs(FLOOR_INDEX[floor] - FLOOR_INDEX[activeFloor]);
-      const moveDuration = 1000 + (diff * 500);
-
-      // Trigger the slide
-      setActiveFloor(floor);
-
-      setTimeout(() => {
-        setIsMoving(false);
-        setDoorState('opening');
-
-        setTimeout(() => {
-          setDoorState('open');
-        }, 1200); 
-      }, moveDuration); 
-    }, 1200); 
-  };
-
-  const leftDoorTransform = (doorState === 'open' || doorState === 'opening') ? 'translateX(-100%)' : 'translateX(0)';
-  const rightDoorTransform = (doorState === 'open' || doorState === 'opening') ? 'translateX(100%)' : 'translateX(0)';
+  start_btn.Q -> motor_latch.S
+  stop_btn.Q -> motor_latch.R
+  motor_latch.Q -> safety_gate.A
+  permissive_suction.Q -> safety_gate.B
+  safety_gate.Q -> pump_contactor.A
+}`;
 
   return (
-    <main className="w-full h-screen overflow-hidden bg-black relative flex">
-      {/* Main Floor View / Elevator Shaft */}
-      <div className="flex-1 h-full relative overflow-hidden bg-zinc-950">
-        
-        <div 
-          className="w-full flex flex-col transition-transform ease-in-out"
-          style={{ 
-            height: '400vh',
-            transform: `translateY(-${FLOOR_INDEX[activeFloor] * 25}%)`,
-            transitionDuration: isMoving ? `${1000 + Math.abs(FLOOR_INDEX[targetFloor] - FLOOR_INDEX[activeFloor]) * 500}ms` : '0ms'
-          }}
-        >
-          {/* Ground Floor (G) */}
-          <div className="h-screen w-full relative flex items-center justify-center text-center">
-            <div className="absolute inset-0 z-0">
-              <Image src="/hero_bg.jpg" alt="Future of Automation" fill className="object-cover" priority />
-              <div className="absolute inset-0 bg-black/60" />
-            </div>
-            <div className="relative z-10 p-8 max-w-4xl text-white">
-              <h1 className="text-6xl md:text-8xl font-serif font-bold tracking-tighter mb-6 shadow-black drop-shadow-xl">AutomationHub</h1>
-              <p className="text-xl md:text-3xl font-light text-gray-200 shadow-black drop-shadow-md">The future of industrial logic and AI is here.</p>
-            </div>
+    <main className="bg-[#fbfbfd] min-h-screen text-[#1d1d1f] font-sans antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
+      {/* 1. HERO SECTION (Apple Cupertino Clean Aesthetic) */}
+      <section className="pt-16 pb-20 px-5 sm:px-8 border-b border-[#e5e5ea] overflow-hidden relative">
+        <div className="max-w-5xl mx-auto text-center">
+          {/* Subtle Tag Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono font-medium text-[#1d1d1f] mb-6 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
+            <span>INDUSTRIAL SCADA &amp; DETERMINISTIC CONTROLS</span>
           </div>
 
-          {/* Basement 1 (B1) - Data Archive (Blog) */}
-          <div className="h-screen w-full bg-[#050505] text-gray-200 p-8 overflow-y-auto relative">
-            {/* Subtle animated background grid */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-            
-            <div className="max-w-7xl mx-auto py-16 pb-32 relative z-10">
-              <div className="mb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-800/80 pb-8">
+          {/* Hero Headline */}
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1d1d1f] leading-[1.08] mb-6">
+            Deterministic Control Logic.
+            <br />
+            <span className="text-[#86868b]">Engineered for Real Plants.</span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-[#515154] leading-relaxed mb-10 font-normal">
+            Interactive Function Block Diagrams, closed-loop process simulations, and fail-safe interlocks — authored for modern electrical and controls engineers.
+          </p>
+
+          {/* Call to Actions */}
+          <div className="flex flex-wrap items-center justify-center gap-3.5">
+            <Link
+              href="/blogs"
+              className="px-6 py-3 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+            >
+              <span>Explore 10 Masterclasses</span>
+              <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/lab"
+              className="px-6 py-3 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#d2d2d7] text-[#1d1d1f] font-medium text-sm transition-all shadow-2xs flex items-center gap-2"
+            >
+              <Cpu size={16} className="text-[#059669]" />
+              <span>Launch Logic Lab</span>
+            </Link>
+          </div>
+
+          {/* Platform Metrics Bar */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs font-mono text-[#86868b] pt-8 border-t border-[#e5e5ea]/80">
+            <div>
+              <strong className="text-[#1d1d1f] text-sm">10</strong> MASTERCLASSES
+            </div>
+            <div>•</div>
+            <div>
+              <strong className="text-[#1d1d1f] text-sm">30</strong> INTERACTIVE FBD LABS
+            </div>
+            <div>•</div>
+            <div>
+              <strong className="text-[#059669] text-sm">⚡ {totalReads}</strong> PLATFORM READS
+            </div>
+            <div>•</div>
+            <div>
+              <strong className="text-[#1d1d1f] text-sm">100%</strong> FREE &amp; OPEN
+            </div>
+          </div>
+        </div>
+
+        {/* Live Interactive Hero Hardware Simulator */}
+        <div className="max-w-4xl mx-auto mt-14">
+          <div className="text-center mb-3">
+            <span className="text-xs font-mono font-medium text-[#86868b] uppercase tracking-wider">
+              [ LIVE HARDWARE SIMULATION · TOGGLE INPUTS BELOW ]
+            </span>
+          </div>
+          <InlineLab
+            dsl={heroCircuitDsl}
+            title="Intake Permissive Interlock (Try toggling LSL-101 Suction)"
+            step="INTERACTIVE DEMO"
+            height={440}
+          />
+        </div>
+      </section>
+
+      {/* 2. THE THREE ENGINEERING PILLARS */}
+      <section className="py-20 px-5 sm:px-8 bg-[#f5f5f7] border-b border-[#e5e5ea]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1d1d1f] mb-4">
+              Built on First-Principles Control Theory
+            </h2>
+            <p className="text-base sm:text-lg text-[#86868b]">
+              Every masterclass is structured to diagnose real catastrophic failures, calculate engineering tolerances, and implement verified logic.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-8 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs">
+              <span className="w-10 h-10 rounded-xl bg-[#0071e3]/10 text-[#0071e3] flex items-center justify-center mb-5">
+                <Cpu size={20} />
+              </span>
+              <h3 className="text-lg font-bold text-[#1d1d1f] mb-2 tracking-tight">
+                Deterministic Execution
+              </h3>
+              <p className="text-sm text-[#515154] leading-relaxed">
+                Single-scan cycle evaluation guarantees that race conditions, contact bounce, and feedback loops are handled without ambiguous simulation timing drift.
+              </p>
+            </div>
+
+            <div className="p-8 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs">
+              <span className="w-10 h-10 rounded-xl bg-[#059669]/10 text-[#059669] flex items-center justify-center mb-5">
+                <Activity size={20} />
+              </span>
+              <h3 className="text-lg font-bold text-[#1d1d1f] mb-2 tracking-tight">
+                P&amp;ID Incident Case Studies
+              </h3>
+              <p className="text-sm text-[#515154] leading-relaxed">
+                From municipal cavitation blowouts to $240,000 hydraulic press amputations, every schematic starts with a real-world root cause failure analysis.
+              </p>
+            </div>
+
+            <div className="p-8 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs">
+              <span className="w-10 h-10 rounded-xl bg-[#dc2626]/10 text-[#dc2626] flex items-center justify-center mb-5">
+                <ShieldCheck size={20} />
+              </span>
+              <h3 className="text-lg font-bold text-[#1d1d1f] mb-2 tracking-tight">
+                Hardware Safety Failsafes
+              </h3>
+              <p className="text-sm text-[#515154] leading-relaxed">
+                Learn why software loops cannot replace physical safety relays, implementing strict ISO 13851 Category 4 / PL e dual-channel monitored architectures.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. THE 10 MASTERCLASSES ARCHIVE */}
+      <section className="py-20 px-5 sm:px-8 border-b border-[#e5e5ea]">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+            <div>
+              <div className="text-xs font-mono text-[#0071e3] font-semibold uppercase tracking-wider mb-2">
+                COMPLETE CURRICULUM
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1d1d1f]">
+                Published Masterclasses
+              </h2>
+            </div>
+            <Link
+              href="/blogs"
+              className="text-xs font-mono font-medium text-[#0071e3] hover:text-[#0077ed] inline-flex items-center gap-1"
+            >
+              <span>View Searchable Directory</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {posts.map((post) => (
+              <Link
+                key={post.slug}
+                href={`/post/${post.slug}`}
+                className="group p-7 rounded-2xl bg-white border border-[#e5e5ea] hover:border-[#d2d2d7] hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
+              >
                 <div>
-                  <p className="text-green-500 font-mono text-xs tracking-widest mb-2 shadow-green-500/20 drop-shadow-md">
-                    [ DIRECTORY ACCESS // RANKED BY READERSHIP ]
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[11px] font-mono font-semibold uppercase px-2.5 py-0.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f]">
+                      {post.tag}
+                    </span>
+                    <div className="flex items-center gap-3 text-[11px] font-mono text-[#86868b]">
+                      <span>{post.date}</span>
+                      <span className="text-[#059669] font-medium">⚡ {post.views} reads</span>
+                    </div>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors leading-snug mb-2.5">
+                    {post.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#515154] line-clamp-3 leading-relaxed mb-6 font-normal">
+                    {post.excerpt}
                   </p>
-                  <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white">Schematics Archive</h2>
-                  <div className="h-1 w-24 bg-green-500 mt-4 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
                 </div>
-                <div className="font-mono text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-800 px-4 py-2 rounded">
-                  <span className="text-emerald-400">● SORT:</span> MOST VIEWED FIRST · <span className="text-zinc-200">{visiblePosts.length}</span> OF <span className="text-zinc-200">{sortedPosts.length}</span> SCHEMATICS
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {visiblePosts.map((article, i) => (
-                  <Link key={article.slug} href={`/post/${article.slug}`} className="group relative block bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 p-6 hover:bg-zinc-800/60 transition-all duration-300 overflow-hidden hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(34,197,94,0.15)] flex flex-col justify-between">
-                    
-                    {/* Hover Glow Effect */}
-                    <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 group-hover:bg-green-500 transition-colors shadow-[0_0_10px_rgba(34,197,94,0)] group-hover:shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-                    
-                    <div>
-                      <div className="flex justify-between items-center mb-6 gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] text-zinc-500 group-hover:text-green-400 transition-colors">
-                            SYS.DOC.{String(i + 1).padStart(3, '0')}
-                          </span>
-                          <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/60">
-                            #{i + 1}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-500/20 px-2 py-0.5 rounded tracking-wider font-semibold">
-                            ⚡ {article.views} {article.views === 1 ? 'VIEW' : 'VIEWS'}
-                          </span>
-                          <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider">
-                            {article.tag}
-                          </span>
-                        </div>
-                      </div>
-
-                      <h3 className="text-2xl font-bold mb-3 text-zinc-100 group-hover:text-white transition-colors leading-tight">{article.title}</h3>
-                      <p className="text-zinc-400 text-sm mb-8 line-clamp-3 group-hover:text-zinc-300 transition-colors">{article.excerpt}</p>
-                    </div>
-                    
-                    <div className="pt-4 border-t border-zinc-800/60 flex items-center justify-between font-mono text-xs text-zinc-500">
-                      <div className="flex flex-col gap-1">
-                        <span
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            window.open('https://www.linkedin.com/in/alazar-wake-45915a276/', '_blank');
-                          }}
-                          className="hover:text-emerald-400 transition cursor-pointer truncate max-w-[220px]"
-                          title={article.author}
-                        >
-                          <span className="text-zinc-600">&gt; AUTH:</span> {article.author}
-                        </span>
-                        <span><span className="text-zinc-600">&gt; DATE:</span> {article.date}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-green-500/0 group-hover:text-green-500 transition-colors mr-2">→</span>
-                        {article.readingTime}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              {sortedPosts.length > 6 && (
-                <div className="mt-14 flex justify-center">
-                  <button
-                    onClick={() => setShowAllArticles(prev => !prev)}
-                    className="group relative inline-flex items-center gap-3 px-8 py-4 bg-zinc-900/90 backdrop-blur-md border border-zinc-700 hover:border-green-500 rounded-sm font-mono text-xs tracking-widest uppercase text-zinc-200 hover:text-white transition-all duration-300 shadow-2xl hover:shadow-[0_0_25px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 cursor-pointer"
+                <div className="pt-4 border-t border-[#f5f5f7] flex items-center justify-between text-xs text-[#86868b]">
+                  <span
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(AUTHOR_LINKEDIN, '_blank');
+                    }}
+                    className="hover:text-[#0071e3] transition truncate max-w-[280px] font-medium"
+                    title={post.author}
                   >
-                    <span className="text-green-400 font-bold group-hover:scale-125 transition-transform">
-                      {showAllArticles ? '▲' : '▼'}
-                    </span>
-                    <span>
-                      {showAllArticles
-                        ? 'COLLAPSE ARCHIVE'
-                        : `READ MORE (+${sortedPosts.length - 6} SCHEMATICS)`}
-                    </span>
-                    <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded text-[10px] ml-2">
-                      {visiblePosts.length} / {sortedPosts.length}
-                    </span>
-                  </button>
+                    Alazar Wake Kore (HCT Senior)
+                  </span>
+                  <span className="font-mono text-[#1d1d1f] group-hover:text-[#0071e3] flex items-center gap-1 font-medium transition-colors">
+                    <span>{post.readingTime.split('+')[0]}</span>
+                    <span>→</span>
+                  </span>
                 </div>
-              )}
-            </div>
+              </Link>
+            ))}
           </div>
+        </div>
+      </section>
 
-          {/* Basement 2 (B2) - The Lab */}
-          <div className="h-screen w-full bg-gray-50 flex items-center justify-center text-center">
-            <div className="max-w-2xl p-8 relative z-10">
-              <h2 className="text-5xl font-extrabold text-gray-900 mb-6">Enter The Lab</h2>
-              <p className="text-xl text-gray-600 mb-10">Start building, simulating, and validating your control logic in a fully interactive visual environment.</p>
-              <Link href="/lab" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold text-lg px-8 py-4 rounded-full transition shadow-xl hover:shadow-2xl transform hover:-translate-y-1">
-                Launch Workspace
+      {/* 4. AUTHOR SPOTLIGHT (Personal Brand / LinkedIn) */}
+      <section className="py-20 px-5 sm:px-8 bg-white border-b border-[#e5e5ea]">
+        <div className="max-w-4xl mx-auto p-8 sm:p-12 rounded-3xl bg-[#f5f5f7] border border-[#e5e5ea] flex flex-col sm:flex-row items-center gap-8 shadow-xs">
+          <div className="w-24 h-24 rounded-full bg-[#1d1d1f] text-white flex items-center justify-center font-bold text-2xl font-mono shrink-0 shadow-md">
+            AW
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <div className="text-xs font-mono uppercase tracking-widest text-[#059669] font-bold mb-1.5">
+              LEAD AUTHOR &amp; RESEARCHER
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-2">
+              Alazar Wake Kore
+            </h3>
+            <p className="text-sm text-[#515154] leading-relaxed mb-4">
+              Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE) specializing in deterministic PLC logic, SCADA safety interlocks, and closed-loop process control.
+            </p>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+              <a
+                href={AUTHOR_LINKEDIN}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-xs font-medium transition shadow-xs"
+              >
+                <span>Connect on LinkedIn</span>
+                <ExternalLink size={13} />
+              </a>
+              <Link
+                href="/write"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-[#e5e5ea] border border-[#d2d2d7] text-[#1d1d1f] text-xs font-medium transition shadow-2xs"
+              >
+                <span>Open Author Studio</span>
+                <ArrowRight size={13} />
               </Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Basement 3 (B3) - Footer/About */}
-          <div className="h-screen w-full bg-zinc-900 text-white p-12 flex flex-col justify-between overflow-y-auto">
-            <div className="max-w-5xl mx-auto w-full pt-16">
-              <h2 className="text-4xl font-bold mb-12">AutomationHub</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-gray-400">
-                <div className="flex flex-col gap-4">
-                  <h4 className="text-white font-semibold mb-2">Platform</h4>
-                  <Link href="/lab" className="hover:text-white transition">Workspace</Link>
-                  <Link href="#" className="hover:text-white transition">HMI Builder</Link>
-                  <Link href="#" className="hover:text-white transition">Logic Engine</Link>
-                </div>
-                <div className="flex flex-col gap-4">
-                  <h4 className="text-white font-semibold mb-2">Resources</h4>
-                  <button onClick={() => goToFloor('B1')} className="text-left hover:text-white transition">Blog</button>
-                  <Link href="#" className="hover:text-white transition">Documentation</Link>
-                  <Link href="#" className="hover:text-white transition">Tutorials</Link>
-                </div>
-                <div className="flex flex-col gap-4">
-                  <h4 className="text-white font-semibold mb-2">Company</h4>
-                  <Link href="#" className="hover:text-white transition">About Us</Link>
-                  <Link href="#" className="hover:text-white transition">Careers</Link>
-                  <Link href="#" className="hover:text-white transition">Contact</Link>
-                </div>
-                <div className="flex flex-col gap-4">
-                  <h4 className="text-white font-semibold mb-2">Legal</h4>
-                  <Link href="#" className="hover:text-white transition">Privacy Policy</Link>
-                  <Link href="#" className="hover:text-white transition">Terms of Service</Link>
-                </div>
-              </div>
-            </div>
-            <div className="text-center text-gray-600 mt-24">
-              © {new Date().getFullYear()} AutomationHub. All rights reserved.
-            </div>
+      {/* 5. MINIMALIST APPLE FOOTER */}
+      <footer className="py-12 px-5 sm:px-8 text-xs text-[#86868b] font-sans">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-md bg-[#1d1d1f] text-white flex items-center justify-center text-[10px] font-bold font-mono">
+              ⚡
+            </span>
+            <span className="font-semibold text-[#1d1d1f]">AutomationHub</span>
+            <span>—</span>
+            <span>Industrial Control Systems Education</span>
+          </div>
+          <div className="flex items-center gap-4 font-mono text-[11px]">
+            <a href={AUTHOR_LINKEDIN} target="_blank" rel="noopener noreferrer" className="hover:text-[#1d1d1f]">
+              LinkedIn
+            </a>
+            <span>•</span>
+            <Link href="/blogs" className="hover:text-[#1d1d1f]">
+              Archive
+            </Link>
+            <span>•</span>
+            <Link href="/lab" className="hover:text-[#1d1d1f]">
+              Logic Lab
+            </Link>
           </div>
         </div>
-        
-        {/* Elevator Glass Doors overlaying the view */}
-        <div 
-          className={`absolute top-0 left-0 w-[50.2%] h-full bg-slate-900/40 backdrop-blur-md border-r-2 border-white/20 shadow-[10px_0_30px_rgba(0,0,0,0.5)] z-40 transition-transform duration-[1200ms] ease-in-out ${doorState === 'open' ? 'pointer-events-none' : ''}`}
-          style={{ transform: leftDoorTransform }}
-        >
-           {/* Glass reflections */}
-           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent w-1/2" />
-        </div>
-        <div 
-          className={`absolute top-0 right-0 w-[50.2%] h-full bg-slate-900/40 backdrop-blur-md border-l-2 border-white/20 shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-40 transition-transform duration-[1200ms] ease-in-out ${doorState === 'open' ? 'pointer-events-none' : ''}`}
-          style={{ transform: rightDoorTransform }}
-        >
-           {/* Glass reflections */}
-           <div className="absolute inset-0 bg-gradient-to-l from-transparent via-white/5 to-transparent w-1/2 right-0" />
-        </div>
-      </div>
-
-      {/* Elevator Control Panel */}
-      <div className="w-24 md:w-32 h-full bg-zinc-900 border-l-4 border-zinc-950 z-50 flex flex-col items-center py-12 shadow-2xl shrink-0 relative overflow-hidden">
-        {/* Metallic brush texture effect */}
-        <div className="absolute inset-0 opacity-10 bg-[repeating-linear-gradient(90deg,transparent,transparent_2px,#fff_2px,#fff_4px)]" />
-        
-        <div className="relative z-10 bg-black w-16 md:w-20 h-12 md:h-16 rounded mb-8 md:mb-12 flex flex-col items-center justify-center border-2 border-zinc-800 shadow-inner">
-          <div className={`text-red-500 font-mono text-2xl md:text-3xl tracking-widest font-bold ${isMoving ? 'animate-pulse' : ''}`}>
-            {isMoving ? '...' : activeFloor}
-          </div>
-        </div>
-
-        <div className="relative z-10 flex flex-col gap-4 md:gap-6">
-          {FLOORS.map(floor => (
-            <button
-              key={floor}
-              onClick={() => goToFloor(floor)}
-              disabled={doorState !== 'open'}
-              className="group relative flex items-center justify-center w-12 md:w-16 h-12 md:h-16 rounded-full bg-zinc-800 border-4 border-zinc-700 shadow-lg hover:border-zinc-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className={`absolute inset-1 rounded-full ${targetFloor === floor && doorState !== 'open' ? 'bg-red-500/20' : ''}`} />
-              <div className={`absolute inset-1 rounded-full ${activeFloor === floor && doorState === 'open' ? 'bg-green-500/10' : ''}`} />
-              <span className={`font-bold font-mono text-lg md:text-xl z-10 ${targetFloor === floor && doorState !== 'open' ? 'text-red-400' : (activeFloor === floor && doorState === 'open' ? 'text-green-400' : 'text-zinc-400 group-hover:text-zinc-200')}`}>
-                {floor}
-              </span>
-            </button>
-          ))}
-        </div>
-        
-        <div className="relative z-10 mt-auto text-zinc-500 font-mono text-[10px] tracking-widest text-center">
-          CAPACITY<br/>1200 KG
-        </div>
-      </div>
+      </footer>
     </main>
   );
 }

@@ -447,9 +447,43 @@ export function saveCustomPost(external: ExternalBlogPost): void {
     const filtered = existingList.filter(p => p.slug !== external.slug);
     filtered.unshift(external);
     localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
+
+    // Persist and sync to Neon PostgreSQL cloud database
+    fetch('/api/articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(external),
+    }).catch(err => console.warn('Neon cloud article sync deferred:', err));
   } catch (e) {
     console.error('Failed to save custom post:', e);
   }
+}
+
+/**
+ * Syncs articles from Neon PostgreSQL into client-side cache
+ */
+export async function syncArticlesFromCloud(): Promise<ExternalBlogPost[]> {
+  try {
+    const res = await fetch('/api/articles');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.articles) && data.articles.length > 0) {
+      if (typeof window !== 'undefined') {
+        const existingRaw = localStorage.getItem(STORAGE_KEY_CUSTOM_POSTS);
+        const existingList: ExternalBlogPost[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const cloudSlugs = new Set(data.articles.map((a: ExternalBlogPost) => a.slug));
+        const merged = [
+          ...data.articles,
+          ...existingList.filter(local => !cloudSlugs.has(local.slug)),
+        ];
+        localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(merged));
+      }
+      return data.articles;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch articles from cloud:', err);
+  }
+  return [];
 }
 
 export function getCustomBlogPosts(): BlogPost[] {
@@ -508,6 +542,13 @@ export function deleteCustomPost(slug: string): void {
     const existing: ExternalBlogPost[] = JSON.parse(raw);
     const filtered = existing.filter(p => p.slug !== slug);
     localStorage.setItem(STORAGE_KEY_CUSTOM_POSTS, JSON.stringify(filtered));
+
+    // Also delete from Neon Cloud Database
+    fetch('/api/articles', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    }).catch(() => {});
   } catch (e) {
     console.error('Failed to delete custom post:', e);
   }

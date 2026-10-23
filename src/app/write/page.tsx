@@ -324,25 +324,25 @@ function WriteContent() {
   };
 
   return (
-    <main className="bg-[#0b101b] min-h-screen text-zinc-100 pb-32 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+    <main className="bg-[#fbfbfd] min-h-screen text-[#1d1d1f] pb-32 font-sans selection:bg-[#0071e3]/20 selection:text-[#0071e3]">
       {/* Top Header / Mode Switcher */}
-      <div className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md py-4 px-6 sticky top-0 z-30 shadow-md">
+      <div className="border-b border-[#e5e5ea] bg-white/80 backdrop-blur-xl py-4 px-6 sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-mono text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               EDITOR STUDIO // AUTHOR STATION
             </span>
 
             {/* Navigation Tabs */}
-            <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+            <div className="flex bg-[#f5f5f7] p-1 rounded-xl border border-[#e5e5ea]">
               <button
                 type="button"
                 onClick={() => setActiveTab('publications')}
                 className={`px-4 py-1.5 text-xs font-mono font-semibold rounded-lg transition ${
                   activeTab === 'publications'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 My Publications ({publications.length})
@@ -352,8 +352,8 @@ function WriteContent() {
                 onClick={() => setActiveTab('editor')}
                 className={`px-4 py-1.5 text-xs font-mono font-semibold rounded-lg transition ${
                   activeTab === 'editor'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 Article Editor
@@ -363,8 +363,8 @@ function WriteContent() {
                 onClick={() => setActiveTab('upload')}
                 className={`px-4 py-1.5 text-xs font-mono font-semibold rounded-lg transition ${
                   activeTab === 'upload'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
                 Import JSON / MD
@@ -376,14 +376,14 @@ function WriteContent() {
             <button
               type="button"
               onClick={startNewArticle}
-              className="text-xs font-mono font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-[0_0_15px_rgba(52,211,153,0.3)]"
+              className="text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
             >
               <PlusCircle size={14} />
               <span>New Masterclass</span>
             </button>
             <Link
               href="/blogs"
-              className="text-xs font-mono text-zinc-400 hover:text-white border border-zinc-700 bg-zinc-900 px-3 py-1.5 rounded-lg transition"
+              className="text-xs font-mono text-[#1d1d1f] hover:bg-[#f5f5f7] border border-[#e5e5ea] bg-white px-3 py-1.5 rounded-xl transition shadow-xs"
             >
               Browse Directory ↗
             </Link>
@@ -394,15 +394,15 @@ function WriteContent() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         {/* Success Alert Banner */}
         {saveSuccessNotice && (
-          <div className="mb-6 p-4 bg-emerald-950/60 border border-emerald-500/40 rounded-xl flex items-center justify-between text-emerald-300 text-xs sm:text-sm font-mono shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-in fade-in">
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-800 text-xs sm:text-sm font-mono shadow-xs animate-in fade-in">
             <div className="flex items-center gap-3">
-              <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+              <CheckCircle size={20} className="text-emerald-600 shrink-0" />
               <span>{saveSuccessNotice}</span>
             </div>
             <button
               type="button"
               onClick={() => setSaveSuccessNotice(null)}
-              className="text-zinc-400 hover:text-white"
+              className="text-[#86868b] hover:text-[#1d1d1f]"
             >
               Dismiss
             </button>
@@ -414,18 +414,18 @@ function WriteContent() {
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'publications' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e5e5ea]">
               <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">
+                <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight">
                   Editor Publications &amp; Works
                 </h2>
-                <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+                <p className="text-xs sm:text-sm text-[#86868b] mt-1">
                   Manage, modify, and proof-test masterclasses authored by{' '}
                   <a
                     href={AUTHOR_LINKEDIN}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-emerald-400 hover:text-emerald-300 font-bold underline decoration-dotted inline-flex items-center gap-1"
+                    className="text-[#0071e3] hover:underline font-bold inline-flex items-center gap-1"
                   >
                     Alazar Wake Kore
                     <ExternalLink size={12} />
@@ -433,8 +433,8 @@ function WriteContent() {
                   . Changes save instantly to your live platform.
                 </p>
               </div>
-              <div className="text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
-                <span className="text-emerald-400 font-bold">10 OF 10</span> PUBLISHED ARTICLES
+              <div className="text-xs font-mono text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3.5 py-2 rounded-xl shadow-xs">
+                <span className="text-[#0071e3] font-bold">10 OF 10</span> PUBLISHED ARTICLES
               </div>
             </div>
 
@@ -442,37 +442,37 @@ function WriteContent() {
               {publications.map((post) => (
                 <div
                   key={post.slug}
-                  className="bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/40 rounded-xl p-5 transition-all flex flex-col justify-between group shadow-sm hover:shadow-[0_8px_24px_rgba(16,185,129,0.1)]"
+                  className="bg-white border border-[#e5e5ea] hover:border-[#0071e3]/40 rounded-2xl p-5 sm:p-6 transition-all flex flex-col justify-between group shadow-xs hover:shadow-md"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="font-mono text-[10px] text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded font-bold">
+                      <span className="font-mono text-[10px] text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-0.5 rounded-full font-bold">
                         {post.tag}
                       </span>
-                      <div className="flex items-center gap-3 font-mono text-[10px] text-zinc-400">
+                      <div className="flex items-center gap-3 font-mono text-[10px] text-[#86868b]">
                         <span>📅 {post.date}</span>
-                        <span className="text-emerald-400">⚡ {post.views} reads</span>
+                        <span className="text-emerald-700 font-semibold">⚡ {post.views} reads</span>
                       </div>
                     </div>
 
-                    <h3 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug mb-2">
+                    <h3 className="text-lg font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors leading-snug mb-2">
                       {post.title}
                     </h3>
-                    <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed mb-4">
+                    <p className="text-xs text-[#424245] line-clamp-2 leading-relaxed mb-4">
                       {post.excerpt}
                     </p>
                   </div>
 
-                  <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-zinc-500">
-                      Author: <span className="text-zinc-300 font-bold">{post.author}</span>
+                  <div className="pt-3 border-t border-[#e5e5ea] flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono text-[#86868b]">
+                      Author: <span className="text-[#1d1d1f] font-semibold">{post.author}</span>
                     </span>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => startEditing(post)}
-                        className="inline-flex items-center gap-1 text-xs font-mono font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 px-3 py-1.5 rounded-lg transition shadow-xs"
+                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3 py-1.5 rounded-lg transition shadow-xs"
                       >
                         <Edit size={12} />
                         <span>Edit</span>
@@ -481,7 +481,7 @@ function WriteContent() {
                       <Link
                         href={`/post/${post.slug}`}
                         target="_blank"
-                        className="inline-flex items-center gap-1 text-xs font-mono text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-2.5 py-1.5 rounded-lg transition"
+                        className="inline-flex items-center gap-1 text-xs font-mono text-[#1d1d1f] hover:bg-[#e5e5ea] bg-[#f5f5f7] border border-[#e5e5ea] px-2.5 py-1.5 rounded-lg transition"
                         title="View Live Post"
                       >
                         <ExternalLink size={12} />
@@ -490,7 +490,7 @@ function WriteContent() {
                       <button
                         type="button"
                         onClick={() => handleExportPost(post)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                        className="p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition"
                         title="Download JSON schema"
                       >
                         <Download size={13} />
@@ -509,22 +509,22 @@ function WriteContent() {
         {activeTab === 'editor' && (
           <div className="space-y-6">
             {/* Editor Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800">
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono font-bold text-emerald-400">
-                  EDITING: <span className="text-white font-mono">{editingPost.slug || 'Untitled'}</span>
+                <span className="text-xs font-mono font-bold text-[#86868b]">
+                  EDITING: <span className="text-[#1d1d1f] font-mono">{editingPost.slug || 'Untitled'}</span>
                 </span>
-                <div className="flex bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-xs font-mono">
+                <div className="flex bg-[#f5f5f7] p-0.5 rounded-xl border border-[#e5e5ea] text-xs font-mono">
                   <button
                     type="button"
                     onClick={() => {
                       setEditorMode('fields');
                       setIsPreviewMode(false);
                     }}
-                    className={`px-3 py-1 rounded-md transition ${
+                    className={`px-3 py-1 rounded-lg transition ${
                       editorMode === 'fields' && !isPreviewMode
-                        ? 'bg-zinc-800 text-white font-bold'
-                        : 'text-zinc-400 hover:text-white'
+                        ? 'bg-white text-[#1d1d1f] font-bold shadow-xs'
+                        : 'text-[#86868b] hover:text-[#1d1d1f]'
                     }`}
                   >
                     Form Mode
@@ -536,10 +536,10 @@ function WriteContent() {
                       setEditorRawJson(JSON.stringify(editingPost, null, 2));
                       setIsPreviewMode(false);
                     }}
-                    className={`px-3 py-1 rounded-md transition ${
+                    className={`px-3 py-1 rounded-lg transition ${
                       editorMode === 'json' && !isPreviewMode
-                        ? 'bg-zinc-800 text-white font-bold'
-                        : 'text-zinc-400 hover:text-white'
+                        ? 'bg-white text-[#1d1d1f] font-bold shadow-xs'
+                        : 'text-[#86868b] hover:text-[#1d1d1f]'
                     }`}
                   >
                     Raw JSON
@@ -547,10 +547,10 @@ function WriteContent() {
                   <button
                     type="button"
                     onClick={() => setIsPreviewMode(!isPreviewMode)}
-                    className={`px-3 py-1 rounded-md transition ${
+                    className={`px-3 py-1 rounded-lg transition ${
                       isPreviewMode
-                        ? 'bg-emerald-500/20 text-emerald-300 font-bold'
-                        : 'text-zinc-400 hover:text-white'
+                        ? 'bg-[#0071e3] text-white font-bold shadow-xs'
+                        : 'text-[#86868b] hover:text-[#1d1d1f]'
                     }`}
                   >
                     <span className="flex items-center gap-1">
@@ -565,7 +565,7 @@ function WriteContent() {
                 <button
                   type="button"
                   onClick={() => handleRevertCustom(editingPost.slug)}
-                  className="px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs transition"
+                  className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] font-mono text-xs transition shadow-xs"
                   title="Revert custom changes to default baseline"
                 >
                   Revert to Default
@@ -573,7 +573,7 @@ function WriteContent() {
                 <button
                   type="button"
                   onClick={() => handleExportPost(editingPost)}
-                  className="px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs transition flex items-center gap-1"
+                  className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] font-mono text-xs transition flex items-center gap-1 shadow-xs"
                 >
                   <Download size={13} />
                   <span>Export JSON</span>
@@ -581,7 +581,7 @@ function WriteContent() {
                 <button
                   type="button"
                   onClick={handleSavePost}
-                  className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold font-mono text-xs transition flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  className="px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs"
                 >
                   <Save size={13} />
                   <span>Save &amp; Update Live Article</span>
@@ -591,7 +591,7 @@ function WriteContent() {
 
             {/* LIVE PREVIEW MODE */}
             {isPreviewMode ? (
-              <div className="p-8 rounded-2xl bg-white text-zinc-900 shadow-xl border border-zinc-300 space-y-6 not-prose">
+              <div className="p-8 rounded-2xl bg-white text-zinc-900 shadow-md border border-[#e5e5ea] space-y-6 not-prose">
                 <div className="pb-4 border-b border-gray-200 flex justify-between items-center text-xs font-mono text-gray-500">
                   <span>PREVIEW RENDERING // {editingPost.slug}</span>
                   <span>Author: {editingPost.author} · {editingPost.date}</span>
@@ -609,74 +609,74 @@ function WriteContent() {
             ) : editorMode === 'json' ? (
               /* RAW JSON EDITING MODE */
               <div className="space-y-3">
-                <div className="text-xs font-mono text-zinc-400 flex justify-between">
+                <div className="text-xs font-mono text-[#86868b] flex justify-between">
                   <span>Structured Article Schema (JSON):</span>
                   <span>Press Save above to commit updates</span>
                 </div>
                 <textarea
                   value={editorRawJson}
                   onChange={(e) => setEditorRawJson(e.target.value)}
-                  className="w-full h-[600px] font-mono text-xs p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-emerald-300 focus:border-emerald-500 outline-none leading-relaxed"
+                  className="w-full h-[600px] font-mono text-xs p-4 rounded-2xl bg-[#1d1d1f] border border-zinc-700 text-emerald-300 focus:border-[#0071e3] outline-none leading-relaxed shadow-inner"
                 />
               </div>
             ) : (
               /* STRUCTURED FORM MODE */
               <div className="space-y-6">
                 {/* Metadata Fields Card */}
-                <div className="p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-4">
-                  <h3 className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                <div className="p-6 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4">
+                  <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
                     Publication Metadata
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Title</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Title</label>
                       <input
                         type="text"
                         value={editingPost.title}
                         onChange={(e) => setEditingPost({ ...editingPost, title: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-white font-medium text-sm focus:border-emerald-500 outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm focus:border-[#0071e3] focus:bg-white outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Slug (URL Path)</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Slug (URL Path)</label>
                       <input
                         type="text"
                         value={editingPost.slug}
                         onChange={(e) => setEditingPost({ ...editingPost, slug: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-cyan-300 font-mono text-sm focus:border-emerald-500 outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#0071e3] font-mono text-sm focus:border-[#0071e3] focus:bg-white outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Author</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Author</label>
                       <input
                         type="text"
                         value={editingPost.author}
                         onChange={(e) => setEditingPost({ ...editingPost, author: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-white font-mono text-sm focus:border-emerald-500 outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-sm focus:border-[#0071e3] focus:bg-white outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono text-zinc-400 mb-1">Category / Tag</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Category / Tag</label>
                       <input
                         type="text"
                         value={editingPost.tag}
                         onChange={(e) => setEditingPost({ ...editingPost, tag: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-white text-sm focus:border-emerald-500 outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] text-sm focus:border-[#0071e3] focus:bg-white outline-none"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-zinc-400 mb-1">Excerpt / Summary</label>
+                    <label className="block text-xs font-mono text-[#86868b] mb-1">Excerpt / Summary</label>
                     <textarea
                       rows={3}
                       value={editingPost.excerpt}
                       onChange={(e) => setEditingPost({ ...editingPost, excerpt: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs sm:text-sm focus:border-emerald-500 outline-none leading-relaxed"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#424245] text-xs sm:text-sm focus:border-[#0071e3] focus:bg-white outline-none leading-relaxed"
                     />
                   </div>
                 </div>
@@ -684,13 +684,13 @@ function WriteContent() {
                 {/* Sections Editor */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                    <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
                       Article Sections &amp; Markdown Prose ({editingPost.sections.length})
                     </h3>
                     <button
                       type="button"
                       onClick={addMarkdownSection}
-                      className="inline-flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300"
+                      className="inline-flex items-center gap-1 text-xs font-mono text-[#0071e3] hover:underline"
                     >
                       <PlusCircle size={14} />
                       <span>Add Text Section</span>
@@ -700,17 +700,17 @@ function WriteContent() {
                   {editingPost.sections.map((section, idx) => (
                     <div
                       key={idx}
-                      className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2"
+                      className="p-5 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-2.5"
                     >
-                      <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
-                        <span className="font-bold text-zinc-200">
+                      <div className="flex items-center justify-between text-xs font-mono text-[#86868b]">
+                        <span className="font-bold text-[#1d1d1f]">
                           SECTION {idx + 1} // TYPE: {section.type.toUpperCase()}
                         </span>
                         {section.type === 'markdown' && (
                           <button
                             type="button"
                             onClick={() => removeSection(idx)}
-                            className="text-red-400 hover:text-red-300 p-1"
+                            className="text-red-500 hover:text-red-700 p-1"
                             title="Remove section"
                           >
                             <Trash2 size={14} />
@@ -723,25 +723,25 @@ function WriteContent() {
                           rows={6}
                           value={section.content}
                           onChange={(e) => updateSectionContent(idx, e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 font-mono text-xs focus:border-emerald-500 outline-none leading-relaxed"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-xs focus:border-[#0071e3] focus:bg-white outline-none leading-relaxed"
                         />
                       ) : section.type === 'callout' ? (
-                        <div className="p-3 bg-zinc-950 rounded-lg text-xs space-y-1 border border-zinc-800">
-                          <strong className="text-amber-400 block font-mono">{section.title}</strong>
-                          <p className="text-zinc-300">{section.text}</p>
+                        <div className="p-3.5 bg-amber-50/80 rounded-xl text-xs space-y-1 border border-amber-200">
+                          <strong className="text-amber-800 block font-mono">{section.title}</strong>
+                          <p className="text-amber-900">{section.text}</p>
                         </div>
                       ) : section.type === 'lab' ? (
-                        <div className="p-3 bg-zinc-950 rounded-lg text-xs space-y-1.5 border border-zinc-800">
-                          <div className="flex items-center justify-between font-mono text-emerald-400">
+                        <div className="p-3.5 bg-[#f5f5f7] rounded-xl text-xs space-y-2 border border-[#e5e5ea]">
+                          <div className="flex items-center justify-between font-mono text-emerald-700">
                             <strong>⚡ InlineLab: {section.title}</strong>
                             <span>{section.step}</span>
                           </div>
-                          <pre className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 p-2 rounded overflow-x-auto max-h-32">
+                          <pre className="text-[10px] text-emerald-400 font-mono bg-[#1d1d1f] p-3 rounded-lg overflow-x-auto max-h-32">
                             {section.dsl}
                           </pre>
                         </div>
                       ) : section.type === 'image' ? (
-                        <div className="text-xs font-mono text-zinc-400">
+                        <div className="text-xs font-mono text-[#86868b]">
                           <span>[SVG Technical Blueprint Vector Embedded]</span>
                         </div>
                       ) : null}
@@ -764,7 +764,7 @@ function WriteContent() {
                 e.preventDefault();
                 if (e.dataTransfer.files?.[0]) handleFileDrop(e.dataTransfer.files[0]);
               }}
-              className="border-2 border-dashed border-zinc-700 hover:border-emerald-500 rounded-2xl p-8 text-center bg-zinc-900/40 hover:bg-emerald-950/20 transition-all cursor-pointer mb-6"
+              className="border-2 border-dashed border-[#d2d2d7] hover:border-[#0071e3] rounded-2xl p-8 text-center bg-white hover:bg-[#f5f5f7] transition-all cursor-pointer mb-6 shadow-xs"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -776,32 +776,32 @@ function WriteContent() {
                   if (e.target.files?.[0]) handleFileDrop(e.target.files[0]);
                 }}
               />
-              <UploadCloud className="mx-auto text-zinc-400 mb-3" size={40} />
-              <h3 className="font-bold text-white text-base">Drop Masterclass File Here</h3>
-              <p className="text-xs text-zinc-400 mt-1">Accepts .json schemas and .md documents with ```fbd blocks</p>
+              <UploadCloud className="mx-auto text-[#86868b] mb-3" size={40} />
+              <h3 className="font-bold text-[#1d1d1f] text-base">Drop Masterclass File Here</h3>
+              <p className="text-xs text-[#86868b] mt-1">Accepts .json schemas and .md documents with ```fbd blocks</p>
             </div>
 
             {validationError && (
-              <div className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-300 text-xs font-mono flex items-center gap-3">
-                <AlertTriangle size={18} className="text-red-400 shrink-0" />
+              <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-mono flex items-center gap-3">
+                <AlertTriangle size={18} className="text-red-500 shrink-0" />
                 <span>{validationError}</span>
               </div>
             )}
 
             {parsedPost && (
-              <div className="p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-4">
+              <div className="p-6 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white font-mono">Parsed Article: {parsedPost.title}</h3>
+                  <h3 className="text-sm font-bold text-[#1d1d1f] font-mono">Parsed Article: {parsedPost.title}</h3>
                   <button
                     type="button"
                     onClick={handlePublishUploaded}
-                    className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold font-mono text-xs transition"
+                    className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition shadow-xs"
                   >
                     Publish to Platform
                   </button>
                 </div>
-                <p className="text-xs text-zinc-400">{parsedPost.excerpt}</p>
-                <div className="text-[11px] font-mono text-zinc-500">
+                <p className="text-xs text-[#424245]">{parsedPost.excerpt}</p>
+                <div className="text-[11px] font-mono text-[#86868b]">
                   Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: Alazar Wake Kore
                 </div>
               </div>
@@ -817,7 +817,7 @@ export default function WritePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0b101b] flex items-center justify-center text-zinc-400 font-mono text-xs">
+        <div className="min-h-screen bg-[#fbfbfd] flex items-center justify-center text-[#86868b] font-mono text-xs">
           Loading Authoring Studio...
         </div>
       }
