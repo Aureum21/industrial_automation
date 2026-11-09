@@ -677,7 +677,9 @@ export function generateArduinoSketch(doc: CircuitDocument, config: ArduinoExpor
       }
 
       case 'TON': {
-        const inIN = resolveInput(block, 'IN', 'false', 'digital');
+        const inIN = incomingMap.get(block.id)?.has('A')
+          ? resolveInput(block, 'A', 'false', 'digital')
+          : resolveInput(block, 'IN', 'false', 'digital');
         const ptMs = Number(block.params.duration ?? block.params.PT ?? 1000);
         logicLines.push(`    timer_${ident}.update(${inIN}, ${ptMs}UL, now);`);
         logicLines.push(`    bool sig_${ident}_Q = timer_${ident}.Q;`);
@@ -686,7 +688,9 @@ export function generateArduinoSketch(doc: CircuitDocument, config: ArduinoExpor
       }
 
       case 'TOF': {
-        const inIN = resolveInput(block, 'IN', 'false', 'digital');
+        const inIN = incomingMap.get(block.id)?.has('A')
+          ? resolveInput(block, 'A', 'false', 'digital')
+          : resolveInput(block, 'IN', 'false', 'digital');
         const ptMs = Number(block.params.duration ?? block.params.PT ?? 1000);
         logicLines.push(`    timer_${ident}.update(${inIN}, ${ptMs}UL, now);`);
         logicLines.push(`    bool sig_${ident}_Q = timer_${ident}.Q;`);

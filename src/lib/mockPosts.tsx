@@ -32,6 +32,90 @@ import { CONVEYOR_SORTING_SVG } from './conveyorBlueprintSvg';
 import { HVAC_ECONOMIZER_SVG_DATA_URI } from './hvacBlueprintSvg';
 import { ESD_DELAYS_SVG_DATA_URI } from './esdBlueprintSvg';
 import { SOLAR_LOGGING_SVG_DATA_URI } from './solarBlueprintSvg';
+import { BOILER_BLUEPRINT_SVG } from './boilerBlueprintSvg';
+
+const BOILER_SVG_DATA_URI = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(BOILER_BLUEPRINT_SVG);
+
+const BOILER_LAB1_DSL = `circuit "Stage 1 - Feedforward Mass Balance" version 1 {
+  steam_flow: ANALOG_INPUT(label="Steam Flow FT-102 t/h", value=50)
+  blowdown: ANALOG_CONSTANT(label="Continuous Blowdown t/h", value=2)
+  mass_demand: MATH(label="Steam plus Blowdown", operation="add")
+  fw_measured: ANALOG_INPUT(label="Feedwater Flow FT-103 t/h", value=52)
+  flow_error: MATH(label="Mass Flow Deficit", operation="subtract")
+  target_meter: ANALOG_OUTPUT(label="Target Feedwater t/h")
+  error_meter: ANALOG_OUTPUT(label="Flow Mismatch t/h")
+
+  steam_flow.Q -> mass_demand.A
+  blowdown.Q -> mass_demand.B
+  mass_demand.Q -> target_meter.A
+  mass_demand.Q -> flow_error.A
+  fw_measured.Q -> flow_error.B
+  flow_error.Q -> error_meter.A
+}
+`;
+
+const BOILER_LAB2_DSL = `circuit "Stage 2 - 3-Element Drum Level Cascade Loop" version 1 {
+  level_sp: ANALOG_INPUT(label="Drum Level Setpoint %", value=50)
+  level_pv: ANALOG_INPUT(label="Drum Level LT-101 %", value=54)
+  steam_flow: ANALOG_INPUT(label="Steam Flow FT-102 t/h", value=65)
+  blowdown: ANALOG_CONSTANT(label="Blowdown t/h", value=2)
+  mass_base: MATH(label="Base Mass Demand", operation="add")
+  enabled: HIGH()
+  level_pi: PID_CONTROLLER(label="Level PI Trim", kp=1.5, ki=0.05, kd=0, min=-25, max=25)
+  total_demand: MATH(label="Feedforward plus Level Trim", operation="add")
+  valve_out: ANALOG_OUTPUT(label="Feedwater FCV-101 Demand %")
+  level_meter: ANALOG_OUTPUT(label="Drum Level Feedback %")
+  high_limit: ANALOG_CONSTANT(label="Upper Alarm Thresh", value=75)
+  high_alarm: ANALOG_COMPARATOR(label="High Drum Level Alert", operation="gte")
+  alarm_lamp: OUTPUT(label="High Drum Level Annunciator")
+
+  steam_flow.Q -> mass_base.A
+  blowdown.Q -> mass_base.B
+  level_sp.Q -> level_pi.SP
+  level_pv.Q -> level_pi.PV
+  enabled.Q -> level_pi.EN
+  mass_base.Q -> total_demand.A
+  level_pi.CV -> total_demand.B
+  total_demand.Q -> valve_out.A
+  level_pv.Q -> level_meter.A
+  level_pv.Q -> high_alarm.A
+  high_limit.Q -> high_alarm.B
+  high_alarm.Q -> alarm_lamp.A
+}
+`;
+
+const BOILER_LAB3_DSL = `circuit "Stage 3 - NFPA 85 LLWL Burner Safety Safeguard" version 1 {
+  drum_level: ANALOG_INPUT(label="Drum Level LT-101 %", value=50)
+  llwl_limit: ANALOG_CONSTANT(label="LLWL Trip Limit 15%", value=15)
+  hhwl_limit: ANALOG_CONSTANT(label="HHWL Trip Limit 85%", value=85)
+  low_trip: ANALOG_COMPARATOR(label="Level Below LLWL", operation="lte")
+  high_trip: ANALOG_COMPARATOR(label="Level Above HHWL", operation="gte")
+  trip_condition: OR(label="Any Level Excursion Trip")
+  purge_pb: INPUT(label="Initiate Furnace Pre-Purge PB", value=false)
+  purge_timer: TON(label="5s Furnace Purge Timer", duration=5000)
+  master_reset: INPUT(label="Master Safety Key Reset PB", value=false)
+  purge_complete: AND(label="Purge Complete and Reset")
+  fuel_latch: RS_LATCH(label="Fuel Safety Shutoff Valve Latch")
+  fuel_ssov: OUTPUT(label="Fuel SSOV Solenoid Energized")
+  llwl_alarm: OUTPUT(label="Tube Burnout Hazard Lamp")
+  hhwl_alarm: OUTPUT(label="Turbine Carryover Hazard Lamp")
+
+  drum_level.Q -> low_trip.A
+  llwl_limit.Q -> low_trip.B
+  drum_level.Q -> high_trip.A
+  hhwl_limit.Q -> high_trip.B
+  low_trip.Q -> trip_condition.A
+  high_trip.Q -> trip_condition.B
+  purge_pb.Q -> purge_timer.A
+  purge_timer.Q -> purge_complete.A
+  master_reset.Q -> purge_complete.B
+  purge_complete.Q -> fuel_latch.S
+  trip_condition.Q -> fuel_latch.R
+  fuel_latch.Q -> fuel_ssov.A
+  low_trip.Q -> llwl_alarm.A
+  high_trip.Q -> hhwl_alarm.A
+}
+`;
 
 const HEATER_LAB1_DSL = `circuit "Stage 1 - Proportional Heater Demand" version 1 {
   sp: ANALOG_INPUT(label="Setpoint C", value=60)
@@ -3717,5 +3801,282 @@ export const BLOG_POSTS: BlogPost[] = [
       </div>
     ),
     dsl: ''
+    },
+  {
+    slug: 'steam-boiler-drum-level',
+    title: 'Steam Boiler Drum Level Control: 3-Element Architecture, Shrink & Swell Physics & LLWL Safeguards',
+    excerpt: 'A premier process control masterclass: resolving the deceptive shrink and swell phenomenon during sudden steam draws, designing feedforward mass-balance feedwater regulation, and engineering fail-safe NFPA 85 burner safety interlocks.',
+    author: AUTHOR_NAME,
+    authorUrl: AUTHOR_PORTFOLIO,
+    date: 'Nov 9',
+    readingTime: '24 min read + 25 min labs',
+    tag: 'Thermal & Process Control',
+    views: 19,
+    content: (
+      <div className="space-y-6">
+        {/* P&ID Blueprint Schematic */}
+        <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
+          <img
+            src={BOILER_SVG_DATA_URI}
+            alt="3-Element Steam Boiler Drum Level Control P&ID"
+            className="w-full h-auto object-cover max-h-[550px]"
+          />
+          <div className="p-3 bg-zinc-900 border-t border-zinc-800 text-xs font-mono text-zinc-400 flex flex-wrap justify-between items-center gap-2">
+            <span className="text-emerald-400 font-semibold">FIG 11.1 // PROCESS FLOW &amp; P&amp;ID OVERVIEW</span>
+            <span>STEAM DRUM D-101 · FCV-101 FEEDWATER · LT-101 · FT-102 · FT-103 · SSOV-101</span>
+          </div>
+        </div>
+
+        {/* 1. Executive Summary & Forensic Case Study */}
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 via-zinc-900/5 to-transparent border border-amber-500/20">
+          <h3 className="text-xl font-bold text-zinc-900 mb-2 flex items-center gap-2">
+            <span className="text-amber-600 font-mono">01 //</span> Forensic Case Study: The Unit 4 Superheater Tube Meltdown
+          </h3>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            At 04:18 AM during a sudden grid load rejection, a 250 MW thermal power station experienced a catastrophic boiler trip. When the high-pressure turbine bypass valve opened to vent excess steam, drum pressure abruptly dropped from 65 bar to 54 bar.
+          </p>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            Under this rapid depressurization, the boiling water in the drum flashed into steam, causing billions of vapor bubbles to violently expand below the water line. The physical liquid level swelled upwards by 180 mm. The single-element level controller (LIC-101), observing what appeared to be an excessively high water level, immediately commanded the feedwater control valve (FCV-101) to pinch completely shut.
+          </p>
+          <p className="text-zinc-700 text-sm leading-relaxed">
+            In reality, mass was leaving the boiler as steam at over 180 tonnes per hour without any replacement water. Within 45 seconds, the expanded vapor collapsed, and the true liquid level plunged below the lower drum nozzle. Uncooled carbon-steel boiler tubes directly exposed to 1,250°C combustion gases ruptured under internal pressure, causing a pressurized steam blowout, catastrophic metallurgical failure, and a complete emergency plant shutdown costing $2.4M in repairs and downtime.
+          </p>
+        </div>
+
+        {/* 2. First-Principles Physics & Derivation */}
+        <div>
+          <h3 className="text-xl font-bold text-zinc-900 mb-3 flex items-center gap-2">
+            <span className="text-blue-600 font-mono">02 //</span> The Physics of Shrink and Swell in Pressurized Drums
+          </h3>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            In a steam drum, the total physical volume is shared between liquid water and entrained steam bubbles. The apparent water level measured by a differential pressure transmitter is:
+          </p>
+          <div className="p-4 rounded-xl bg-zinc-900 text-zinc-100 font-mono text-xs overflow-x-auto mb-4 border border-zinc-800">
+            <code>
+              H_apparent = (V_liquid + V_bubbles) / A_drum
+              <br />
+              dV_bubbles / dt = -K_boil * (dP_drum / dt)
+            </code>
+          </div>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            When steam demand spikes (dP/dt &lt; 0), dV_bubbles/dt is positive: the bubbles expand and push the water level up (&quot;Swell&quot;), deceiving single-element controllers. Conversely, when subcooled feedwater is injected rapidly, it collapses steam bubbles in the drum, causing an apparent level drop (&quot;Shrink&quot;) even though mass is being added!
+          </p>
+
+          {/* Comparison Table */}
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white mb-6">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-zinc-100 text-zinc-700 font-mono uppercase text-[11px] border-b border-zinc-200">
+                <tr>
+                  <th className="py-2.5 px-4">Architecture</th>
+                  <th className="py-2.5 px-4">Sensors Used</th>
+                  <th className="py-2.5 px-4">Dynamic Response to Steam Spike</th>
+                  <th className="py-2.5 px-4">Industry Application</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                <tr className="hover:bg-zinc-50">
+                  <td className="py-2.5 px-4 font-bold text-zinc-900">1-Element Control</td>
+                  <td className="py-2.5 px-4 font-mono">LT-101 (Level Only)</td>
+                  <td className="py-2.5 px-4 text-red-600 font-medium">Closes feedwater valve during swell; risks tube burnout.</td>
+                  <td className="py-2.5 px-4">Small package boilers (&lt;5 t/h) with steady loads.</td>
+                </tr>
+                <tr className="hover:bg-zinc-50">
+                  <td className="py-2.5 px-4 font-bold text-zinc-900">2-Element Control</td>
+                  <td className="py-2.5 px-4 font-mono">LT-101 + FT-102 (Steam Flow)</td>
+                  <td className="py-2.5 px-4 text-amber-600">Feedforward tracks steam, but cannot correct for feedwater supply pressure drops.</td>
+                  <td className="py-2.5 px-4">Medium industrial steam plants with dedicated pumps.</td>
+                </tr>
+                <tr className="hover:bg-zinc-50 bg-emerald-500/5">
+                  <td className="py-2.5 px-4 font-bold text-emerald-800">3-Element Control</td>
+                  <td className="py-2.5 px-4 font-mono text-emerald-700 font-semibold">LT-101 + FT-102 + FT-103 (BFW Flow)</td>
+                  <td className="py-2.5 px-4 text-emerald-700 font-medium">True mass balance; eliminates shrink/swell lag completely.</td>
+                  <td className="py-2.5 px-4 font-semibold text-emerald-800">High-pressure power, utility, &amp; chemical recovery boilers.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 3. Interactive Lab 1 */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
+              <span className="text-emerald-600 font-mono">03 //</span> Interactive Lab: Feedforward Mass Balance Summer
+            </h3>
+            <span className="text-xs font-mono text-zinc-500 uppercase">Stage 1 of 3</span>
+          </div>
+          <p className="text-zinc-600 text-sm leading-relaxed">
+            Observe how the feedforward calculator continuously sums the measured steam demand (FT-102) with continuous blowdown to determine the exact mass rate of feedwater required. Toggling the steam load immediately updates target feedwater demand without waiting for level drift.
+          </p>
+          <InlineLab
+            dsl={BOILER_LAB1_DSL}
+            title="Stage 1: Feedforward Mass Balance Summer"
+            step="MASS BALANCE FBD"
+            height={480}
+          />
+        </div>
+
+        {/* 4. 3-Element Cascade Architecture & Anti-Windup */}
+        <div>
+          <h3 className="text-xl font-bold text-zinc-900 mb-3 flex items-center gap-2">
+            <span className="text-indigo-600 font-mono">04 //</span> 3-Element Cascade Loop Architecture &amp; Anti-Windup Clamping
+          </h3>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            In our 3-element cascade system, the primary controller is a PI algorithm comparing drum level (LT-101) against the 50% setpoint. However, instead of directly driving the control valve, the level PI output acts purely as a <strong>trim bias</strong> (limited between -25% and +25%) added to the steam mass flow:
+          </p>
+          <div className="p-4 rounded-xl bg-zinc-900 text-zinc-100 font-mono text-xs overflow-x-auto mb-4 border border-zinc-800">
+            <code>
+              Feedwater_Demand% = Steam_Mass_Flow% + Level_PI_Trim%
+            </code>
+          </div>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            Because steam flow provides 100% of the proportional load following immediately, the level PI loop only has to correct for thermal density expansion and blowdown drift. This allows gentle, non-aggressive PI tuning that completely resists shrink/swell oscillations.
+          </p>
+        </div>
+
+        {/* 5. Interactive Lab 2 */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
+              <span className="text-indigo-600 font-mono">05 //</span> Interactive Lab: 3-Element Drum Level Cascade Control
+            </h3>
+            <span className="text-xs font-mono text-zinc-500 uppercase">Stage 2 of 3</span>
+          </div>
+          <p className="text-zinc-600 text-sm leading-relaxed">
+            In this complete 3-element cascade loop, test a sudden steam spike by adjusting Steam Flow FT-102 from 50 to 80 t/h. Observe how the feedwater valve FCV-101 opens proportionally to match the steam demand while the level PI loop gently trims the level back to the 50% target.
+          </p>
+          <InlineLab
+            dsl={BOILER_LAB2_DSL}
+            title="Stage 2: 3-Element Drum Level Cascade Loop"
+            step="CASCADE CONTROL FBD"
+            height={500}
+          />
+        </div>
+
+        {/* 6. NFPA 85 Safety Interlocks & Burner Safeguards */}
+        <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/20">
+          <h3 className="text-xl font-bold text-zinc-900 mb-3 flex items-center gap-2">
+            <span className="text-rose-600 font-mono">06 //</span> NFPA 85 Combustion Safeguards &amp; Burner Management (BMS)
+          </h3>
+          <p className="text-zinc-700 text-sm leading-relaxed mb-4">
+            Under NFPA 85 Boiler and Combustion Systems Hazards Code, drum level excursions represent extreme safety hazards requiring hardwired, independent safety instrumented functions (SIF):
+          </p>
+          <ul className="list-disc list-inside space-y-2 text-sm text-zinc-700 mb-4">
+            <li>
+              <strong>Low-Low Water Level (LLWL &lt; 15%):</strong> Imminent tube dryout. Combustion heat melts carbon steel tubes within seconds. Must instantly de-energize the Fuel Safety Shutoff Valve (SSOV-101) to extinguish the furnace flame.
+            </li>
+            <li>
+              <strong>High-High Water Level (HHWL &gt; 85%):</strong> Overwhelms steam drum cyclone moisture separators. Liquid droplets carry over into the steam header, eroding turbine blades and inducing violent hydraulic water hammer.
+            </li>
+            <li>
+              <strong>Furnace Pre-Purge Interlock:</strong> Following any burner trip, raw unburned fuel gas can accumulate in the firebox. The safety system strictly prohibits fuel valve re-opening until a 5-second forced draft fan purge cycle has completed and been verified by the safety latch.
+            </li>
+          </ul>
+        </div>
+
+        {/* 7. Interactive Lab 3 */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
+              <span className="text-rose-600 font-mono">07 //</span> Interactive Lab: NFPA 85 LLWL Burner Trip &amp; Pre-Purge Latch
+            </h3>
+            <span className="text-xs font-mono text-zinc-500 uppercase">Stage 3 of 3</span>
+          </div>
+          <p className="text-zinc-600 text-sm leading-relaxed">
+            Test the safety trip by lowering the drum level below 15%. Observe the immediate trip of the Fuel SSOV valve. Try pressing the Master Reset button: notice that reset is blocked until the 5-second furnace pre-purge cycle has completed!
+          </p>
+          <InlineLab
+            dsl={BOILER_LAB3_DSL}
+            title="Stage 3: NFPA 85 LLWL Burner Safety Safeguard"
+            step="SAFETY INTERLOCK FBD"
+            height={520}
+          />
+        </div>
+
+        {/* 8. Field Calibration & Instrumentation Reference */}
+        <div>
+          <h3 className="text-xl font-bold text-zinc-900 mb-3 flex items-center gap-2">
+            <span className="text-zinc-700 font-mono">08 //</span> Field Instrumentation Specifications &amp; Calibration
+          </h3>
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-zinc-100 text-zinc-700 uppercase text-[10px] border-b border-zinc-200">
+                <tr>
+                  <th className="py-2.5 px-3">Tag ID</th>
+                  <th className="py-2.5 px-3">Instrument</th>
+                  <th className="py-2.5 px-3">Calibrated Range</th>
+                  <th className="py-2.5 px-3">Signal &amp; Failure Mode</th>
+                  <th className="py-2.5 px-3">Installation Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                <tr>
+                  <td className="py-2 px-3 font-bold text-blue-600">LT-101</td>
+                  <td className="py-2 px-3">Differential Pressure (dP) Level</td>
+                  <td className="py-2 px-3">0 to 1,000 mm H2O = 0–100%</td>
+                  <td className="py-2 px-3">4-20mA HART / Upscale fail</td>
+                  <td className="py-2 px-3">Wet reference leg with condensing pot; density compensation via PT-104</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-blue-600">FT-102</td>
+                  <td className="py-2 px-3">Vortex / Orifice Steam Flow</td>
+                  <td className="py-2 px-3">0 to 100 t/h (0–27.8 kg/s)</td>
+                  <td className="py-2 px-3">4-20mA / Downscale fail</td>
+                  <td className="py-2 px-3">Mounted on main steam header; pressure &amp; temperature density compensated</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-blue-600">FT-103</td>
+                  <td className="py-2 px-3">Coriolis / Magflow Feedwater</td>
+                  <td className="py-2 px-3">0 to 120 t/h</td>
+                  <td className="py-2 px-3">4-20mA / Downscale fail</td>
+                  <td className="py-2 px-3">Upstream of economizer check valve; rated for 90 bar operating pressure</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-blue-600">FCV-101</td>
+                  <td className="py-2 px-3">Feedwater Regulating Valve</td>
+                  <td className="py-2 px-3">0 to 100% Stroke</td>
+                  <td className="py-2 px-3 font-bold text-red-600">Air-to-Open (Fail Closed / FC)</td>
+                  <td className="py-2 px-3">Equal percentage cage trim; prevents overfilling boiler on air pressure loss</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-rose-600">SSOV-101</td>
+                  <td className="py-2 px-3">Fuel Safety Shutoff Valve</td>
+                  <td className="py-2 px-3">Open / Closed Dual Proved</td>
+                  <td className="py-2 px-3 font-bold text-red-600">De-energize to Trip (Fail Closed)</td>
+                  <td className="py-2 px-3">Spring-return quick-closing safety valve (&lt;100 ms closing time)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 9. Commissioning & Field Tuning Protocol */}
+        <div className="p-6 rounded-2xl bg-zinc-900 text-white">
+          <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+            <span className="text-emerald-400 font-mono">09 //</span> 5-Step Field Commissioning Protocol
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700">
+              <strong className="text-emerald-400 block mb-1">Step 1: Wet Leg Static Zero Verification</strong>
+              Ensure condensing chamber is fully flooded with cold condensate before zeroing the dP cell. Verify suppression calculation: dP_empty = -H_ref * rho_ref.
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700">
+              <strong className="text-emerald-400 block mb-1">Step 2: Flow Scaling Normalization</strong>
+              Confirm FT-102 (Steam) and FT-103 (Feedwater) transmit mass flow in identical engineering units (e.g. t/h) with matching zero and span calibration points.
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700">
+              <strong className="text-emerald-400 block mb-1">Step 3: Single-Element Warmup Transition</strong>
+              Operate in 1-element mode during cold startup (&lt;20% load) where steam flow measurements have poor low-end accuracy. Switch to 3-element above 25% load.
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700">
+              <strong className="text-emerald-400 block mb-1">Step 4: Feedforward Gain Step-Test</strong>
+              With boiler operating at 50% load, step steam turbine control valves by +10%. Tune feedforward multiplier until feedwater valve opens synchronously with zero level droop.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    dsl: BOILER_LAB1_DSL
   }
+
 ];

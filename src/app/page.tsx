@@ -111,11 +111,11 @@ export default function Home() {
           {/* Platform Metrics Bar */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs font-mono text-[#86868b] pt-8 border-t border-[#e5e5ea]/80">
             <div>
-              <strong className="text-[#1d1d1f] text-sm">10</strong> MASTERCLASSES
+              <strong className="text-[#1d1d1f] text-sm">11</strong> MASTERCLASSES
             </div>
             <div>•</div>
             <div>
-              <strong className="text-[#1d1d1f] text-sm">30</strong> INTERACTIVE FBD LABS
+              <strong className="text-[#1d1d1f] text-sm">33</strong> INTERACTIVE FBD LABS
             </div>
             <div>•</div>
             <div>

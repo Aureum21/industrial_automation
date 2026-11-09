@@ -9,6 +9,7 @@ export const CORE_MASTERCLASS_SLUGS = new Set([
   'traffic-intersection-controller',
   'emergency-shutdown-esd-matrix',
   'tank-level-cascade-pid',
+  'steam-boiler-drum-level',
 ]);
 
 export function isAuthorUser(user?: { name?: string; email?: string } | null): boolean {

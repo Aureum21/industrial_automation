@@ -18,11 +18,12 @@ test('isAuthorUser identifies Alazar Wake Kore correctly and rejects others', ()
   assert.equal(isAuthorUser(null), false);
 });
 
-test('CORE_MASTERCLASS_SLUGS contains all 10 initial masterclasses', () => {
+test('CORE_MASTERCLASS_SLUGS contains all 11 core masterclasses', () => {
   assert.equal(CORE_MASTERCLASS_SLUGS.has('water-treatment'), true);
   assert.equal(CORE_MASTERCLASS_SLUGS.has('hydraulic-press-safety-interlock'), true);
   assert.equal(CORE_MASTERCLASS_SLUGS.has('solar-tracker-mppt-hysteresis'), true);
-  assert.equal(CORE_MASTERCLASS_SLUGS.size, 10);
+  assert.equal(CORE_MASTERCLASS_SLUGS.has('steam-boiler-drum-level'), true);
+  assert.equal(CORE_MASTERCLASS_SLUGS.size, 11);
 });
 
 test('canEditPost strictly protects core masterclasses for non-lead authors', () => {
