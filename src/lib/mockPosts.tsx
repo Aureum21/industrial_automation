@@ -3,7 +3,9 @@ import InlineLab from '@/components/lab/InlineLab';
 
 export const AUTHOR_NAME =
   'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
-export const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/alazar-wake-45915a276/';
+export const AUTHOR_PORTFOLIO = 'https://www.alazarwakekore.online/';
+export const AUTHOR_WEBSITE = 'https://www.alazarwakekore.online/';
+export const AUTHOR_LINKEDIN = 'https://www.alazarwakekore.online/';
 
 export interface BlogPost {
   slug: string;

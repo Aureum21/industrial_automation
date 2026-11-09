@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BLOG_POSTS, AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
+import { BLOG_POSTS, AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 import PostClientView from './PostClientView';
 
 interface PageProps {
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    authors: [{ name: 'Alazar Wake Kore', url: AUTHOR_LINKEDIN }],
+    authors: [{ name: post.author || 'Alazar Wake Kore', url: post.authorUrl || AUTHOR_PORTFOLIO }],
     openGraph: {
       title,
       description,

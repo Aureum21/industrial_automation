@@ -16,7 +16,7 @@ import {
   Zap,
   CheckCircle2,
 } from 'lucide-react';
-import { BLOG_POSTS, AUTHOR_LINKEDIN, type BlogPost } from '@/lib/mockPosts';
+import { BLOG_POSTS, AUTHOR_PORTFOLIO, type BlogPost } from '@/lib/mockPosts';
 import { getAllPosts, syncArticlesFromCloud } from '@/lib/blogStorage';
 
 type CategoryFilter =
@@ -192,10 +192,11 @@ export default function BlogsPage() {
                   <span className="text-xs text-[#86868b] font-medium">
                     Authored by{' '}
                     <a
-                      href={AUTHOR_LINKEDIN}
+                      href={featuredPost.authorUrl || AUTHOR_PORTFOLIO}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#1d1d1f] hover:text-[#0071e3] font-semibold underline decoration-dotted"
+                      title="View Author Portfolio"
                     >
                       Alazar Wake Kore (HCT Senior) ↗
                     </a>
@@ -326,10 +327,10 @@ export default function BlogsPage() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        window.open(AUTHOR_LINKEDIN, '_blank');
+                        window.open(post.authorUrl || AUTHOR_PORTFOLIO, '_blank');
                       }}
                       className="hover:text-[#0071e3] transition truncate max-w-[280px] font-medium"
-                      title={post.author}
+                      title={post.author || 'Alazar Wake Kore'}
                     >
                       Alazar Wake Kore (HCT Senior)
                     </span>

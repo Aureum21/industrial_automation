@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getDb, initDb, isDbConfigured } from '@/lib/db';
-import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
+import { AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 import { CORE_MASTERCLASS_SLUGS, type ExternalBlogPost } from '@/lib/blogStorage';
 
 interface SessionUser {
@@ -216,7 +216,7 @@ export async function POST(req: Request) {
 
     // Stamp identity
     const authorName = post.author || user.name;
-    const authorUrl = post.authorUrl || (user.isLeadAuthor ? AUTHOR_LINKEDIN : undefined);
+    const authorUrl = post.authorUrl || (user.isLeadAuthor ? AUTHOR_PORTFOLIO : undefined);
     const dateStr = post.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const readingTime = post.readingTime || '12 min read';
     const tag = post.tag || 'Process Control';

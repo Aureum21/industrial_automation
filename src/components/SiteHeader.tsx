@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Edit, LogOut, Cpu, Compass, BookOpen, Layers } from 'lucide-react';
+import { Edit, LogOut, Cpu, Compass, BookOpen, Layers, ExternalLink } from 'lucide-react';
 import { getCurrentUser, clearCurrentUser, AUTH_CHANGE_EVENT, type User } from '@/lib/auth';
 import { isAuthorUser } from '@/lib/blogStorage';
+import { AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 
 export default function SiteHeader() {
   const [user, setUser] = useState<User | null>(null);
@@ -75,6 +76,17 @@ export default function SiteHeader() {
               </Link>
             );
           })}
+
+          <a
+            href={AUTHOR_PORTFOLIO}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-[#515154] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-all"
+            title="Visit Alazar Wake Kore's Portfolio"
+          >
+            <span>Portfolio</span>
+            <ExternalLink size={11} className="text-[#86868b]" />
+          </a>
 
           <div className="h-4 w-[1px] bg-[#e5e5ea] mx-1 sm:mx-2" />
 

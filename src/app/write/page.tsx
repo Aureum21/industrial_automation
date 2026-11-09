@@ -47,7 +47,7 @@ import {
   type ExternalSection,
 } from '@/lib/blogStorage';
 import { checkSessionWithNeon, getCurrentUser, type User as AuthUser } from '@/lib/auth';
-import { AUTHOR_NAME, AUTHOR_LINKEDIN } from '@/lib/mockPosts';
+import { AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 import InlineLab from '@/components/lab/InlineLab';
 import { stringifyCircuitDSL, parseCircuitDSL } from '@/lib/automation/dsl';
@@ -719,7 +719,7 @@ function WriteContent() {
                     <>
                       Manage, modify, and proof-test core masterclasses authored by{' '}
                       <a
-                        href={AUTHOR_LINKEDIN}
+                        href={AUTHOR_PORTFOLIO}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#0071e3] hover:underline font-bold inline-flex items-center gap-1"

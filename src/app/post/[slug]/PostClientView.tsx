@@ -8,7 +8,7 @@ import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import { getCurrentUser, type User } from '@/lib/auth';
-import type { BlogPost } from '@/lib/mockPosts';
+import { type BlogPost, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 import { getPostBySlug, isAuthorUser, canEditPost } from '@/lib/blogStorage';
 
 interface PostClientViewProps {
@@ -232,11 +232,11 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
             </div>
             <div>
               <a
-                href="https://www.linkedin.com/in/alazar-wake-45915a276/"
+                href={post.authorUrl || AUTHOR_PORTFOLIO}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-[#1d1d1f] hover:text-[#0071e3] transition inline-flex items-center gap-1.5 group text-sm sm:text-base leading-snug"
-                title="View LinkedIn Profile"
+                title="View Author Portfolio Website"
               >
                 <span>{post.author}</span>
                 <ExternalLink size={13} className="text-[#86868b] group-hover:text-[#0071e3] shrink-0" />
