@@ -11,8 +11,9 @@ export default function SiteHeader() {
   const hasUser = Boolean(user);
 
   const navLinks = [
-    { href: '/blogs', label: 'Masterclasses' },
+    { href: '/challenges', label: 'Challenges' },
     { href: '/lab', label: 'Logic Lab' },
+    { href: '/blogs', label: 'Masterclasses' },
     { href: '/library', label: 'Catalog' },
     ...(hasUser ? [{ href: '/write', label: 'Studio' }] : []),
   ];

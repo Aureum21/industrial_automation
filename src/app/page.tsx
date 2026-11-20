@@ -14,6 +14,7 @@ import {
 import InlineLab from '@/components/lab/InlineLab';
 import { getPostSummaries } from '@/server/services/content';
 import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
+import { CHALLENGES } from '@/lib/challenges/catalog';
 
 export default async function Home() {
   const posts = await getPostSummaries();
@@ -61,11 +62,18 @@ export default async function Home() {
           {/* Call to Actions */}
           <div className="flex flex-wrap items-center justify-center gap-3.5">
             <Link
-              href="/blogs"
+              href="/challenges"
               className="px-6 py-3 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
             >
-              <span>Explore the masterclasses</span>
+              <span>Start the challenges</span>
               <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/blogs"
+              className="px-6 py-3 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#d2d2d7] text-[#1d1d1f] font-medium text-sm transition-all shadow-2xs flex items-center gap-2"
+            >
+              <BookOpen size={16} className="text-[#0071e3]" />
+              <span>Read the masterclasses</span>
             </Link>
             <Link
               href="/lab"
@@ -78,6 +86,10 @@ export default async function Home() {
 
           {/* Platform Metrics Bar */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs font-mono text-[#86868b] pt-8 border-t border-[#e5e5ea]/80">
+            <div>
+              <strong className="text-[#1d1d1f] text-sm">{CHALLENGES.length}</strong> AUTO-GRADED CHALLENGES
+            </div>
+            <div>•</div>
             <div>
               <strong className="text-[#1d1d1f] text-sm">{posts.length}</strong> MASTERCLASSES
             </div>

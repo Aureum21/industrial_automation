@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, useNodesInitialized, ConnectionLineType, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LogicEngine } from '@/lib/LogicEngine';
@@ -45,7 +45,23 @@ async function openSharedFromUrl(handlers: {
   }
 }
 
-function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boolean; initialDocument?: CircuitDocument; isFullscreen?: boolean }) {
+/** Handle used by pages that host the lab, e.g. the challenge page grades the current circuit. */
+export interface LabController {
+  getDocument: () => CircuitDocument;
+  startOver: () => void;
+}
+
+interface WorkspaceProps {
+  readOnly?: boolean;
+  initialDocument?: CircuitDocument;
+  isFullscreen?: boolean;
+  /** Challenge mode: starts from `initialDocument`, auto-saves to this localStorage key. */
+  persistKey?: string;
+  controller?: Ref<LabController>;
+}
+
+function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, controller }: WorkspaceProps) {
+  const challengeMode = Boolean(persistKey);
   const [engine] = useState(() => new LogicEngine());
   const [nodes, setNodes] = useState<CircuitFlowNode[]>(() => {
     if (initialDocument) {
@@ -272,6 +288,21 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   }, [centerView, nodes.length]);
 
   useEffect(() => {
+    if (initialDocument && persistKey) {
+      const timer = setTimeout(() => {
+        try {
+          const saved = localStorage.getItem(persistKey);
+          if (saved) {
+            loadRef.current(parseCircuitDocument(saved), 'Restored your work on this challenge.');
+            return;
+          }
+        } catch {
+          // Corrupt or unavailable storage: fall back to the starter.
+        }
+        loadRef.current(initialDocument, 'Starter loaded. Add logic between the inputs and outputs, then press Check.');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
     if (initialDocument) {
       const circuitKey = `${initialDocument.name ?? ''}::${initialDocument.blocks.length}::${initialDocument.connections.length}`;
       if (loadedCircuitKeyRef.current === circuitKey) return;
@@ -291,7 +322,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
       loadRef.current(getExample('start-stop'), 'Starter example loaded. Press Run to explore.');
     }, 0);
     return () => clearTimeout(timer);
-  }, [initialDocument]);
+  }, [initialDocument, persistKey]);
 
   useEffect(() => {
     if (readOnly) return;
@@ -306,12 +337,37 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     return () => clearInterval(interval);
   }, [engine, running, sync]);
 
+  // Challenge mode saves automatically shortly after each change.
   useEffect(() => {
-    if (!dirty) return;
+    if (!persistKey || !dirty) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(persistKey, JSON.stringify(engine.toDocument(name, widgets)));
+        setDirty(false);
+      } catch {
+        setNotice('Your browser blocked saving. Use Export to keep a copy.');
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [persistKey, dirty, engine, name, widgets, nodes, edges]);
+
+  useImperativeHandle(controller, () => ({
+    getDocument: () => engine.toDocument(name, widgets),
+    startOver: () => {
+      if (!initialDocument) return;
+      try {
+        if (persistKey) localStorage.removeItem(persistKey);
+      } catch {}
+      load(initialDocument, 'Back to the starter circuit.');
+    },
+  }), [engine, name, widgets, initialDocument, persistKey, load]);
+
+  useEffect(() => {
+    if (!dirty || challengeMode) return;
     const onLeave = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener('beforeunload', onLeave);
     return () => window.removeEventListener('beforeunload', onLeave);
-  }, [dirty]);
+  }, [dirty, challengeMode]);
 
   const requestLoad = (document: CircuitDocument, label: string) => {
     if (dirty) setPending({ document, label });
@@ -406,9 +462,9 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     {!readOnly && (
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e5ea] px-4 py-2.5 bg-white">
         <div className="flex items-center gap-3">
-          <span className="rounded-md border border-[#e5e5ea] bg-[#f5f5f7] px-2 py-0.5 font-mono text-[10px] text-[#1d1d1f]">LAB / 01</span>
+          <span className="rounded-md border border-[#e5e5ea] bg-[#f5f5f7] px-2 py-0.5 font-mono text-[10px] text-[#1d1d1f]">{challengeMode ? 'CHALLENGE' : 'LAB'}</span>
           <input aria-label="Circuit name" value={name} maxLength={120} onChange={event => { setName(event.target.value); setDirty(true); }} className="w-48 bg-transparent text-sm font-semibold text-[#1d1d1f] outline-none focus:text-[#0071e3]" />
-          <span className="text-[10px] text-[#86868b]">{dirty ? 'Unsaved' : 'Workspace'}</span>
+          <span className="text-[10px] text-[#86868b]">{challengeMode ? (dirty ? 'Saving…' : 'Saved') : dirty ? 'Unsaved' : 'Workspace'}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-[#f5f5f7] p-1 rounded-xl border border-[#e5e5ea] mr-2">
@@ -416,7 +472,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'hmi' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'code' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
           </div>
-          <button className="lab-button" onClick={save}>Save</button>
+          {!challengeMode && <button className="lab-button" onClick={save}>Save</button>}
           <button className="lab-button primary" onClick={() => void shareCircuit()} title="Copy a link that opens a copy of this circuit">Share link</button>
           <button className="lab-button" onClick={exportFile}>Export</button>
           <button
@@ -427,7 +483,11 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
             <span>⚡</span> Arduino (.ino)
           </button>
           <button className="lab-button" onClick={() => fileRef.current?.click()}>Import</button>
-          <button className="lab-button" onClick={() => setShowNewDialog(true)}>New circuit</button>
+          {challengeMode ? (
+            <button className="lab-button" onClick={() => { if (confirm('Discard your work and go back to the starter circuit?')) { try { localStorage.removeItem(persistKey!); } catch {} if (initialDocument) load(initialDocument, 'Back to the starter circuit.'); } }}>Start over</button>
+          ) : (
+            <button className="lab-button" onClick={() => setShowNewDialog(true)}>New circuit</button>
+          )}
         </div>
       </div>
     )}
@@ -441,7 +501,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
         <span className="ml-2 font-mono text-[11px] text-[#86868b]">{(timeMs / 1000).toFixed(1)} s</span>
       </div>
       <div className="flex items-center gap-2">
-        {!readOnly && <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>}
+        {!readOnly && !challengeMode && <select aria-label="Load example circuit" className="lab-button max-w-48" value="" onChange={event => requestLoad(getExample(event.target.value), 'Example loaded. Press Run or Step to simulate.')}><option value="" disabled>Load an example</option>{EXAMPLES.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}</select>}
         {!readOnly && <button className="lab-button danger" disabled={!selectedCount} onClick={deleteSelected}>Delete {selectedCount ? `(${selectedCount})` : ''}</button>}
       </div>
     </div>
@@ -529,4 +589,6 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   </main>;
 }
 
-export default function LabWorkspace({ readOnly, document, isFullscreen }: { readOnly?: boolean; document?: CircuitDocument; isFullscreen?: boolean }) { return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} isFullscreen={isFullscreen} /></ReactFlowProvider>; }
+export default function LabWorkspace({ readOnly, document, isFullscreen, persistKey, ref }: { readOnly?: boolean; document?: CircuitDocument; isFullscreen?: boolean; persistKey?: string; ref?: Ref<LabController> }) {
+  return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} isFullscreen={isFullscreen} persistKey={persistKey} controller={ref} /></ReactFlowProvider>;
+}
