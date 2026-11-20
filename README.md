@@ -20,16 +20,35 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The application is built with Next.js, React, React Flow, and Tailwind CSS. It runs entirely locally in your browser and does not require any database or API keys to start.
+Open [localhost:3000](http://localhost:3000). Without a database the simulator, lab and built-in articles all work; accounts and the Studio are disabled.
 
-## Testing and Building
+### With a local database (accounts, Studio, read counts)
+
+Production uses Neon's HTTP driver. Locally you can use any Postgres through a small proxy that speaks the same protocol:
 
 ```sh
-npm test              # Run the engine and circuit regression tests
-npm run lint          # Check code quality
-npm run typecheck     # Verify TypeScript types
-npm run build         # Build for production
-npm start             # Serve the production build
+createdb automationhub                       # any Postgres 14+
+LOCAL_PG_URL=postgres://localhost/automationhub npm run db:proxy   # listens on :4444
+```
+
+Then in `.env.local` (see `.env.example`):
+
+```sh
+DATABASE_URL=postgres://localhost/automationhub
+NEON_FETCH_ENDPOINT=http://localhost:4444/sql
+OWNER_INITIAL_PASSWORD=choose-one     # creates the owner account on first start
+```
+
+Migrations run automatically on the first request (`src/server/db/migrations.ts`).
+
+## Testing and building
+
+```sh
+npm test              # Unit tests: engine, DSL, documents, Arduino export, permissions, validation
+npm run lint          # ESLint (must be error-free)
+npm run typecheck     # TypeScript
+npm run build         # Production build
+npm run smoke:api     # End-to-end API checks (see scripts/smoke-fixtures.sh for setup)
 ```
 
 ## How to use the Lab
@@ -39,12 +58,33 @@ npm start             # Serve the production build
 3. **Tags**: You can assign text tags (like `Motor_1`) to blocks in the lab. This allows you to wirelessly link them to HMI dashboard widgets or monitor them automatically in the logic analyzer.
 4. **Saving**: Use the Save button to store your current workspace locally in your browser, or use Export to download it as a portable JSON file so you can share it.
 
-## Architecture Map
+## Architecture
 
-* `src/lib/LogicEngine.ts`: The core deterministic simulator that evaluates the logic graphs.
-* `src/lib/automation/catalog.ts`: The complete inventory of every available block and logic gate.
-* `src/components/lab/`: The React Flow visual canvas, node renderers, and workspace UI.
-* `src/components/lab/HmiCanvas.tsx`: The SCADA dashboard builder.
-* `src/components/lab/oscilloscope/`: The time-travel logic analyzer.
+```
+src/
+  app/                 Pages and API route handlers (thin: validate, authorize, call a service)
+  server/              Server-only code (imports 'server-only')
+    db/                Neon client and versioned migrations
+    auth/              Password hashing and sessions (hashed tokens in an HttpOnly cookie)
+    repos/             SQL queries per table
+    services/          Business rules: articles, auth, published content for pages
+    http.ts            JSON responses, error handling, request validation
+  shared/              Pure code used by both sides: types, permissions, validation (zod), URL safety
+  lib/
+    api/client.ts      The only place the browser calls the API
+    auth.ts            Client session store (useSession)
+    content/           Article rendering and upload parsing
+    LogicEngine.ts     The deterministic simulator
+    automation/        Block catalog, circuit DSL, documents, layout
+    codegen/           Arduino sketch generator
+  components/lab/      React Flow canvas, HMI builder, logic analyzer
+```
+
+Rules of thumb:
+
+* Authorization lives in `src/shared/permissions.ts` and is enforced by the API on every write; the UI only uses it to decide what to show.
+* Every API payload is validated with the schemas in `src/shared/validation.ts`.
+* Public pages read data on the server through `src/server/services/content.ts`, so articles are fully rendered for readers and search engines.
+* Schema changes are new entries at the end of `MIGRATIONS`; never edit one that has shipped.
 
 This project is an educational simulator and does not claim compatibility with specific PLC vendors. It is designed to make learning control logic accessible, visual, and highly interactive.

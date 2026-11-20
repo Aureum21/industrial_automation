@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, useNodesInitialized, ConnectionLineType, type Connection, type Edge, type NodeChange, type EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LogicEngine } from '@/lib/LogicEngine';
@@ -113,7 +113,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   }, [engine]);
 
   const runningRef = useRef(running);
-  runningRef.current = running;
+  useLayoutEffect(() => { runningRef.current = running; }, [running]);
 
   const mutate = useCallback((operation: () => void) => {
     try { operation(); if (!readOnly) setDirty(true); sync(); }
@@ -176,7 +176,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   }, [engine, makeNode, centerView, sync]);
 
   const loadRef = useRef(load);
-  loadRef.current = load;
+  useLayoutEffect(() => { loadRef.current = load; }, [load]);
   const loadedCircuitKeyRef = useRef<string | null>(null);
 
   // Auto-center whenever nodes are initialized or change

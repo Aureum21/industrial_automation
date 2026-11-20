@@ -1,167 +1,105 @@
 'use client';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  stationId?: string;
-  avatar?: string;
-  bio?: string;
-  joinedDate: string;
-  isOwner?: boolean;
-}
-
-const AUTH_STORAGE_KEY = 'automationhub_authenticated_user';
-export const AUTH_CHANGE_EVENT = 'automationhub_auth_change';
-
-export function getCurrentUser(): User | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (err) {
-    console.warn('Failed to parse stored user:', err);
-    return null;
-  }
-}
-
-export function setCurrentUser(user: User): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: user }));
-  } catch (err) {
-    console.error('Failed to save user session:', err);
-  }
-}
-
-export function clearCurrentUser(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: null }));
-  } catch (err) {
-    console.error('Failed to clear user session:', err);
-  }
-}
+import { useEffect, useSyncExternalStore } from 'react';
+import { authApi, type ApiResult, type SessionUser } from '@/lib/api/client';
 
 /**
- * Sign in against Neon PostgreSQL backend (/api/auth/signin).
- * Synchronizes session cookie and localStorage user state.
+ * Client-side view of the signed-in user. The server session cookie is the source of truth;
+ * this store caches the profile so the header can render instantly, and refreshes it from
+ * /api/auth/me once per page load. Authorization is always re-checked by the API.
  */
-export async function signInWithNeon(
-  emailOrUsername: string,
-  password: string
-): Promise<{ ok: boolean; user?: User; error?: string }> {
-  try {
-    const res = await fetch('/api/auth/signin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailOrUsername, password }),
-    });
+export type User = SessionUser;
 
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error || 'Failed to sign in.' };
-    }
-
-    if (data.user) {
-      setCurrentUser(data.user);
-    }
-
-    return { ok: true, user: data.user };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
-  }
+interface SessionState {
+  user: User | null;
+  /** True once the server has been asked at least once during this page load. */
+  checked: boolean;
+  /** False when the deployment has no database, so accounts are unavailable. */
+  accounts: boolean;
 }
 
-/**
- * Sign up a new user in Neon PostgreSQL backend (/api/auth/signup).
- */
-export async function signUpWithNeon(userData: {
-  name: string;
-  email: string;
-  password: string;
-  stationId?: string;
-  role?: string;
-  bio?: string;
-}): Promise<{ ok: boolean; user?: User; error?: string }> {
+const CACHE_KEY = 'automationhub.session.v2';
+const listeners = new Set<() => void>();
+let state: SessionState = { user: null, checked: false, accounts: true };
+let hydrated = false;
+let refreshing: Promise<void> | null = null;
+
+function readCache(): User | null {
   try {
-    const res = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData),
-    });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error || 'Failed to create account.' };
-    }
-
-    if (data.user) {
-      setCurrentUser(data.user);
-    }
-
-    return { ok: true, user: data.user };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
-  }
-}
-
-/**
- * Sign out from server session and clear local session state.
- */
-export async function signOutWithNeon(): Promise<void> {
-  try {
-    await fetch('/api/auth/signout', { method: 'POST' });
-  } catch (err) {
-    console.warn('Signout request failed:', err);
-  } finally {
-    clearCurrentUser();
-  }
-}
-
-/**
- * Check if the active session is valid on Neon server (/api/auth/me).
- */
-export async function checkSessionWithNeon(): Promise<User | null> {
-  try {
-    const res = await fetch('/api/auth/me');
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.ok && data.user) {
-      setCurrentUser(data.user);
-      return data.user;
-    }
-    return null;
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
   } catch {
     return null;
   }
 }
 
-/**
- * Updates the user's password in Neon PostgreSQL (/api/auth/change-password).
- */
-export async function changePasswordWithNeon(payload: {
-  currentPassword: string;
-  newPassword: string;
-  emailOrUsername?: string;
-}): Promise<{ ok: boolean; message?: string; error?: string }> {
+function writeCache(user: User | null) {
   try {
-    const res = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error || 'Failed to update password.' };
-    }
-
-    return { ok: true, message: data.message };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message || 'Network connection failed.' };
+    if (user) localStorage.setItem(CACHE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // Storage may be unavailable (private mode); the session still works via the cookie.
   }
 }
+
+function setState(next: Partial<SessionState>) {
+  state = { ...state, ...next };
+  if ('user' in next) writeCache(state.user);
+  listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void) {
+  if (!hydrated && typeof window !== 'undefined') {
+    hydrated = true;
+    state = { ...state, user: readCache() };
+    // Drop the pre-2026-11 cache key, which stored user objects without server verification.
+    try {
+      localStorage.removeItem('automationhub_authenticated_user');
+    } catch {}
+  }
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+const SERVER_STATE: SessionState = { user: null, checked: false, accounts: true };
+
+export function refreshSession(): Promise<void> {
+  refreshing ??= authApi
+    .me()
+    .then((result) => {
+      if (result.ok) setState({ user: result.data.user, accounts: result.data.accounts, checked: true });
+      else setState({ checked: true });
+    })
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+/** Current session; triggers one server check per page load. */
+export function useSession(): SessionState {
+  const snapshot = useSyncExternalStore(subscribe, () => state, () => SERVER_STATE);
+  useEffect(() => {
+    if (!state.checked) void refreshSession();
+  }, []);
+  return snapshot;
+}
+
+export async function signIn(identifier: string, password: string): Promise<ApiResult<{ user: User }>> {
+  const result = await authApi.signIn(identifier, password);
+  if (result.ok) setState({ user: result.data.user, checked: true });
+  return result;
+}
+
+export async function signUp(input: { name: string; email: string; password: string; role?: string }): Promise<ApiResult<{ user: User }>> {
+  const result = await authApi.signUp(input);
+  if (result.ok) setState({ user: result.data.user, checked: true });
+  return result;
+}
+
+export async function signOut(): Promise<void> {
+  await authApi.signOut();
+  setState({ user: null, checked: true });
+}
+
+export const changePassword = authApi.changePassword;

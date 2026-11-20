@@ -350,7 +350,7 @@ export default function Oscilloscope({ engine, onScrub, scrubTime, timeMs = 0, s
         {traces.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400 text-xs p-6 text-center">
             <p className="font-medium text-gray-600 mb-1">No signals selected for analysis.</p>
-            <p className="text-gray-400 mb-3">Click "+ Signals" above to choose inputs, outputs, or controllers to inspect.</p>
+            <p className="text-gray-400 mb-3">Click &ldquo;+ Signals&rdquo; above to choose inputs, outputs, or controllers to inspect.</p>
             <button 
               onClick={selectAllBlocks}
               className="px-3 py-1 rounded bg-green-600 text-white font-semibold text-xs hover:bg-green-700"
@@ -602,7 +602,7 @@ function TracePath({ history, block, minTime, maxTime, latestTime, isAnalog, col
     const visibleSnaps = history.filter(s => s.timeMs >= minTime && s.timeMs <= maxTime);
 
     let path = '';
-    let startY = getY(initialNum);
+    const startY = getY(initialNum);
     path += `M 0 ${startY} `;
     let lastX = 0;
     let lastY = startY;

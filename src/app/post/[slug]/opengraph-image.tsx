@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
-import { BLOG_POSTS, AUTHOR_NAME } from '@/lib/mockPosts';
+import { getPublishedPost } from '@/server/services/content';
+import { OWNER_HANDLE as AUTHOR_NAME } from '@/shared/site';
 
 export const alt = 'AutomationHub Masterclass Schematics';
 export const size = { width: 1200, height: 630 };
@@ -7,11 +8,12 @@ export const contentType = 'image/png';
 
 export default async function Image(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
-  const post = BLOG_POSTS.find((p) => p.slug === slug);
+  const published = await getPublishedPost(slug);
+  const post = published ? (published.source === 'static' ? published.post : published.doc) : undefined;
 
   const title = post?.title || 'Industrial Automation Masterclass';
   const tag = post?.tag || 'Process Control';
-  const readingTime = post?.readingTime || '15 min read + interactive labs';
+  const readingTime = post?.readingTime || 'Interactive labs';
 
   return new ImageResponse(
     (

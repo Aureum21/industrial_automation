@@ -1,11 +1,7 @@
-'use client';
-
-import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Cpu,
   ArrowRight,
-  ExternalLink,
   ShieldCheck,
   Activity,
   Layers,
@@ -15,41 +11,13 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
-import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
-import { getAllPosts, syncArticlesFromCloud } from '@/lib/blogStorage';
 import InlineLab from '@/components/lab/InlineLab';
+import { getPostSummaries } from '@/server/services/content';
+import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 
-export default function Home() {
-  const [posts, setPosts] = useState<BlogPost[]>(BLOG_POSTS);
-
-  useEffect(() => {
-    setPosts(getAllPosts());
-
-    // Fetch live actual read counts and synced articles from Neon DB
-    fetch('/api/views')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && data.views) {
-          setPosts((prev) =>
-            prev.map((p) => ({
-              ...p,
-              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-
-    syncArticlesFromCloud().then((cloudPosts) => {
-      if (cloudPosts.length > 0) {
-        setPosts(getAllPosts());
-      }
-    });
-  }, []);
-
-  const totalReads = useMemo(() => {
-    return posts.reduce((sum, p) => sum + (p.views || 1), 0);
-  }, [posts]);
+export default async function Home() {
+  const posts = await getPostSummaries();
+  const labCount = DEFAULT_MASTERCLASSES.reduce((sum, post) => sum + post.sections.filter((s) => s.type === 'lab').length, 0);
 
   // Interactive Hero Demo Circuit (Start/Stop with Dry Suction Permissive)
   const heroCircuitDsl = `circuit "Intake Permissive Interlock" version 1 {
@@ -96,7 +64,7 @@ export default function Home() {
               href="/blogs"
               className="px-6 py-3 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
             >
-              <span>Explore 10 Masterclasses</span>
+              <span>Explore the masterclasses</span>
               <ArrowRight size={15} />
             </Link>
             <Link
@@ -111,15 +79,11 @@ export default function Home() {
           {/* Platform Metrics Bar */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs font-mono text-[#86868b] pt-8 border-t border-[#e5e5ea]/80">
             <div>
-              <strong className="text-[#1d1d1f] text-sm">11</strong> MASTERCLASSES
+              <strong className="text-[#1d1d1f] text-sm">{posts.length}</strong> MASTERCLASSES
             </div>
             <div>•</div>
             <div>
-              <strong className="text-[#1d1d1f] text-sm">33</strong> INTERACTIVE FBD LABS
-            </div>
-            <div>•</div>
-            <div>
-              <strong className="text-[#059669] text-sm">⚡ {totalReads}</strong> PLATFORM READS
+              <strong className="text-[#1d1d1f] text-sm">{labCount}</strong> INTERACTIVE FBD LABS
             </div>
             <div>•</div>
             <div>
@@ -189,14 +153,14 @@ export default function Home() {
                 Hardware Safety Failsafes
               </h3>
               <p className="text-sm text-[#515154] leading-relaxed">
-                Learn why software loops cannot replace physical safety relays, implementing strict ISO 13851 Category 4 / PL e dual-channel monitored architectures.
+                Learn why software loops cannot replace physical safety relays, implementing strict ISO 13849 Category 4 / PL e dual-channel monitored architectures.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. THE 10 MASTERCLASSES ARCHIVE */}
+      {/* 3. MASTERCLASSES ARCHIVE */}
       <section className="py-20 px-5 sm:px-8 border-b border-[#e5e5ea]">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
@@ -231,7 +195,7 @@ export default function Home() {
                     </span>
                     <div className="flex items-center gap-3 text-[11px] font-mono text-[#86868b]">
                       <span>{post.date}</span>
-                      <span className="text-[#059669] font-medium">⚡ {post.views} reads</span>
+                      {post.views > 0 && <span className="text-[#059669] font-medium">⚡ {post.views} reads</span>}
                     </div>
                   </div>
 

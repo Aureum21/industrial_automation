@@ -1,39 +1,24 @@
-import { NextResponse } from 'next/server';
-import { getDb, initDb, isDbConfigured } from '@/lib/db';
-import type { ExternalBlogPost } from '@/lib/blogStorage';
+import { HttpError, ok, route } from '@/server/http';
+import { requireUser } from '@/server/auth/session';
+import { getStoredArticle, removeArticle } from '@/server/services/articles';
+import { slugSchema } from '@/shared/validation';
 
-export async function GET(
-  request: Request,
-  props: { params: Promise<{ slug: string }> }
-) {
-  const { slug } = await props.params;
+type Context = { params: Promise<{ slug: string }> };
 
-  if (!isDbConfigured()) {
-    return NextResponse.json({ ok: false, post: null, error: 'Database not configured' }, { status: 404 });
-  }
-
-  try {
-    await initDb();
-    const sql = getDb();
-    if (!sql) {
-      return NextResponse.json({ ok: false, post: null }, { status: 500 });
-    }
-
-    const rows = await sql`
-      SELECT content_json
-      FROM articles
-      WHERE slug = ${slug}
-      LIMIT 1;
-    `;
-
-    if (!rows || rows.length === 0) {
-      return NextResponse.json({ ok: false, post: null }, { status: 404 });
-    }
-
-    const post = rows[0]?.content_json as ExternalBlogPost;
-    return NextResponse.json({ ok: true, post });
-  } catch (err) {
-    console.error('Failed to get article from Neon:', err);
-    return NextResponse.json({ ok: false, post: null, error: (err as Error).message }, { status: 500 });
-  }
+async function readSlug(context: Context): Promise<string> {
+  const parsed = slugSchema.safeParse((await context.params).slug);
+  if (!parsed.success) throw new HttpError(400, 'Invalid article slug.');
+  return parsed.data;
 }
+
+export const GET = route(async (_req: Request, context: Context) => {
+  const article = await getStoredArticle(await readSlug(context));
+  if (!article) throw new HttpError(404, 'Article not found.');
+  return ok({ article });
+});
+
+export const DELETE = route(async (_req: Request, context: Context) => {
+  const user = await requireUser();
+  await removeArticle(user, await readSlug(context));
+  return ok({ deleted: true });
+});

@@ -1,7 +1,9 @@
 import React from 'react';
 import InlineLab from '@/components/lab/InlineLab';
 
-export const AUTHOR_NAME = 'alex_eng_aut';
+import { OWNER_HANDLE } from '@/shared/site';
+
+export const AUTHOR_NAME = OWNER_HANDLE;
 
 export interface BlogPost {
   slug: string;
@@ -10,11 +12,9 @@ export interface BlogPost {
   author: string;
   authorUrl?: string;
   authorId?: string;
-  authorEmail?: string;
   date: string;
   readingTime: string;
   tag: string;
-  views: number;
   content: React.ReactNode;
   dsl: string;
 }
@@ -1489,7 +1489,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Oct 15',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
-    views: 18,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -1652,7 +1651,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Oct 8',
     readingTime: '20 min read + 25 min labs',
     tag: 'Process Control',
-    views: 14,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -1963,7 +1961,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Oct 1',
     readingTime: '22 min read + 25 min labs',
     tag: 'Control Systems',
-    views: 19,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2241,7 +2238,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 24',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
-    views: 7,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2464,7 +2460,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 17',
     readingTime: '18 min read + 20 min labs',
     tag: 'Safety',
-    views: 1,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2709,7 +2704,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 10',
     readingTime: '12 min read + 15 min labs',
     tag: 'HVAC / Climate',
-    views: 12,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2740,7 +2734,7 @@ export const BLOG_POSTS: BlogPost[] = [
         <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg my-4 text-sm font-sans text-amber-950">
           <strong className="block font-semibold mb-1">The Costly Field Disaster:</strong>
           <p>
-            In November at a regional community college, maintenance noticed the campus electric bill had spiked by over $4,200. During inspection, technicians discovered that the rooftop fresh air damper (<code>OAD-101</code>) was rusted shut at 10%. The building's DX air conditioning compressor had been running continuously even while outdoor temperatures hovered at a chilly 54°F!
+            In November at a regional community college, maintenance noticed the campus electric bill had spiked by over $4,200. During inspection, technicians discovered that the rooftop fresh air damper (<code>OAD-101</code>) was rusted shut at 10%. The building&apos;s DX air conditioning compressor had been running continuously even while outdoor temperatures hovered at a chilly 54°F!
           </p>
           <p className="mt-2">
             To &quot;fix&quot; it, a junior technician wedged the damper 100% open. Two nights later, an unseasonal cold snap plunged outside temperatures to 24°F (-4°C). The Arctic air blew straight into the mixing plenum, freezing the hot-water heating coil solid. The copper pipes ruptured under hydrostatic ice pressure, flooding three classrooms with water.
@@ -2754,7 +2748,7 @@ export const BLOG_POSTS: BlogPost[] = [
           Understanding the 3 Main Dampers &amp; Air Streams
         </h2>
         <p>
-          Before diving into the logic circuits, let's understand the physical anatomy of an Air Handling Unit (AHU):
+          Before diving into the logic circuits, let&apos;s understand the physical anatomy of an Air Handling Unit (AHU):
         </p>
         <ul className="list-disc pl-6 space-y-2">
           <li><strong>Outdoor Air Damper (OAD):</strong> Modulates from 0% to 100% to admit outside fresh air into the unit.</li>
@@ -2925,7 +2919,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Sep 3',
     readingTime: '18 min read + 20 min labs',
     tag: 'Control Systems',
-    views: 16,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -2953,7 +2946,7 @@ export const BLOG_POSTS: BlogPost[] = [
           During the root-cause investigation, controls engineers pulled the PLC program archive. A junior automation technician had implemented the tank filling routine using a single naive analog comparator:
         </p>
         <div className="bg-zinc-900 text-emerald-400 p-4 rounded-lg font-mono text-sm not-prose my-4 border border-zinc-800">
-          // NAIVE TANK FILL LOGIC - DO NOT USE IN PRODUCTION<br />
+          {'// NAIVE TANK FILL LOGIC - DO NOT USE IN PRODUCTION'}<br />
           IF Tank_Level_LT201 &lt; 50.0 THEN<br />
           &nbsp;&nbsp;&nbsp;&nbsp;Pump_Cmd := TRUE;<br />
           ELSE<br />
@@ -3167,7 +3160,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Aug 27',
     readingTime: '12 min read + 15 min labs',
     tag: 'Intermediate',
-    views: 4,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3383,7 +3375,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Aug 20',
     readingTime: '12 min read + 15 min labs',
     tag: 'Safety / ESD',
-    views: 1,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3602,7 +3593,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Aug 13',
     readingTime: '12 min read + 15 min labs',
     tag: 'Renewables / IoT',
-    views: 9,
     content: (
       <div className="space-y-6">
         <div className="my-8 not-prose rounded-xl overflow-hidden border border-zinc-300 shadow-xl bg-white">
@@ -3621,7 +3611,7 @@ export const BLOG_POSTS: BlogPost[] = [
           The 4,000 False Alarms &amp; The Weekend Database Crash
         </h2>
         <p>
-          Imagine driving down a bumpy, rocky dirt road. If your car speedometer displayed the raw instant speed of each bounce every millisecond, the needle would violently blur between 20 MPH and 50 MPH! You wouldn't be able to read your speed, and your cruise control would violently jerk the throttle.
+          Imagine driving down a bumpy, rocky dirt road. If your car speedometer displayed the raw instant speed of each bounce every millisecond, the needle would violently blur between 20 MPH and 50 MPH! You wouldn&apos;t be able to read your speed, and your cruise control would violently jerk the throttle.
         </p>
         <p>
           Modern cars solve this with <strong>digital smoothing</strong>—averaging recent readings to display a smooth, steady number.
@@ -3639,7 +3629,7 @@ export const BLOG_POSTS: BlogPost[] = [
             On a partly cloudy Saturday afternoon, puffy cumulus clouds drifted across the desert sky. Every few seconds, the sunlight would dim for a brief moment, causing the raw voltage to dip from 28V down to 22V, and then bounce right back up.
           </p>
           <p className="mt-2">
-            The raw threshold comparator tripped and untripped continuously! By Sunday evening, the system had spammed over <strong>4,200 text messages</strong> to the plant manager's phone and filled the remote cellular gateway memory to 100%, causing a complete communications lockup.
+            The raw threshold comparator tripped and untripped continuously! By Sunday evening, the system had spammed over <strong>4,200 text messages</strong> to the plant manager&apos;s phone and filled the remote cellular gateway memory to 100%, causing a complete communications lockup.
           </p>
           <p className="mt-2 font-medium">
             The Golden Lesson: Never connect raw, noisy analog signals directly to alarm thresholds or high-frequency loggers. Always filter transients with a Moving Average (AVERAGE) and log clean, periodic snapshots with a DATA_LOG block.
@@ -3806,7 +3796,6 @@ export const BLOG_POSTS: BlogPost[] = [
     date: 'Nov 9',
     readingTime: '24 min read + 25 min labs',
     tag: 'Thermal & Process Control',
-    views: 19,
     content: (
       <div className="space-y-6">
         {/* P&ID Blueprint Schematic */}

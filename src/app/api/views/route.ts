@@ -1,70 +1,17 @@
-import { NextResponse } from 'next/server';
-import { getDb, initDb, isDbConfigured } from '@/lib/db';
+import { z } from 'zod';
+import { HttpError, ok, readJson, route } from '@/server/http';
+import { db, isDbConfigured } from '@/server/db';
+import { getAllViewCounts, incrementViewCount } from '@/server/repos/views';
+import { slugSchema } from '@/shared/validation';
 
-export async function GET() {
-  if (!isDbConfigured()) {
-    return NextResponse.json({ ok: false, views: {}, configured: false });
-  }
+export const GET = route(async () => {
+  if (!isDbConfigured()) return ok({ views: {} });
+  return ok({ views: await getAllViewCounts(await db()) });
+});
 
-  try {
-    await initDb();
-    const sql = getDb();
-    if (!sql) {
-      return NextResponse.json({ ok: false, views: {} });
-    }
-
-    const rows = await sql`
-      SELECT slug, views FROM article_views;
-    `;
-
-    const viewsMap: Record<string, number> = {};
-    for (const r of rows as { slug: string; views: number }[]) {
-      viewsMap[r.slug] = Number(r.views) || 1;
-    }
-
-    return NextResponse.json({ ok: true, views: viewsMap, configured: true });
-  } catch (err) {
-    console.error('Failed to get views:', err);
-    return NextResponse.json({ ok: false, views: {}, error: (err as Error).message });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const slug = (body.slug || '').trim();
-
-    if (!slug) {
-      return NextResponse.json({ ok: false, error: 'Slug is required.' }, { status: 400 });
-    }
-
-    if (!isDbConfigured()) {
-      return NextResponse.json({ ok: true, slug, views: 1, offline: true });
-    }
-
-    await initDb();
-    const sql = getDb();
-    if (!sql) {
-      return NextResponse.json({ ok: false, error: 'Database unavailable' }, { status: 500 });
-    }
-
-    const result = await sql`
-      INSERT INTO article_views (slug, views)
-      VALUES (${slug}, 1)
-      ON CONFLICT (slug)
-      DO UPDATE SET views = article_views.views + 1, updated_at = NOW()
-      RETURNING views;
-    `;
-
-    const updatedViews = Number(result[0]?.views) || 1;
-
-    return NextResponse.json({
-      ok: true,
-      slug,
-      views: updatedViews,
-    });
-  } catch (err) {
-    console.error('Failed to record view:', err);
-    return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
-  }
-}
+/** Records one read. The client sends this at most once per browser session per post. */
+export const POST = route(async (req: Request) => {
+  const { slug } = await readJson(req, z.object({ slug: slugSchema }), 1_000);
+  if (!isDbConfigured()) throw new HttpError(503, 'Read counts are not available on this deployment.');
+  return ok({ slug, views: await incrementViewCount(await db(), slug) });
+});

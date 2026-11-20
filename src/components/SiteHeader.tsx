@@ -1,39 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut, Cpu } from 'lucide-react';
-import { getCurrentUser, clearCurrentUser, AUTH_CHANGE_EVENT, type User } from '@/lib/auth';
+import { signOut, useSession } from '@/lib/auth';
 
 export default function SiteHeader() {
-  const [user, setUser] = useState<User | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const { user } = useSession();
   const pathname = usePathname();
-
-  useEffect(() => {
-    setMounted(true);
-    setUser(getCurrentUser());
-
-    const handleAuthChange = (e: Event) => {
-      const customEvent = e as CustomEvent<User | null>;
-      setUser(customEvent.detail ?? getCurrentUser());
-    };
-
-    window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
-    window.addEventListener('storage', () => setUser(getCurrentUser()));
-
-    return () => {
-      window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
-    };
-  }, []);
-
-  const handleSignOut = () => {
-    clearCurrentUser();
-    setUser(null);
-  };
-
-  const hasUser = mounted && Boolean(user);
+  const hasUser = Boolean(user);
 
   const navLinks = [
     { href: '/blogs', label: 'Masterclasses' },
@@ -85,14 +60,14 @@ export default function SiteHeader() {
                 title={`Signed in as: ${user.name}`}
               >
                 <span className="w-5 h-5 rounded-full bg-[#1d1d1f] text-white font-bold flex items-center justify-center text-[10px] font-mono">
-                  {user.avatar || user.name.slice(0, 2).toUpperCase()}
+                  {user.name.slice(0, 2).toUpperCase()}
                 </span>
                 <span className="hidden sm:inline font-sans font-medium text-xs">
-                  {user.name.split(' ')[0]}
+                  {user.name}
                 </span>
               </Link>
               <button
-                onClick={handleSignOut}
+                onClick={() => void signOut()}
                 className="text-[#86868b] hover:text-red-600 transition p-1.5 rounded-full hover:bg-[#f5f5f7]"
                 title="Sign out of station"
                 type="button"

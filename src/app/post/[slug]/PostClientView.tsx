@@ -2,102 +2,70 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Edit, CheckCircle2, Award, ArrowLeft, Share2, Sparkles } from 'lucide-react';
+import { Edit, CheckCircle2, Award, ArrowLeft, Share2 } from 'lucide-react';
 import LabWorkspace from '@/components/lab/LabWorkspace';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
-import { getCurrentUser, type User } from '@/lib/auth';
-import { type BlogPost } from '@/lib/mockPosts';
-import { getPostBySlug, canEditPost } from '@/lib/blogStorage';
+import { useSession } from '@/lib/auth';
+import { viewsApi } from '@/lib/api/client';
+import { useStoredValue } from '@/lib/useStoredValue';
+import { canEditArticle } from '@/shared/permissions';
 
-interface PostClientViewProps {
+/** Serializable post metadata passed from the server page. The body arrives as `children`. */
+export interface PostViewModel {
   slug: string;
-  initialPost?: BlogPost;
+  title: string;
+  excerpt: string;
+  author: string;
+  authorId?: string;
+  date: string;
+  readingTime: string;
+  tag: string;
+  /** Optional single-lab circuit shown after the article body. */
+  dsl: string;
+  views: number;
+  /** Number of verifiable lab stages in the article (0 hides the progress pill). */
+  labCount: number;
 }
 
-export default function PostClientView({ slug, initialPost }: PostClientViewProps) {
-  const [post, setPost] = useState<BlogPost | undefined>(initialPost);
-  const [user, setUser] = useState<User | null>(null);
-  const [liveViews, setLiveViews] = useState<number | null>(initialPost?.views ?? null);
+const NO_STAGES: string[] = [];
+
+export default function PostClientView({ post, children }: { post: PostViewModel; children: React.ReactNode }) {
+  const { user } = useSession();
+  const [views, setViews] = useState(post.views);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const progressKey = `automationhub_lab_progress_${post.slug}`;
+  const [completedStages, setCompletedStages] = useStoredValue<string[]>(progressKey, NO_STAGES);
 
-  // Lab Stage Completion State (Tracks verified stages in this masterclass)
-  const [completedStages, setCompletedStages] = useState<string[]>([]);
-
+  // Count one read per browser session.
   useEffect(() => {
-    setUser(getCurrentUser());
-    const found = getPostBySlug(slug);
-    if (found) {
-      setPost(found);
-      if (liveViews === null) setLiveViews(found.views ?? 1);
-    }
-
-    // Load saved lab completion progress for this post
-    const progressKey = `automationhub_lab_progress_${slug}`;
+    const key = `has_read_${post.slug}`;
     try {
-      const saved = localStorage.getItem(progressKey);
-      if (saved) {
-        setCompletedStages(JSON.parse(saved));
-      }
-    } catch {}
-
-    // Record real visitor read count in Neon PostgreSQL
-    const sessionKey = 'has_read_' + slug;
-    const alreadyRead = typeof window !== 'undefined' && sessionStorage.getItem(sessionKey);
-
-    if (!alreadyRead) {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem(sessionKey, '1');
-      }
-      fetch('/api/views', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.ok && typeof data.views === 'number') {
-            setLiveViews(data.views);
-          }
-        })
-        .catch(() => {});
-    } else {
-      fetch('/api/views')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.ok && data.views && typeof data.views[slug] === 'number') {
-            setLiveViews(data.views[slug]);
-          }
-        })
-        .catch(() => {});
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      return;
     }
+    void viewsApi.record(post.slug).then((result) => {
+      if (result.ok) setViews(result.data.views);
+    });
+  }, [post.slug]);
 
-    // Listen for inline lab stage completions
-    const handleStageCompleted = (e: Event) => {
-      const customEvent = e as CustomEvent<{ slug: string; stageId: string }>;
-      if (customEvent.detail && customEvent.detail.slug === slug) {
-        setCompletedStages((prev) => {
-          if (prev.includes(customEvent.detail.stageId)) return prev;
-          const next = [...prev, customEvent.detail.stageId];
-          try {
-            localStorage.setItem(progressKey, JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-      }
+  // Inline labs announce verified stages with a window event.
+  useEffect(() => {
+    const onVerified = (event: Event) => {
+      const detail = (event as CustomEvent<{ slug: string; stageId: string }>).detail;
+      if (detail?.slug !== post.slug || completedStages.includes(detail.stageId)) return;
+      setCompletedStages([...completedStages, detail.stageId]);
     };
+    window.addEventListener('lab_stage_verified', onVerified);
+    return () => window.removeEventListener('lab_stage_verified', onVerified);
+  }, [post.slug, completedStages, setCompletedStages]);
 
-    window.addEventListener('lab_stage_verified', handleStageCompleted);
-    return () => {
-      window.removeEventListener('lab_stage_verified', handleStageCompleted);
-    };
-  }, [slug]);
-
-  // Single embedded lab parser
   const singleLabDoc = useMemo(() => {
-    if (!post?.dsl) return undefined;
+    if (!post.dsl) return undefined;
     try {
       const doc = parseCircuitDSL(post.dsl, BLOCK_CATALOG);
       doc.name = post.title;
@@ -106,35 +74,19 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
     } catch {
       return undefined;
     }
-  }, [post]);
+  }, [post.dsl, post.title]);
 
   const handleShare = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
+    void navigator.clipboard?.writeText(window.location.href).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
-    }
+    });
   };
 
-  if (!post) {
-    return (
-      <main className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] flex flex-col items-center justify-center px-4 font-sans">
-        <h1 className="text-3xl font-bold tracking-tight mb-3">Masterclass Not Found</h1>
-        <p className="text-[#86868b] text-sm mb-6">The requested engineering schematic could not be located.</p>
-        <Link
-          href="/blogs"
-          className="px-5 py-2.5 rounded-full bg-[#0071e3] text-white font-medium text-xs hover:bg-[#0077ed] transition shadow-sm"
-        >
-          Return to Schematics Archive
-        </Link>
-      </main>
-    );
-  }
-
-  // Calculate masterclass completion (out of 3 standard stages)
-  const totalStages = 3;
-  const progressPercent = Math.min(100, Math.round((completedStages.length / totalStages) * 100));
-  const isMasterclassComplete = completedStages.length >= totalStages;
+  const canEdit = canEditArticle({ slug: post.slug, exists: true, authorId: post.authorId ?? null }, user);
+  const totalStages = post.labCount;
+  const doneStages = Math.min(completedStages.length, totalStages);
+  const isMasterclassComplete = totalStages > 0 && doneStages >= totalStages;
 
   return (
     <main className="bg-[#fbfbfd] min-h-screen text-[#1d1d1f] font-sans pb-32 antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
@@ -157,19 +109,21 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
 
           <div className="flex items-center gap-3">
             {/* Lab Progress Pill */}
+            {totalStages > 0 && (
             <div className="flex items-center gap-2 bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-1 rounded-full text-xs font-mono">
               {isMasterclassComplete ? (
                 <span className="text-[#059669] font-bold flex items-center gap-1.5">
                   <CheckCircle2 size={13} className="text-[#059669]" />
-                  Masterclass Mastered (3/3)
+                  All labs verified ({doneStages}/{totalStages})
                 </span>
               ) : (
                 <span className="text-[#86868b] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#0071e3]" />
-                  Lab Progress: <strong className="text-[#1d1d1f]">{completedStages.length}/{totalStages}</strong>
+                  Lab Progress: <strong className="text-[#1d1d1f]">{doneStages}/{totalStages}</strong>
                 </span>
               )}
             </div>
+            )}
 
             {/* Share Button */}
             <button
@@ -186,12 +140,12 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
 
       <article className="mx-auto max-w-3xl px-5 sm:px-8 mt-10 sm:mt-14">
         {/* Author Station Banner (Only when logged in as the author of this masterclass) */}
-        {user && post && canEditPost(post, user) && (
+        {user && canEdit && (
           <div className="mb-8 p-4 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
             <div className="flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
               <span className="text-[#1d1d1f] font-medium font-mono">
-                AUTHOR CONSOLE // Signed in as <strong className="text-[#059669]">{user.name}</strong>
+                Signed in as <strong className="text-[#059669]">{user.name}</strong>
               </span>
             </div>
             <Link
@@ -199,7 +153,7 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1d1d1f] hover:bg-black text-white font-medium text-xs transition shadow-xs"
             >
               <Edit size={12} />
-              <span>Edit Schematic in Studio</span>
+              <span>Edit in Studio</span>
             </Link>
           </div>
         )}
@@ -208,9 +162,6 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
         <div className="flex flex-wrap items-center gap-2.5 mb-4">
           <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#0071e3] bg-[#0071e3]/10 border border-[#0071e3]/20 px-3 py-1 rounded-full">
             {post.tag}
-          </span>
-          <span className="text-[11px] font-mono text-[#86868b]">
-            INDUSTRIAL SCADA &amp; DETERMINISTIC CONTROLS
           </span>
         </div>
 
@@ -238,10 +189,14 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
                 <span>{post.readingTime}</span>
                 <span>·</span>
                 <span>{post.date}</span>
-                <span>·</span>
-                <span className="text-[#059669] font-medium bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full">
-                  ⚡ {liveViews ?? post.views ?? 1} reads
-                </span>
+                {views > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-[#059669] font-medium bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full">
+                      {views} {views === 1 ? 'read' : 'reads'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -249,7 +204,7 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
 
         {/* Masterclass Content & Interactive Stages */}
         <div className="prose prose-zinc max-w-none text-base leading-relaxed text-[#1d1d1f] mb-16">
-          {post.content}
+          {children}
         </div>
 
         {/* Standalone Single Lab fallback (if post uses direct dsl) */}
@@ -286,10 +241,10 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
             </div>
             <div>
               <h3 className="text-lg font-bold text-[#065f46] mb-1">
-                Masterclass Successfully Completed!
+                All labs verified
               </h3>
               <p className="text-xs sm:text-sm text-[#047857] leading-relaxed mb-3">
-                You have verified all three functional stages of this masterclass: permissive interlocks, process hysteresis, and automated fail-safes.
+                You have worked through every lab in this article.
               </p>
               <div className="flex items-center gap-3">
                 <Link

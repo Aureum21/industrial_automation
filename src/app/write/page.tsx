@@ -1,358 +1,201 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   UploadCloud,
-  FileCode,
   CheckCircle,
   AlertTriangle,
   Eye,
-  ArrowRight,
   Download,
   PlusCircle,
   Trash2,
   Edit,
   BookOpen,
   Save,
-  RotateCcw,
-  Sparkles,
-  Layers,
-  ShieldCheck,
-  User,
   ExternalLink,
-  Code2,
   Lock,
   LogIn,
-  ShieldAlert,
   Cpu,
   ArrowUp,
   ArrowDown,
   Play,
   FolderOpen,
-  Check,
 } from 'lucide-react';
-import {
-  parseUploadedFileContent,
-  saveCustomPost,
-  getEditablePosts,
-  getEditablePost,
-  deleteCustomPost,
-  renderSectionsToReact,
-  CORE_MASTERCLASS_SLUGS,
-  isSiteOwner,
-  canEditPost,
-  type ExternalBlogPost,
-  type ExternalSection,
-} from '@/lib/blogStorage';
-import { checkSessionWithNeon, getCurrentUser, type User as AuthUser } from '@/lib/auth';
-import { AUTHOR_NAME } from '@/lib/mockPosts';
-import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 import InlineLab from '@/components/lab/InlineLab';
+import { useSession } from '@/lib/auth';
+import { articlesApi } from '@/lib/api/client';
+import { ArticleSections } from '@/lib/content/render';
+import { parseArticleUpload } from '@/lib/content/upload';
+import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 import { stringifyCircuitDSL, parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
-import { getExample, EXAMPLES } from '@/lib/automation/examples';
-import { STORAGE_KEY as LAB_STORAGE_KEY } from '@/lib/automation/documents';
+import { getExample } from '@/lib/automation/examples';
+import { parseCircuitDocument, STORAGE_KEY as LAB_STORAGE_KEY } from '@/lib/automation/documents';
+import type { ArticleDocument, ArticleSection } from '@/shared/articles';
+import { CORE_MASTERCLASS_SLUGS, canEditArticle, isSiteOwner } from '@/shared/permissions';
+import { OWNER_HANDLE } from '@/shared/site';
+import type { ArticleInput } from '@/shared/validation';
 
-const SAMPLE_TEMPLATE_JSON = {
-  slug: 'vacuum-degasser-control',
-  title: 'Vacuum Degasser Sequence: Dual-Ejector Automation & Cavitation Safeguards',
-  excerpt: 'A comprehensive engineering guide on sequencing multi-stage steam ejectors, condenser interlocks, and vacuum vessel pressure regulation.',
-  author: AUTHOR_NAME,
-  date: 'Oct 15',
-  readingTime: '12 min read',
-  tag: 'Vacuum Systems',
-  views: 12,
-  heroImage: '/water_treatment_pid.jpg',
-  sections: [
-    {
-      type: 'markdown',
-      content: '## The Loss of Vacuum at Ejector Skid 2\n\nAt 4:10 AM during a specialty alloy pour, the primary vacuum degasser vessel lost critical suction pressure within 45 seconds.\n\nInvestigation revealed that stage-two motive steam was applied prior to condenser cooling water verification, resulting in thermal vapor blowback and severe ejector throat erosion.'
-    },
-    {
-      type: 'callout',
-      variant: 'warning',
-      title: 'Motive Steam Pre-Condition',
-      text: 'Motive steam must never be introduced to ejectors until inter-condenser cooling water flow and seal pot levels exceed minimum permissives.'
-    },
-    {
-      type: 'markdown',
-      content: '### Stage 1: Steam Ejector Permissive Interlock\n\nBelow is the permissive logic ensuring condenser water flow and seal pot switches are confirmed before the steam valve can open:'
-    },
-    {
-      type: 'lab',
-      title: 'Stage 1: Motive Steam Permissive Interlock',
-      step: 'Stage 1 of 3',
-      height: 460,
-      dsl: `circuit "Stage 1: Permissives" version 1 {
-  cw_flow: INPUT(label="Cooling Water Flow OK", value=true)
-  seal_pot: INPUT(label="Seal Pot Level OK", value=true)
-  open_cmd: INPUT(label="Open Steam Cmd", value=false)
-  perm: AND()
-  gate: AND()
-  valve: OUTPUT(label="Steam Supply XV-101")
+type Notice = { kind: 'success' | 'error'; text: string };
+type CalloutVariant = NonNullable<Extract<ArticleSection, { type: 'callout' }>['variant']>;
 
-  cw_flow.Q -> perm.A
-  seal_pot.Q -> perm.B
-  perm.Q -> gate.A
-  open_cmd.Q -> gate.B
-  gate.Q -> valve.A
-}`
-    }
-  ]
-};
+function toInput(post: ArticleDocument): ArticleInput {
+  return {
+    slug: post.slug.trim(),
+    title: post.title,
+    excerpt: post.excerpt ?? '',
+    author: post.author || undefined,
+    date: post.date || undefined,
+    readingTime: post.readingTime || undefined,
+    tag: post.tag || undefined,
+    heroImage: post.heroImage || undefined,
+    sections: post.sections,
+  };
+}
+
+function starterLab(presetId: string, index: number): ArticleSection {
+  const example = getExample(presetId);
+  return { type: 'lab', title: `Stage ${index}: ${example.name}`, step: `Stage ${index}`, dsl: stringifyCircuitDSL(example), height: 480 };
+}
 
 function WriteContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const editSlugParam = searchParams.get('edit');
+  const { user: currentUser, checked, accounts } = useSession();
+  const isAuthor = isSiteOwner(currentUser);
 
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const isAuthor = useMemo(() => isSiteOwner(currentUser), [currentUser]);
   const [activeTab, setActiveTab] = useState<'publications' | 'editor' | 'upload'>('publications');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Publications State
-  const [publications, setPublications] = useState<ExternalBlogPost[]>([]);
-  const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+  /** Articles stored in the database that this user may manage. */
+  const [stored, setStored] = useState<ArticleDocument[]>([]);
+  const [loadingStored, setLoadingStored] = useState(true);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Active Post in Editor
-  const [editingPost, setEditingPost] = useState<ExternalBlogPost>({
+  const [editingPost, setEditingPost] = useState<ArticleDocument>({
     slug: '',
     title: '',
     excerpt: '',
     author: '',
-    date: 'Oct 15',
-    readingTime: '15 min read + 20 min labs',
-    tag: 'Process Control',
-    views: 1,
-    sections: [
-      {
-        type: 'markdown',
-        content: '## Overview\n\nWrite your technical introduction here.',
-      },
-    ],
+    date: '',
+    readingTime: '',
+    tag: 'Automation',
+    sections: [{ type: 'markdown', content: '## Overview\n\nWrite your introduction here.' }],
   });
-
-  // Determines whether the current user can edit the post currently in the editor
-  const isPostEditable = useMemo(() => {
-    if (!currentUser) return false;
-    if (editingPost.slug && CORE_MASTERCLASS_SLUGS.has(editingPost.slug)) {
-      return isAuthor;
-    }
-    return true;
-  }, [currentUser, editingPost.slug, isAuthor]);
-
-  // Tracks which lab sections have their live interactive simulation preview toggled on
   const [previewingLabs, setPreviewingLabs] = useState<Record<number, boolean>>({});
-
-  const [editorRawJson, setEditorRawJson] = useState<string>('');
+  const [editorRawJson, setEditorRawJson] = useState('');
   const [editorMode, setEditorMode] = useState<'fields' | 'json'>('fields');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
-  // Upload Tab State
-  const [rawText, setRawText] = useState('');
-  const [parsedPost, setParsedPost] = useState<ExternalBlogPost | null>(null);
+  const [parsedPost, setParsedPost] = useState<ArticleInput | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const refreshPublications = (userToUse = currentUser) => {
-    if (!userToUse) return;
-    const updated = getEditablePosts(userToUse);
-    setPublications(updated);
+  const storedBySlug = useMemo(() => new Map(stored.map((post) => [post.slug, post])), [stored]);
 
-    fetch('/api/articles?scope=my')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && Array.isArray(data.articles)) {
-          if (isSiteOwner(userToUse)) {
-            const cloudSlugs = new Set(data.articles.map((a: ExternalBlogPost) => a.slug));
-            const defaults = DEFAULT_MASTERCLASSES.filter((p) => !cloudSlugs.has(p.slug));
-            setPublications([...data.articles, ...defaults]);
-          } else {
-            // Community authors only see their own articles.
-            setPublications(data.articles);
-          }
-        }
-      })
-      .catch(() => {});
-  };
+  /** The owner also sees built-in masterclasses that have never been edited (they live in code). */
+  const publications = useMemo(() => {
+    if (!isAuthor) return stored;
+    return [...stored, ...DEFAULT_MASTERCLASSES.filter((post) => !storedBySlug.has(post.slug))];
+  }, [isAuthor, stored, storedBySlug]);
 
-  // Load initial publications and auth
-  useEffect(() => {
-    // 1. Initial cached user state
-    const local = getCurrentUser();
-    if (local) {
-      setCurrentUser(local);
-      const posts = getEditablePosts(local);
-      setPublications(posts);
-    }
+  const isPostEditable = useMemo(() => {
+    const existing = storedBySlug.get(editingPost.slug.trim());
+    return canEditArticle({ slug: editingPost.slug.trim(), exists: Boolean(existing), authorId: existing?.authorId ?? null }, currentUser);
+  }, [currentUser, editingPost.slug, storedBySlug]);
 
-    // 2. Validate live server session against Neon PostgreSQL
-    checkSessionWithNeon()
-      .then((serverUser) => {
-        const active = serverUser || local;
-        if (active) {
-          setCurrentUser(active);
-          refreshPublications(active);
-
-          // If navigated with ?edit=slug, open that post directly
-          if (editSlugParam) {
-            // Guard: non-authors cannot edit core masterclasses
-            if (CORE_MASTERCLASS_SLUGS.has(editSlugParam) && !isSiteOwner(active)) {
-              alert('Access restricted: core masterclasses can only be edited by the site owner.');
-              router.replace('/write');
-              return;
-            }
-            const match = getEditablePost(editSlugParam, active);
-            if (match) {
-              startEditing(match);
-            }
-          }
-        } else {
-          setCurrentUser(null);
-          setPublications([]);
-        }
-      })
-      .finally(() => {
-        setIsAuthChecking(false);
-      });
-
-    // Fetch live read counts from Neon PostgreSQL
-    fetch('/api/views')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && data.views) {
-          setPublications((prev) =>
-            prev.map((p) => ({
-              ...p,
-              views: data.views[p.slug] !== undefined ? data.views[p.slug] : p.views,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, [editSlugParam]);
-
-  const startEditing = (post: ExternalBlogPost) => {
-    setEditingPost(JSON.parse(JSON.stringify(post)));
+  const startEditing = useCallback((post: ArticleDocument) => {
+    setEditingPost(structuredClone(post));
     setEditorRawJson(JSON.stringify(post, null, 2));
+    setPreviewingLabs({});
     setActiveTab('editor');
-    setSaveSuccessNotice(null);
+    setNotice(null);
     setIsPreviewMode(false);
-  };
+  }, []);
+
+  // Load the user's articles; then honour a /write?edit=<slug> deep link once.
+  const openedFromParam = useRef(false);
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+    void articlesApi.listMine().then((result) => {
+      if (cancelled) return;
+      setLoadingStored(false);
+      if (!result.ok) {
+        setNotice({ kind: 'error', text: `Could not load your articles: ${result.error}` });
+        return;
+      }
+      const mine = result.data.articles;
+      setStored(mine);
+      if (editSlugParam && !openedFromParam.current) {
+        openedFromParam.current = true;
+        const candidates = isSiteOwner(currentUser) ? [...mine, ...DEFAULT_MASTERCLASSES] : mine;
+        const match = candidates.find((post) => post.slug === editSlugParam);
+        if (match) startEditing(match);
+        else setNotice({ kind: 'error', text: `You can't edit "${editSlugParam}", or it doesn't exist.` });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, editSlugParam, startEditing]);
+
 
   const startNewArticle = () => {
-    const authorName = currentUser?.name || 'Engineer';
-    let defaultDsl = '';
-    try {
-      defaultDsl = stringifyCircuitDSL(getExample('start-stop'));
-    } catch {
-      defaultDsl = `circuit "Stage 1: Permissive Interlock" version 1 {
-  start: INPUT(label="Start Pushbutton", value=false)
-  stop: INPUT(label="Stop Pushbutton", value=true)
-  latch: RS_LATCH(label="Motor Run Latch")
-  motor: OUTPUT(label="Motor Contactor M1")
-
-  start.Q -> latch.S
-  stop.Q -> latch.R
-  latch.Q -> motor.A
-}`;
-    }
-
-    const newDoc: ExternalBlogPost = {
-      slug: 'schematic-' + Date.now().toString(36),
-      title: 'New Industrial Masterclass',
-      excerpt: 'A comprehensive technical overview of industrial automation logic and controls.',
-      author: authorName,
-      authorId: currentUser?.id,
-      authorEmail: currentUser?.email,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      readingTime: '15 min read + 20 min labs',
-      tag: 'Process Control',
-      views: 1,
+    startEditing({
+      slug: `article-${Date.now().toString(36)}`,
+      title: 'New article',
+      excerpt: '',
+      author: isAuthor ? OWNER_HANDLE : currentUser?.name ?? '',
+      date: '',
+      readingTime: '',
+      tag: 'Automation',
       sections: [
-        {
-          type: 'markdown',
-          content: '## Introduction & Incident Scenario\n\nDescribe the operational event or plant challenge here.',
-        },
-        {
-          type: 'callout',
-          variant: 'warning',
-          title: 'Engineering Permissive Notice',
-          text: 'Hardware safety interlocks must precede software logic triggers.',
-        },
-        {
-          type: 'lab',
-          title: 'Stage 1: Motor Start / Stop Interlock',
-          step: 'Stage 1 of 3',
-          dsl: defaultDsl,
-          height: 480,
-        },
+        { type: 'markdown', content: '## Introduction\n\nDescribe the problem this circuit solves.' },
+        starterLab('start-stop', 1),
       ],
-    };
-    startEditing(newDoc);
+    });
   };
 
-  const handleSavePost = () => {
+  const handleSavePost = async () => {
     let postToSave = editingPost;
-
     if (editorMode === 'json') {
       try {
-        postToSave = JSON.parse(editorRawJson);
+        postToSave = JSON.parse(editorRawJson) as ArticleDocument;
       } catch (err) {
-        alert('Invalid JSON syntax: ' + (err as Error).message);
+        setNotice({ kind: 'error', text: `Invalid JSON: ${(err as Error).message}` });
         return;
       }
     }
-
-    if (!postToSave.slug || !postToSave.title) {
-      alert('Article requires a valid title and slug.');
+    setSaving(true);
+    const result = await articlesApi.save(toInput(postToSave));
+    setSaving(false);
+    if (!result.ok) {
+      setNotice({ kind: 'error', text: result.error });
       return;
     }
-
-    // Only the site owner can modify core masterclasses (the server enforces this too)
-    if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(postToSave.slug)) {
-      alert('Access restricted: core masterclasses can only be modified by the site owner.');
-      return;
-    }
-
-    const finalizedPost: ExternalBlogPost = {
-      ...postToSave,
-      author: postToSave.author || currentUser?.name || 'Engineer',
-      authorId: postToSave.authorId || currentUser?.id,
-      authorEmail: postToSave.authorEmail || currentUser?.email,
-      date: postToSave.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      views: Number(postToSave.views) || 1,
-    };
-
-    const result = saveCustomPost(finalizedPost, currentUser);
-    if (result && !result.ok) {
-      alert(result.error || 'Failed to save post.');
-      return;
-    }
-
-    setEditingPost(finalizedPost);
-    setEditorRawJson(JSON.stringify(finalizedPost, null, 2));
-    refreshPublications(currentUser);
-    setSaveSuccessNotice(`"${finalizedPost.title}" saved successfully! Live changes are now active.`);
+    const saved = result.data.article;
+    setEditingPost(saved);
+    setEditorRawJson(JSON.stringify(saved, null, 2));
+    setStored((previous) => [saved, ...previous.filter((post) => post.slug !== saved.slug)]);
+    setNotice({ kind: 'success', text: `"${saved.title}" is published.` });
   };
 
-  const handleDeleteCustom = (slug: string) => {
-    if (CORE_MASTERCLASS_SLUGS.has(slug) && !isAuthor) {
-      alert('Access Restricted: Core masterclasses cannot be deleted.');
+  const handleDeleteCustom = async (slug: string) => {
+    if (!confirm('Delete this article permanently?')) return;
+    const result = await articlesApi.remove(slug);
+    if (!result.ok) {
+      setNotice({ kind: 'error', text: result.error });
       return;
     }
-    if (confirm('Are you sure you want to delete this masterclass?')) {
-      deleteCustomPost(slug, currentUser);
-      refreshPublications(currentUser);
-      setActiveTab('publications');
-      setSaveSuccessNotice('Masterclass deleted successfully.');
-    }
+    setStored((previous) => previous.filter((post) => post.slug !== slug));
+    setActiveTab('publications');
+    setNotice({ kind: 'success', text: 'Article deleted.' });
   };
 
-  const handleExportPost = (post: ExternalBlogPost) => {
+  const handleExportPost = (post: ArticleDocument) => {
     const blob = new Blob([JSON.stringify(post, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -362,166 +205,93 @@ function WriteContent() {
     URL.revokeObjectURL(url);
   };
 
-  const handleRevertCustom = (slug: string) => {
-    if (!isAuthor) {
-      alert('Access restricted: only the site owner can revert core masterclasses.');
+  /** Owner only: drop the stored edit of a built-in masterclass so the original is served again. */
+  const handleRevertCustom = async (slug: string) => {
+    const original = DEFAULT_MASTERCLASSES.find((post) => post.slug === slug);
+    if (!original) return;
+    if (!storedBySlug.has(slug)) {
+      startEditing(original);
       return;
     }
-    if (confirm('Revert all custom edits to the original default masterclass?')) {
-      deleteCustomPost(slug, currentUser);
-      refreshPublications(currentUser);
-      const fresh = getEditablePost(slug, currentUser);
-      if (fresh) startEditing(fresh);
-      setSaveSuccessNotice('Reverted article to original baseline.');
+    if (!confirm('Discard your edits and restore the original version of this masterclass?')) return;
+    const result = await articlesApi.remove(slug);
+    if (!result.ok) {
+      setNotice({ kind: 'error', text: result.error });
+      return;
     }
+    setStored((previous) => previous.filter((post) => post.slug !== slug));
+    startEditing(original);
+    setNotice({ kind: 'success', text: 'Restored the original version.' });
   };
 
-  // Section modifiers for fields mode
-  const updateMarkdownSection = (index: number, content: string) => {
-    const updated = [...editingPost.sections];
-    if (updated[index].type === 'markdown') {
-      updated[index] = { ...updated[index], content };
-      setEditingPost({ ...editingPost, sections: updated });
-    }
+  const updateSection = (index: number, patch: Partial<ArticleSection>) => {
+    const sections = editingPost.sections.map((section, i) => (i === index ? ({ ...section, ...patch } as ArticleSection) : section));
+    setEditingPost({ ...editingPost, sections });
   };
-
-  const updateCalloutSection = (
-    index: number,
-    patch: { title?: string; text?: string; variant?: 'info' | 'warning' | 'success' | 'error' }
-  ) => {
-    const updated = [...editingPost.sections];
-    if (updated[index].type === 'callout') {
-      updated[index] = { ...updated[index], ...patch };
-      setEditingPost({ ...editingPost, sections: updated });
-    }
-  };
-
-  const updateLabSection = (
-    index: number,
-    patch: { title?: string; step?: string; dsl?: string; height?: number }
-  ) => {
-    const updated = [...editingPost.sections];
-    if (updated[index].type === 'lab') {
-      updated[index] = { ...updated[index], ...patch };
-      setEditingPost({ ...editingPost, sections: updated });
-    }
-  };
+  const updateMarkdownSection = (index: number, content: string) => updateSection(index, { content });
+  const updateCalloutSection = (index: number, patch: { title?: string; text?: string; variant?: CalloutVariant }) => updateSection(index, patch);
+  const updateLabSection = (index: number, patch: { title?: string; step?: string; dsl?: string; height?: number }) => updateSection(index, patch);
 
   const removeSection = (index: number) => {
-    const updated = editingPost.sections.filter((_, i) => i !== index);
-    setEditingPost({ ...editingPost, sections: updated });
+    setEditingPost({ ...editingPost, sections: editingPost.sections.filter((_, i) => i !== index) });
   };
 
   const moveSection = (index: number, direction: 'up' | 'down') => {
     const target = direction === 'up' ? index - 1 : index + 1;
     if (target < 0 || target >= editingPost.sections.length) return;
-    const updated = [...editingPost.sections];
-    const temp = updated[index];
-    updated[index] = updated[target];
-    updated[target] = temp;
-    setEditingPost({ ...editingPost, sections: updated });
+    const sections = [...editingPost.sections];
+    [sections[index], sections[target]] = [sections[target], sections[index]];
+    setEditingPost({ ...editingPost, sections });
   };
 
-  const addMarkdownSection = () => {
-    const updated: ExternalSection[] = [
-      ...editingPost.sections,
-      {
-        type: 'markdown',
-        content: '### New Section Heading\n\nExplain your operational control concepts, ladder rungs, or sensor topologies here.',
-      },
-    ];
-    setEditingPost({ ...editingPost, sections: updated });
-  };
+  const addMarkdownSection = () =>
+    setEditingPost({ ...editingPost, sections: [...editingPost.sections, { type: 'markdown', content: '### New section\n\n' }] });
 
-  const addCalloutSection = () => {
-    const updated: ExternalSection[] = [
-      ...editingPost.sections,
-      {
-        type: 'callout',
-        variant: 'warning',
-        title: 'Safety Interlock Permissive',
-        text: 'All emergency stop conditions and hardware relays must be verified before proceeding.',
-      },
-    ];
-    setEditingPost({ ...editingPost, sections: updated });
-  };
+  const addCalloutSection = () =>
+    setEditingPost({
+      ...editingPost,
+      sections: [...editingPost.sections, { type: 'callout', variant: 'warning', title: 'Note', text: '' }],
+    });
 
   const addLabSection = (presetId = 'start-stop') => {
-    let dsl = '';
-    let labTitle = 'Control Interlock';
+    const index = editingPost.sections.filter((section) => section.type === 'lab').length + 1;
+    setEditingPost({ ...editingPost, sections: [...editingPost.sections, starterLab(presetId, index)] });
+  };
+
+  const loadCircuitText = (index: number, text: string, fallbackTitle: string) => {
     try {
-      dsl = stringifyCircuitDSL(getExample(presetId));
-      labTitle = getExample(presetId).name;
-    } catch {
-      dsl = `circuit "Stage 1: Permissive Interlock" version 1 {
-  start: INPUT(label="Start Pushbutton", value=false)
-  stop: INPUT(label="Stop Pushbutton", value=true)
-  latch: RS_LATCH(label="Motor Run Latch")
-  motor: OUTPUT(label="Motor Contactor M1")
-
-  start.Q -> latch.S
-  stop.Q -> latch.R
-  latch.Q -> motor.A
-}`;
+      const doc = parseCircuitDocument(text);
+      updateLabSection(index, { dsl: stringifyCircuitDSL(doc), title: doc.name || fallbackTitle });
+      setNotice({ kind: 'success', text: `Loaded "${doc.name || fallbackTitle}" into lab ${index + 1}.` });
+    } catch (err) {
+      setNotice({ kind: 'error', text: `That circuit could not be loaded: ${(err as Error).message}` });
     }
-
-    const labCount = editingPost.sections.filter((s) => s.type === 'lab').length + 1;
-    const updated: ExternalSection[] = [
-      ...editingPost.sections,
-      {
-        type: 'lab',
-        title: `Stage ${labCount}: ${labTitle}`,
-        step: `Stage ${labCount} of ${Math.max(3, labCount)}`,
-        dsl,
-        height: 480,
-      },
-    ];
-    setEditingPost({ ...editingPost, sections: updated });
   };
 
   const importActiveCircuitFromLab = (index: number) => {
-    if (typeof window === 'undefined') return;
+    let raw: string | null = null;
     try {
-      const raw = localStorage.getItem(LAB_STORAGE_KEY);
-      if (!raw) {
-        alert('No active circuit found in your Visual Lab workspace. Open /lab to design or wire a circuit, then return here to import it!');
-        return;
-      }
-      const doc = JSON.parse(raw);
-      const dsl = stringifyCircuitDSL(doc);
-      updateLabSection(index, { dsl, title: doc.name || 'Imported Lab Circuit' });
-      alert(`Successfully imported "${doc.name || 'Visual Circuit'}" from your Logic Lab workspace!`);
-    } catch (err) {
-      alert('Failed to parse circuit from Logic Lab: ' + (err as Error).message);
+      raw = localStorage.getItem(LAB_STORAGE_KEY);
+    } catch {}
+    if (!raw) {
+      setNotice({ kind: 'error', text: 'No saved circuit found. Build one in the Logic Lab, press Save there, then import it here.' });
+      return;
     }
+    loadCircuitText(index, raw, 'Imported circuit');
   };
 
   const handleCircuitFileUpload = (index: number, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = (e.target?.result as string) || '';
-        const doc = JSON.parse(content);
-        const dsl = stringifyCircuitDSL(doc);
-        updateLabSection(index, { dsl, title: doc.name || 'Uploaded Circuit' });
-        alert(`Loaded "${doc.name || file.name}" into this lab!`);
-      } catch (err) {
-        alert('Invalid circuit JSON file: ' + (err as Error).message);
-      }
-    };
-    reader.readAsText(file);
+    void file.text().then((text) => loadCircuitText(index, text, file.name));
   };
 
-  // Upload Tab Handlers
-  const handleValidate = (textToValidate: string) => {
-    if (!textToValidate.trim()) {
+  const handleValidate = (text: string) => {
+    if (!text.trim()) {
       setParsedPost(null);
       setValidationError(null);
       return;
     }
     try {
-      const parsed = parseUploadedFileContent(textToValidate);
-      setParsedPost(parsed);
+      setParsedPost(parseArticleUpload(text));
       setValidationError(null);
     } catch (err) {
       setParsedPost(null);
@@ -530,88 +300,64 @@ function WriteContent() {
   };
 
   const handleFileDrop = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = (e.target?.result as string) || '';
-      setRawText(content);
-      handleValidate(content);
-    };
-    reader.readAsText(file);
+    void file.text().then(handleValidate);
   };
 
-  const handlePublishUploaded = () => {
+  const handlePublishUploaded = async () => {
     if (!parsedPost) return;
-    if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(parsedPost.slug)) {
-      alert('Access restricted: core masterclasses can only be modified by the site owner.');
+    setSaving(true);
+    const result = await articlesApi.save(parsedPost);
+    setSaving(false);
+    if (!result.ok) {
+      setNotice({ kind: 'error', text: result.error });
       return;
     }
-    const postWithAuthor: ExternalBlogPost = {
-      ...parsedPost,
-      author: parsedPost.author || currentUser?.name || 'Engineer',
-      authorId: currentUser?.id,
-      authorEmail: currentUser?.email,
-      views: parsedPost.views && parsedPost.views <= 20 ? parsedPost.views : 1,
-    };
-    const result = saveCustomPost(postWithAuthor, currentUser);
-    if (result && !result.ok) {
-      alert(result.error || 'Failed to publish post.');
-      return;
-    }
-    refreshPublications(currentUser);
-    startEditing(postWithAuthor);
-    setSaveSuccessNotice(`Imported and published "${postWithAuthor.title}" successfully.`);
+    const saved = result.data.article;
+    setStored((previous) => [saved, ...previous.filter((post) => post.slug !== saved.slug)]);
+    startEditing(saved);
+    setNotice({ kind: 'success', text: `Imported and published "${saved.title}".` });
   };
 
-  if (isAuthChecking) {
+  if (!checked) {
     return (
       <div className="min-h-screen bg-[#fbfbfd] flex flex-col items-center justify-center text-[#1d1d1f] font-sans px-4">
         <div className="w-8 h-8 rounded-full border-2 border-[#e5e5ea] border-t-[#0071e3] animate-spin mb-4" />
-        <p className="text-xs font-mono text-[#86868b] tracking-wider uppercase">
-          Verifying author security credentials...
-        </p>
+        <p className="text-xs font-mono text-[#86868b]">Checking your session…</p>
       </div>
     );
   }
 
-  // Security interlock: Must be authenticated to access Author Studio
   if (!currentUser) {
     const redirectUrl = editSlugParam ? `/write?edit=${encodeURIComponent(editSlugParam)}` : '/write';
     return (
-      <main className="min-h-[calc(100vh-64px)] bg-[#fbfbfd] flex flex-col justify-center items-center px-4 py-16 font-sans antialiased selection:bg-[#0071e3]/15 selection:text-[#0071e3]">
+      <main className="min-h-[calc(100vh-64px)] bg-[#fbfbfd] flex flex-col justify-center items-center px-4 py-16 font-sans antialiased">
         <div className="max-w-md w-full bg-white border border-[#e5e5ea] rounded-3xl p-8 sm:p-10 shadow-sm text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center mx-auto mb-6 text-[#1d1d1f] shadow-2xs">
+          <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center mx-auto mb-6">
             <Lock size={28} className="text-[#0071e3]" />
           </div>
-
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] text-[11px] font-mono text-[#86868b] uppercase tracking-wider mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Author Studio // Creator Hub</span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-3">
-            Author Access Required
-          </h1>
-
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-3">Sign in to write</h1>
           <p className="text-sm text-[#515154] leading-relaxed mb-6">
-            The Authoring Studio is available to all registered engineers. Sign in to your station account to compose, preview, and publish technical masterclasses with embedded circuit simulations.
+            {accounts
+              ? 'The Studio is open to everyone with a free account. Write articles with live, runnable circuits and publish them to the site.'
+              : 'Accounts are not available on this deployment because no database is configured.'}
           </p>
-
-          <div className="space-y-3">
-            <Link
-              href={`/signin?redirect=${encodeURIComponent(redirectUrl)}`}
-              className="w-full py-3 px-5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all"
-            >
-              <LogIn size={15} />
-              <span>Sign In to Station</span>
-            </Link>
-
-            <Link
-              href={`/signup?redirect=${encodeURIComponent(redirectUrl)}`}
-              className="w-full py-3 px-5 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm flex items-center justify-center gap-2 transition"
-            >
-              <span>Create Station Account</span>
-            </Link>
-          </div>
+          {accounts && (
+            <div className="space-y-3">
+              <Link
+                href={`/signin?redirect=${encodeURIComponent(redirectUrl)}`}
+                className="w-full py-3 px-5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium text-sm flex items-center justify-center gap-2 shadow-xs transition-all"
+              >
+                <LogIn size={15} />
+                <span>Sign in</span>
+              </Link>
+              <Link
+                href={`/signin?mode=signup&redirect=${encodeURIComponent(redirectUrl)}`}
+                className="w-full py-3 px-5 rounded-full bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-medium text-sm flex items-center justify-center gap-2 transition"
+              >
+                <span>Create a free account</span>
+              </Link>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -625,7 +371,7 @@ function WriteContent() {
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
               <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
-              <span>STUDIO // {currentUser?.name || 'GUEST'}</span>
+              <span>STUDIO // {currentUser.name}</span>
             </span>
 
             {/* Navigation Tabs */}
@@ -673,7 +419,7 @@ function WriteContent() {
               className="text-xs font-mono font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
             >
               <PlusCircle size={14} />
-              <span>New Masterclass</span>
+              <span>New article</span>
             </button>
             <Link
               href="/blogs"
@@ -686,18 +432,19 @@ function WriteContent() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        {/* Success Alert Banner */}
-        {saveSuccessNotice && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-800 text-xs sm:text-sm font-mono shadow-xs animate-in fade-in">
+        {/* Status banner */}
+        {notice && (
+          <div
+            role={notice.kind === 'error' ? 'alert' : 'status'}
+            className={`mb-6 p-4 rounded-2xl flex items-center justify-between gap-4 text-xs sm:text-sm font-mono shadow-xs border ${
+              notice.kind === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <CheckCircle size={20} className="text-emerald-600 shrink-0" />
-              <span>{saveSuccessNotice}</span>
+              {notice.kind === 'error' ? <AlertTriangle size={20} className="text-red-600 shrink-0" /> : <CheckCircle size={20} className="text-emerald-600 shrink-0" />}
+              <span>{notice.text}</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setSaveSuccessNotice(null)}
-              className="text-[#86868b] hover:text-[#1d1d1f]"
-            >
+            <button type="button" onClick={() => setNotice(null)} className="text-[#86868b] hover:text-[#1d1d1f]">
               Dismiss
             </button>
           </div>
@@ -714,23 +461,25 @@ function WriteContent() {
                   {`${currentUser.name}’s articles`}
                 </h2>
                 <p className="text-xs sm:text-sm text-[#86868b] mt-1">
-                  Manage, edit, and proof-test your articles. Changes sync to the cloud and run live circuits in the browser.
+                  {isAuthor ? 'All published articles, plus the built-in masterclasses.' : 'Articles you have published.'}
                 </p>
               </div>
               <div className="text-xs font-mono text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3.5 py-2 rounded-xl shadow-xs">
                 <span className="text-[#0071e3] font-bold">{publications.length}</span>{' '}
-                {publications.length === 1 ? 'PUBLISHED ARTICLE' : 'PUBLISHED ARTICLES'}
+                {publications.length === 1 ? 'ARTICLE' : 'ARTICLES'}
               </div>
             </div>
 
-            {publications.length === 0 ? (
+            {loadingStored ? (
+              <p className="text-xs font-mono text-[#86868b]">Loading…</p>
+            ) : publications.length === 0 ? (
               <div className="bg-white border border-dashed border-[#d2d2d7] rounded-3xl p-10 sm:p-14 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center mx-auto mb-4 text-[#0071e3]">
                   <BookOpen size={24} />
                 </div>
-                <h3 className="text-lg font-bold text-[#1d1d1f] mb-2">No Published Masterclasses Yet</h3>
+                <h3 className="text-lg font-bold text-[#1d1d1f] mb-2">No articles yet</h3>
                 <p className="text-xs sm:text-sm text-[#86868b] max-w-md mx-auto mb-6 leading-relaxed">
-                  You haven&apos;t composed any masterclasses yet. Start your first engineering guide with interactive circuit simulations, custom ladder/FBD logic, and real-time verification.
+                  Write about a control problem you know well and embed a live circuit readers can run.
                 </p>
                 <button
                   type="button"
@@ -738,7 +487,7 @@ function WriteContent() {
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-medium shadow-xs transition"
                 >
                   <PlusCircle size={15} />
-                  <span>Start Your First Masterclass</span>
+                  <span>Write your first article</span>
                 </button>
               </div>
             ) : (
@@ -754,8 +503,8 @@ function WriteContent() {
                           {post.tag}
                         </span>
                         <div className="flex items-center gap-3 font-mono text-[10px] text-[#86868b]">
-                          <span>📅 {post.date}</span>
-                          <span className="text-emerald-700 font-semibold">⚡ {post.views || 1} reads</span>
+                          <span>{post.date}</span>
+                          {!storedBySlug.has(post.slug) && <span className="text-[#86868b]">built-in</span>}
                         </div>
                       </div>
 
@@ -800,10 +549,10 @@ function WriteContent() {
                           <Download size={13} />
                         </button>
 
-                        {!CORE_MASTERCLASS_SLUGS.has(post.slug) && (
+                        {!CORE_MASTERCLASS_SLUGS.has(post.slug) && storedBySlug.has(post.slug) && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteCustom(post.slug)}
+                            onClick={() => void handleDeleteCustom(post.slug)}
                             className="p-1.5 rounded-lg text-[#86868b] hover:text-red-600 hover:bg-red-50 transition"
                             title="Delete Masterclass"
                           >
@@ -881,11 +630,11 @@ function WriteContent() {
                 {isAuthor && CORE_MASTERCLASS_SLUGS.has(editingPost.slug) && (
                   <button
                     type="button"
-                    onClick={() => handleRevertCustom(editingPost.slug)}
+                    onClick={() => void handleRevertCustom(editingPost.slug)}
                     className="px-3.5 py-1.5 rounded-xl border border-[#e5e5ea] bg-white hover:bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] font-mono text-xs transition shadow-xs"
                     title="Revert custom changes to default baseline"
                   >
-                    Revert to Default
+                    Restore original
                   </button>
                 )}
                 <button
@@ -898,11 +647,12 @@ function WriteContent() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSavePost}
-                  className="px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs"
+                  onClick={() => void handleSavePost()}
+                  disabled={saving || !isPostEditable}
+                  className="px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={13} />
-                  <span>Save &amp; Update Live Article</span>
+                  <span>{saving ? 'Publishing…' : 'Publish'}</span>
                 </button>
               </div>
             </div>
@@ -921,7 +671,7 @@ function WriteContent() {
                   {editingPost.excerpt}
                 </p>
                 <div className="pt-4">
-                  {renderSectionsToReact(editingPost.sections)}
+                  <ArticleSections sections={editingPost.sections} />
                 </div>
               </div>
             ) : editorMode === 'json' ? (
@@ -979,16 +729,17 @@ function WriteContent() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-mono text-[#86868b] mb-1">Author Name / Credentials</label>
+                      <label className="block text-xs font-mono text-[#86868b] mb-1">Author</label>
                       <input
                         type="text"
-                        value={editingPost.author}
-                        readOnly={!isPostEditable}
+                        value={isAuthor ? editingPost.author : currentUser.name}
+                        readOnly={!isPostEditable || !isAuthor}
+                        title={isAuthor ? undefined : 'Articles are published under your username.'}
                         onChange={(e) => setEditingPost({ ...editingPost, author: e.target.value })}
                         className={`w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[#1d1d1f] font-mono text-sm outline-none transition ${
                           isPostEditable ? 'focus:border-[#0071e3] focus:bg-white' : 'cursor-default opacity-85'
                         }`}
-                        placeholder="Your Name and Engineering Specialization"
+                        placeholder={OWNER_HANDLE}
                       />
                     </div>
 
@@ -1153,7 +904,7 @@ function WriteContent() {
                               <select
                                 value={section.variant || 'warning'}
                                 disabled={!isPostEditable}
-                                onChange={(e) => updateCalloutSection(idx, { variant: e.target.value as any })}
+                                onChange={(e) => updateCalloutSection(idx, { variant: e.target.value as CalloutVariant })}
                                 className="w-full px-3 py-1.5 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-xs font-mono text-[#1d1d1f] outline-none"
                               >
                                 <option value="warning">Warning (Amber)</option>
@@ -1391,7 +1142,7 @@ function WriteContent() {
                 }}
               />
               <UploadCloud className="mx-auto text-[#86868b] mb-3" size={40} />
-              <h3 className="font-bold text-[#1d1d1f] text-base">Drop Masterclass File Here</h3>
+              <h3 className="font-bold text-[#1d1d1f] text-base">Drop an article file here</h3>
               <p className="text-xs text-[#86868b] mt-1">Accepts .json schemas and .md documents with ```fbd blocks</p>
             </div>
 
@@ -1406,27 +1157,18 @@ function WriteContent() {
               <div className="p-6 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-[#1d1d1f] font-mono">Parsed Article: {parsedPost.title}</h3>
-                  {isAuthor ? (
-                    <button
-                      type="button"
-                      onClick={handlePublishUploaded}
-                      className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition shadow-xs"
-                    >
-                      Publish to Platform
-                    </button>
-                  ) : (
-                    <Link
-                      href="/signin?redirect=/write"
-                      className="px-4 py-2 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-medium font-mono text-xs transition shadow-xs flex items-center gap-1.5"
-                    >
-                      <Lock size={12} className="text-amber-400" />
-                      <span>Sign in to Publish</span>
-                    </Link>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handlePublishUploaded()}
+                    disabled={saving}
+                    className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-medium font-mono text-xs transition shadow-xs disabled:opacity-50"
+                  >
+                    {saving ? 'Publishing…' : 'Publish'}
+                  </button>
                 </div>
                 <p className="text-xs text-[#424245]">{parsedPost.excerpt}</p>
                 <div className="text-[11px] font-mono text-[#86868b]">
-                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: {parsedPost.author || currentUser?.name || AUTHOR_NAME}
+                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag || 'Automation'} · Author: {isAuthor ? parsedPost.author || OWNER_HANDLE : currentUser.name}
                 </div>
               </div>
             )}
@@ -1442,7 +1184,7 @@ export default function WritePage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#fbfbfd] flex items-center justify-center text-[#86868b] font-mono text-xs">
-          Loading Authoring Studio...
+          Loading Studio…
         </div>
       }
     >

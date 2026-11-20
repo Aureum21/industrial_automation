@@ -1,0 +1,126 @@
+import 'server-only';
+import type { Sql } from './client';
+
+/**
+ * Ordered, append-only schema migrations. Each runs once per database and is recorded in
+ * `schema_migrations`. Statements are idempotent so two serverless instances starting at the
+ * same time cannot corrupt the schema. Never edit a migration that has shipped; add a new one.
+ */
+interface Migration {
+  id: string;
+  up: (sql: Sql) => Promise<void>;
+}
+
+const LEGACY_OWNER_ID = 'usr-alazar-lead';
+const OWNER_HANDLE = 'alex_eng_aut';
+const OWNER_EMAIL = 'alex_eng_aut@industrialautomation.website';
+
+export const MIGRATIONS: Migration[] = [
+  {
+    // Matches the schema the site already had in production, so it is a no-op there.
+    id: '001_initial_schema',
+    up: async (sql) => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id VARCHAR(64) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          role VARCHAR(255) DEFAULT 'Engineer',
+          station_id VARCHAR(128) DEFAULT 'TERMINAL-LOCAL-01',
+          avatar VARCHAR(16),
+          bio TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS sessions (
+          id VARCHAR(128) PRIMARY KEY,
+          user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS articles (
+          slug VARCHAR(128) PRIMARY KEY,
+          title TEXT NOT NULL,
+          excerpt TEXT,
+          author VARCHAR(255) NOT NULL,
+          author_url TEXT,
+          date_str VARCHAR(64),
+          reading_time VARCHAR(64),
+          tag VARCHAR(64),
+          views INT DEFAULT 1,
+          content_json JSONB NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS author_id VARCHAR(64)`;
+      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS author_email VARCHAR(255)`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS article_views (
+          slug VARCHAR(128) PRIMARY KEY,
+          views INT DEFAULT 0,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+    },
+  },
+  {
+    // Replaces the old name-based "lead author" check with an explicit flag.
+    id: '002_owner_flag',
+    up: async (sql) => {
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner BOOLEAN NOT NULL DEFAULT FALSE`;
+      await sql`
+        UPDATE users
+        SET name = ${OWNER_HANDLE}, email = ${OWNER_EMAIL}, role = 'Author',
+            station_id = NULL, avatar = NULL, bio = '', is_owner = TRUE
+        WHERE id = ${LEGACY_OWNER_ID}`;
+    },
+  },
+  {
+    // Sessions are now stored as SHA-256 hashes of the cookie token, so a database leak does not
+    // hand out live sessions. Old plaintext sessions cannot be converted and are removed (everyone
+    // signs in again once).
+    id: '003_hashed_sessions',
+    up: async (sql) => {
+      await sql`DELETE FROM sessions`;
+      await sql`CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id)`;
+    },
+  },
+  {
+    // Author emails were copied into the public article JSON. Strip them and stop storing them.
+    id: '004_strip_author_email_from_articles',
+    up: async (sql) => {
+      await sql`UPDATE articles SET content_json = content_json - 'authorEmail' WHERE content_json ? 'authorEmail'`;
+      await sql`UPDATE articles SET content_json = content_json - 'views' WHERE content_json ? 'views'`;
+      await sql`CREATE INDEX IF NOT EXISTS articles_author_id_idx ON articles(author_id)`;
+    },
+  },
+];
+
+let pending: Promise<void> | null = null;
+
+/** Applies outstanding migrations once per server instance. Retries on the next call if it fails. */
+export function ensureSchema(sql: Sql): Promise<void> {
+  if (!pending) {
+    pending = runMigrations(sql).catch((error) => {
+      pending = null;
+      throw error;
+    });
+  }
+  return pending;
+}
+
+async function runMigrations(sql: Sql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id VARCHAR(128) PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  const rows = (await sql`SELECT id FROM schema_migrations`) as { id: string }[];
+  const applied = new Set(rows.map((row) => row.id));
+  for (const migration of MIGRATIONS) {
+    if (applied.has(migration.id)) continue;
+    await migration.up(sql);
+    await sql`INSERT INTO schema_migrations (id) VALUES (${migration.id}) ON CONFLICT (id) DO NOTHING`;
+  }
+}

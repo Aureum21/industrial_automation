@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Check, CheckCircle2, Maximize2, Minimize2, Cpu, Zap } from 'lucide-react';
 import LabWorkspace from './LabWorkspace';
 import ArduinoExportModal from './ArduinoExportModal';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
+import { useStoredString } from '@/lib/useStoredValue';
 
 interface InlineLabProps {
   dsl: string;
@@ -17,7 +18,6 @@ interface InlineLabProps {
 
 export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
   const [showArduinoModal, setShowArduinoModal] = useState(false);
 
@@ -25,22 +25,12 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
   const stageId = useMemo(() => {
     return title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   }, [title]);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`automationhub_stage_${stageId}`);
-      if (saved === 'verified') {
-        setIsVerified(true);
-      }
-    } catch {}
-  }, [stageId]);
+  const [stageStatus, setStageStatus] = useStoredString(`automationhub_stage_${stageId}`);
+  const isVerified = stageStatus === 'verified';
 
   const handleVerify = () => {
-    setIsVerified(true);
+    setStageStatus('verified');
     setJustVerified(true);
-    try {
-      localStorage.setItem(`automationhub_stage_${stageId}`, 'verified');
-    } catch {}
 
     // Extract slug from URL if in browser
     if (typeof window !== 'undefined') {

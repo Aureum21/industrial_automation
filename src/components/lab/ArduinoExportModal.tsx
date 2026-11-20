@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Download,
@@ -39,15 +39,9 @@ export default function ArduinoExportModal({ isOpen, onClose, doc }: ArduinoExpo
   const [scanCycleMs, setScanCycleMs] = useState<number>(10);
   const [enableTelemetry, setEnableTelemetry] = useState<boolean>(true);
   const [telemetryIntervalMs, setTelemetryIntervalMs] = useState<number>(250);
-  const [pinAssignments, setPinAssignments] = useState<Record<string, PinAssignment>>({});
+  const [pinAssignments, setPinAssignments] = useState<Record<string, PinAssignment>>(() => autoAssignPins(doc, 'uno'));
   const [activeTab, setActiveTab] = useState<'code' | 'pins' | 'guide'>('code');
   const [copied, setCopied] = useState<boolean>(false);
-
-  // Initialize or re-assign pins when doc or board changes
-  useEffect(() => {
-    if (!isOpen) return;
-    setPinAssignments(autoAssignPins(doc, board));
-  }, [isOpen, doc, board]);
 
   // Handle board change
   const handleBoardChange = (newBoard: ArduinoBoardId) => {
