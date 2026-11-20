@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { blockSlug } from '@/lib/automation/blockPages';
 import {
   Search,
   X,
@@ -469,10 +470,10 @@ export default function LibraryPage() {
                         </span>
                         {isReady ? (
                           <Link
-                            href="/lab"
+                            href={`/library/${blockSlug(block.type)}`}
                             className="inline-flex items-center gap-1 text-xs font-mono font-medium text-[#0071e3] hover:underline transition-colors group-hover:translate-x-0.5"
                           >
-                            <span>Wire in Lab</span>
+                            <span>Guide &amp; live demo</span>
                             <ArrowRight size={12} />
                           </Link>
                         ) : (

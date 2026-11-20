@@ -15,9 +15,11 @@ interface InlineLabProps {
   title: string;
   step?: string;
   height?: number;
+  /** Show the "Verify stage" progress button (articles). Default true. */
+  verifiable?: boolean;
 }
 
-export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabProps) {
+export default function InlineLab({ dsl, title, step, height = 500, verifiable = true }: InlineLabProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
   const [showArduinoModal, setShowArduinoModal] = useState(false);
@@ -121,6 +123,7 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
           )}
 
           {/* Verification Status Button */}
+          {verifiable && (
           <button
             type="button"
             onClick={handleVerify}
@@ -143,6 +146,8 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
               </>
             )}
           </button>
+
+          )}
 
           {/* Fullscreen Button */}
           <button

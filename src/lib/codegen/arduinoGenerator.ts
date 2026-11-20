@@ -290,6 +290,11 @@ const NOT_YET_EXPORTABLE = new Set<BlockType>([
 ]);
 const MAX_AVERAGE_SAMPLES = 256;
 
+export type ArduinoSupport = 'supported' | 'simulation-only' | 'not-yet';
+export function arduinoSupport(type: BlockType): ArduinoSupport {
+  return SIMULATION_ONLY.has(type) ? 'simulation-only' : NOT_YET_EXPORTABLE.has(type) ? 'not-yet' : 'supported';
+}
+
 /** Problems that would make the exported sketch wrong. Each one becomes a #error in the sketch. */
 export function analyzeArduinoExport(doc: CircuitDocument, config?: Pick<ArduinoExportConfig, 'pinAssignments'>): ArduinoExportIssue[] {
   const issues: ArduinoExportIssue[] = [];
