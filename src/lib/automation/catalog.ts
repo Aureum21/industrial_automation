@@ -259,7 +259,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockDefinition> = {
     'Generates continuous test waves (Sine, Square, Triangle).', digital('EN'), analog('Q'),
     { stateful: true, parameters: [text('type', 'Wave (sine, square, tri)', 'sine'), number('freq', 'Frequency (Hz)', 1), number('amp', 'Amplitude', 10), number('offset', 'DC Offset', 0)] }),
   MATH_EXPRESSION: block('MATH_EXPRESSION', 'Math Expression', 'ƒ(x)', 'Mechatronics',
-    'Evaluates a string math expression (e.g. A * sin(B)).', analog('A', 'B', 'C'), analog('Q'),
+    'Evaluates a formula of inputs A, B, C, e.g. A > 50 ? A * 2 : sin(B). Supports + - * / % ^, comparisons, && || !, ?:, PI, E and functions like abs, sqrt, min, max, clamp, round, sin, cos, log.', analog('A', 'B', 'C'), analog('Q'),
     { parameters: [text('expr', 'Expression', 'A + B')] }),
 };
 

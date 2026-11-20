@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BLOCK_CATALOG, getBlockDefinition } from './automation/catalog.ts';
+import { evaluateExpression, parseExpression, type ExpressionNode } from './automation/expression.ts';
 import type {
   BlockDefinition, CircuitBlock, CircuitConnection, CircuitDocument,
   ParameterValue, RuntimeBlock, Signal, SignalKind,
@@ -974,19 +975,25 @@ export class LogicEngine {
         break;
       }
       case 'MATH_EXPRESSION': {
-        const expr = (block.params.expr as string) || 'A + B';
-        try {
-          if (!(block.state as any).func || (block.state as any).lastExpr !== expr) {
-            (block.state as any).func = new Function('A', 'B', 'C', 'Math', `
-              const {sin, cos, tan, abs, sqrt, min, max, PI, pow, round} = Math;
-              return ${expr};
-            `);
-            (block.state as any).lastExpr = expr;
+        // Parsed by a dedicated math parser: expressions can come from published articles,
+        // so they must never be executed as JavaScript.
+        const expr = String(block.params.expr ?? '') || 'A + B';
+        const cached = block.state as unknown as { exprSource?: string; exprTree?: ExpressionNode; exprError?: string };
+        if (cached.exprSource !== expr) {
+          cached.exprSource = expr;
+          try {
+            cached.exprTree = parseExpression(expr);
+            cached.exprError = undefined;
+          } catch (error) {
+            cached.exprTree = undefined;
+            cached.exprError = error instanceof Error ? error.message : 'Invalid formula.';
           }
-          block.outputs.Q = (block.state as any).func(analog('A'), analog('B'), analog('C'), Math);
-        } catch(e) {
+        }
+        if (cached.exprTree) {
+          block.outputs.Q = evaluateExpression(cached.exprTree, { A: analog('A'), B: analog('B'), C: analog('C') });
+        } else {
           block.outputs.Q = 0;
-          if (this.timeMs % 1000 === 0) this.diagnostics.push(`Math Expr error: ${e instanceof Error ? e.message : 'Invalid formula'}`);
+          this.diagnostics.push(`${block.label || definition.name}: ${cached.exprError}`);
         }
         break;
       }
