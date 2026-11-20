@@ -94,3 +94,11 @@ export async function decodeCircuitFragment(fragment: string): Promise<CircuitDo
 export async function buildShareUrl(origin: string, doc: CircuitDocument): Promise<string> {
   return `${origin}/lab#${await encodeCircuitFragment(doc)}`;
 }
+
+const escapeAttribute = (text: string) => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** HTML to paste into a blog or LMS page: an interactive, read-only copy of the shared circuit. */
+export function buildEmbedCode(shareUrl: string, title: string): string {
+  const embedUrl = shareUrl.replace('/lab#', '/embed#');
+  return `<iframe src="${escapeAttribute(embedUrl)}" title="${escapeAttribute(title || 'Logic circuit')}" width="100%" height="480" style="border:1px solid #e5e5ea;border-radius:12px" loading="lazy"></iframe>`;
+}

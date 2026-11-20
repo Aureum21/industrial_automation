@@ -8,7 +8,7 @@ import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
 import { createBlock, parseCircuitDocument, STORAGE_KEY } from '@/lib/automation/documents';
 import { parseCircuitDSL, stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { applyLayout } from '@/lib/automation/layout';
-import { buildShareUrl, decodeCircuitFragment } from '@/lib/automation/share';
+import { buildEmbedCode, buildShareUrl, decodeCircuitFragment } from '@/lib/automation/share';
 import { EXAMPLES, getExample } from '@/lib/automation/examples';
 import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal, HmiWidget } from '@/lib/automation/types';
 import Sidebar from '@/components/Sidebar';
@@ -567,12 +567,24 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
             aria-label="Share link"
             className="mt-4 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-700"
           />
+          <label className="mt-4 block text-xs font-medium text-gray-600" htmlFor="embed-code">Embed on a website or course page (interactive, read-only)</label>
+          <textarea
+            id="embed-code"
+            readOnly
+            rows={3}
+            value={buildEmbedCode(share.url, name)}
+            onFocus={(event) => event.currentTarget.select()}
+            className="mt-1 w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-[11px] text-gray-700"
+          />
           <div className="mt-5 flex justify-end gap-2">
             <button
               className="lab-button"
               onClick={() => void navigator.clipboard?.writeText(share.url).then(() => setShare({ ...share, copied: true }))}
             >
-              Copy again
+              Copy link
+            </button>
+            <button className="lab-button" onClick={() => void navigator.clipboard?.writeText(buildEmbedCode(share.url, name))}>
+              Copy embed code
             </button>
             <button autoFocus className="lab-button primary" onClick={() => setShare(null)}>Done</button>
           </div>

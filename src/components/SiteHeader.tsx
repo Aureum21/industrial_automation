@@ -9,6 +9,8 @@ export default function SiteHeader() {
   const { user } = useSession();
   const pathname = usePathname();
   const hasUser = Boolean(user);
+  // Embedded circuits run inside other sites' iframes: no site chrome.
+  if (pathname?.startsWith('/embed')) return null;
 
   const navLinks = [
     { href: '/challenges', label: 'Challenges' },

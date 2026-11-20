@@ -65,3 +65,10 @@ test('decompression bombs are stopped', async () => {
   const fragment = await encodeCircuitFragment(huge);
   await assert.rejects(decodeCircuitFragment(fragment), /too large/);
 });
+
+test('embed code points at /embed and escapes the title', async () => {
+  const { buildEmbedCode } = await import('../src/lib/automation/share.ts');
+  const code = buildEmbedCode('https://x.test/lab#c=1.abc', 'Pump "A" <test>');
+  assert.match(code, /src="https:\/\/x\.test\/embed#c=1\.abc"/);
+  assert.match(code, /title="Pump &quot;A&quot; &lt;test&gt;"/);
+});
