@@ -104,6 +104,18 @@ export const MIGRATIONS: Migration[] = [
       await sql`CREATE INDEX IF NOT EXISTS articles_author_id_idx ON articles(author_id)`;
     },
   },
+  {
+    // Fixed-window counters for rate limiting (shared across serverless instances).
+    id: '005_rate_limits',
+    up: async (sql) => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS rate_limits (
+          key VARCHAR(255) PRIMARY KEY,
+          window_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          count INT NOT NULL DEFAULT 0
+        )`;
+    },
+  },
 ];
 
 let pending: Promise<void> | null = null;

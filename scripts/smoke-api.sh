@@ -77,6 +77,12 @@ cp /tmp/j_bob /tmp/j_bob_copy
 check "sign out" 200 $(req /tmp/j_bob POST /api/auth/signout)
 check "stolen copy of cookie is dead after sign-out" null "$(req /tmp/j_bob_copy GET /api/auth/me >/dev/null; jq -r .data.user /tmp/body)"
 
+echo "== rate limiting"
+for i in 1 2 3 4 5 6 7 8; do req /tmp/j_x POST /api/auth/signin '{"identifier":"nobody-here","password":"guess'$i'"}' >/dev/null; done
+check "9th failed sign-in for one account is throttled" 429 $(req /tmp/j_x POST /api/auth/signin '{"identifier":"nobody-here","password":"guess9"}')
+check "throttle message says how long to wait" 1 $(grep -c "Please wait" /tmp/body)
+check "other accounts are unaffected" 401 $(req /tmp/j_x POST /api/auth/signin '{"identifier":"someone-else","password":"x"}')
+
 echo "== owner restores core masterclass"
 check "owner deletes override" 200 $(req /tmp/j_owner DELETE /api/articles/traffic-lights)
 

@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from '../db';
 import { HttpError } from '../http';
 import type { AuthUser } from '../repos/users';
+import { RATE_RULES, consumeRateLimit } from '../rateLimit';
 import * as articles from '../repos/articles';
 import type { ArticleDocument } from '@/shared/articles';
 import { canDeleteArticle, canEditArticle, isSiteOwner } from '@/shared/permissions';
@@ -36,6 +37,7 @@ function toDocument(input: ArticleInput, user: AuthUser): ArticleDocument {
 
 export async function saveArticle(user: AuthUser, input: ArticleInput): Promise<ArticleDocument> {
   const sql = await db();
+  await consumeRateLimit(sql, RATE_RULES.publishPerUser, user.id);
   const authorId = await articles.getArticleAuthorId(sql, input.slug);
   const target = { slug: input.slug, exists: authorId !== undefined, authorId };
   if (!canEditArticle(target, user)) {
