@@ -9,6 +9,7 @@ import { createBlock, parseCircuitDocument, STORAGE_KEY } from '@/lib/automation
 import { parseCircuitDSL, stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { applyLayout } from '@/lib/automation/layout';
 import LadderView from './LadderView';
+import PublishDialog from './PublishDialog';
 import { buildEmbedCode, buildShareUrl, decodeCircuitFragment } from '@/lib/automation/share';
 import { EXAMPLES, getExample } from '@/lib/automation/examples';
 import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal, HmiWidget } from '@/lib/automation/types';
@@ -122,6 +123,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showArduinoModal, setShowArduinoModal] = useState(false);
   const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const flowWrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
@@ -476,6 +478,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
           </div>
           {!challengeMode && <button className="lab-button" onClick={save}>Save</button>}
           <button className="lab-button primary" onClick={() => void shareCircuit()} title="Copy a link that opens a copy of this circuit">Share link</button>
+          {!challengeMode && <button className="lab-button" onClick={() => setPublishOpen(true)} title="Publish this circuit to the community gallery">Publish</button>}
           <button className="lab-button" onClick={exportFile}>Export</button>
           <button
             className="lab-button flex items-center gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 font-medium"
@@ -559,6 +562,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
         </div>
       </div>
     )}
+    {publishOpen && <PublishDialog getDocument={() => engine.toDocument(name, widgets)} defaultTitle={name} onClose={() => setPublishOpen(false)} />}
     {share && (
       <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true" aria-labelledby="share-title">
         <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">

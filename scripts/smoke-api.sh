@@ -91,6 +91,25 @@ check "earlier solve from another device wins" "2026-01-01T00:00:00.000Z" $(req 
 check "later solve does not overwrite" "2026-01-01T00:00:00.000Z" $(req /tmp/j_owner POST /api/progress '{"solved":[{"slug":"light-switch","solvedAt":"2026-03-01T00:00:00Z"}]}' >/dev/null; jq -r '.data.progress["light-switch"].solvedAt' /tmp/body)
 check "GET returns both solves" 2 $(req /tmp/j_owner GET /api/progress >/dev/null; jq -r '.data.progress | length' /tmp/body)
 
+echo "== gallery"
+CIRCUIT='{"version":1,"name":"x","blocks":[{"id":"i","type":"INPUT","position":{"x":0,"y":0},"params":{}},{"id":"o","type":"OUTPUT","position":{"x":200,"y":0},"params":{}}],"connections":[{"id":"w","fromBlockId":"i","fromPin":"Q","toBlockId":"o","toPin":"A"}]}'
+check "publish needs sign-in" 401 $(req /tmp/j_none POST /api/circuits "{\"title\":\"Lamp\",\"document\":$CIRCUIT}")
+check "invalid circuit rejected" 400 $(req /tmp/j_owner POST /api/circuits '{"title":"Bad","document":{"version":1,"name":"x","blocks":[{"id":"a","type":"EVIL","position":{"x":0,"y":0},"params":{}}],"connections":[]}}')
+check "short title rejected" 400 $(req /tmp/j_owner POST /api/circuits "{\"title\":\"x\",\"document\":$CIRCUIT}")
+check "publish a circuit" 200 $(req /tmp/j_alice POST /api/circuits "{\"title\":\"Lamp switch\",\"description\":\"<b>hi</b>\",\"document\":$CIRCUIT}")
+CID=$(jq -r .data.circuit.id /tmp/body)
+check "author is the account name" alazar_fake $(jq -r .data.circuit.author /tmp/body)
+check "listed publicly" 1 $(req /tmp/j_none GET /api/circuits >/dev/null; jq -r "[.data.circuits[] | select(.id==\"$CID\")] | length" /tmp/body)
+check "fetch with document" 2 $(req /tmp/j_none GET /api/circuits/$CID >/dev/null; jq -r '.data.circuit.document.blocks | length' /tmp/body)
+check "fork remembers its source" "$CID" $(req /tmp/j_owner POST /api/circuits "{\"title\":\"Lamp remix\",\"forkedFrom\":\"$CID\",\"document\":$CIRCUIT}" >/dev/null; jq -r .data.circuit.forkedFrom /tmp/body)
+FID=$(jq -r .data.circuit.id /tmp/body)
+check "bogus fork source is dropped" null $(req /tmp/j_owner POST /api/circuits "{\"title\":\"Lamp again\",\"forkedFrom\":\"doesnotexist\",\"document\":$CIRCUIT}" >/dev/null; jq -r .data.circuit.forkedFrom /tmp/body)
+check "others cannot delete" 403 $(req /tmp/j_alice DELETE /api/circuits/$FID)
+check "unknown id is 404" 404 $(req /tmp/j_none GET /api/circuits/nope%2F..)
+check "gallery page renders the circuit" 1 $(curl -s $BASE/gallery | grep -c "Lamp switch")
+check "owner can moderate" 200 $(req /tmp/j_owner DELETE /api/circuits/$CID)
+check "deleted circuit is gone" 404 $(req /tmp/j_none GET /api/circuits/$CID)
+
 echo "== owner restores core masterclass"
 check "owner deletes override" 200 $(req /tmp/j_owner DELETE /api/articles/traffic-lights)
 

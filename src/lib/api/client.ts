@@ -1,6 +1,8 @@
 import type { ArticleDocument } from '@/shared/articles';
 import type { ArticleInput } from '@/shared/validation';
 import type { ChallengeProgress } from '@/shared/progress';
+import type { GallerySummary } from '@/shared/gallery';
+import type { CircuitDocument } from '@/lib/automation/types';
 
 /**
  * The only place the browser talks to the API. Every call resolves to a result object
@@ -65,4 +67,10 @@ export const viewsApi = {
 
 export const progressApi = {
   sync: (solved: { slug: string; solvedAt: string }[]) => post<{ progress: ChallengeProgress }>('/api/progress', { solved }),
+};
+
+export const galleryApi = {
+  publish: (input: { title: string; description: string; document: CircuitDocument; forkedFrom?: string }) =>
+    post<{ circuit: GallerySummary }>('/api/circuits', input),
+  remove: (id: string) => request<{ deleted: true }>(`/api/circuits/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

@@ -54,3 +54,8 @@ export function canEditArticle(article: PermissionArticle, user: PermissionUser 
 export function canDeleteArticle(article: PermissionArticle, user: PermissionUser | null | undefined): boolean {
   return article.exists && canEditArticle(article, user);
 }
+
+/** A gallery circuit may be deleted by whoever published it, or by the site owner (moderation). */
+export function canDeleteGalleryCircuit(user: PermissionUser | null | undefined, circuit: { ownerId: string }): boolean {
+  return Boolean(user && (user.id === circuit.ownerId || isSiteOwner(user)));
+}

@@ -57,3 +57,12 @@ test('legacy rows without a recorded author are owner-only', () => {
   assert.equal(canDeleteArticle(legacy, alice), false);
   assert.equal(canEditArticle(legacy, owner), true);
 });
+
+test('gallery circuits can be deleted by their author or the site owner only', async () => {
+  const { canDeleteGalleryCircuit } = await import('../src/shared/permissions.ts');
+  const circuit = { ownerId: 'u1' };
+  assert.equal(canDeleteGalleryCircuit({ id: 'u1' }, circuit), true);
+  assert.equal(canDeleteGalleryCircuit({ id: 'u2' }, circuit), false);
+  assert.equal(canDeleteGalleryCircuit({ id: 'u2', isOwner: true }, circuit), true);
+  assert.equal(canDeleteGalleryCircuit(null, circuit), false);
+});

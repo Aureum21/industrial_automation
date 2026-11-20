@@ -129,6 +129,25 @@ export const MIGRATIONS: Migration[] = [
         )`;
     },
   },
+  {
+    // Community gallery of published circuits. Forks are new rows that remember their source.
+    id: '007_gallery_circuits',
+    up: async (sql) => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS gallery_circuits (
+          id VARCHAR(32) PRIMARY KEY,
+          owner_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(120) NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          document JSONB NOT NULL,
+          block_count INT NOT NULL,
+          forked_from VARCHAR(32),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`;
+      await sql`CREATE INDEX IF NOT EXISTS gallery_circuits_created ON gallery_circuits (created_at DESC)`;
+      await sql`CREATE INDEX IF NOT EXISTS gallery_circuits_owner ON gallery_circuits (owner_id)`;
+    },
+  },
 ];
 
 let pending: Promise<void> | null = null;

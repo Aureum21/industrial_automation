@@ -15,6 +15,7 @@ export default function SiteHeader() {
   const navLinks = [
     { href: '/challenges', label: 'Challenges' },
     { href: '/lab', label: 'Logic Lab' },
+    { href: '/gallery', label: 'Gallery' },
     { href: '/blogs', label: 'Masterclasses' },
     { href: '/library', label: 'Catalog' },
     ...(hasUser ? [{ href: '/write', label: 'Studio' }] : []),
