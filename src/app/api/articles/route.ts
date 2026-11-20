@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getDb, initDb, isDbConfigured } from '@/lib/db';
-import { AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
 import { CORE_MASTERCLASS_SLUGS, type ExternalBlogPost } from '@/lib/blogStorage';
 
 interface SessionUser {
   id: string;
   name: string;
   email: string;
-  isLeadAuthor: boolean;
+  isOwner: boolean;
 }
 
 async function verifyUserSession(): Promise<{
@@ -35,7 +34,7 @@ async function verifyUserSession(): Promise<{
     }
 
     const rows = await sql`
-      SELECT u.id, u.name, u.email
+      SELECT u.id, u.name, u.email, u.is_owner
       FROM sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.id = ${sessionCookie.value} AND s.expires_at > NOW()
@@ -50,13 +49,7 @@ async function verifyUserSession(): Promise<{
       };
     }
 
-    const u = rows[0] as { id: string; name: string; email: string };
-    const email = (u.email || '').toLowerCase();
-    const name = (u.name || '').toLowerCase();
-    const isLeadAuthor =
-      email === 'alazar@industrialautomation.website' ||
-      email.startsWith('alazar') ||
-      name.includes('alazar');
+    const u = rows[0] as { id: string; name: string; email: string; is_owner: boolean | null };
 
     return {
       authenticated: true,
@@ -64,7 +57,7 @@ async function verifyUserSession(): Promise<{
         id: u.id,
         name: u.name,
         email: u.email,
-        isLeadAuthor,
+        isOwner: u.is_owner === true,
       },
     };
   } catch (err) {
@@ -94,8 +87,8 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: false, error: 'Unauthorized', articles: [] }, { status: 401 });
       }
 
-      // Lead Author Alazar: return all his created articles + legacy null author_id articles
-      if (auth.user.isLeadAuthor) {
+      // Site owner: own articles + legacy articles with no author_id
+      if (auth.user.isOwner) {
         const rows = await sql`
           SELECT slug, content_json, author_id, author_email, updated_at
           FROM articles
@@ -183,10 +176,10 @@ export async function POST(req: Request) {
 
     const { user } = authCheck;
 
-    // 1. Guard core masterclasses: only lead author Alazar can modify them
-    if (CORE_MASTERCLASS_SLUGS.has(post.slug) && !user.isLeadAuthor) {
+    // 1. Guard core masterclasses: only the site owner can modify them
+    if (CORE_MASTERCLASS_SLUGS.has(post.slug) && !user.isOwner) {
       return NextResponse.json(
-        { ok: false, error: 'Permission denied: The 10 core masterclasses are reserved for Alazar Wake Kore.' },
+        { ok: false, error: 'Permission denied: core masterclasses can only be edited by the site owner.' },
         { status: 403 }
       );
     }
@@ -202,7 +195,7 @@ export async function POST(req: Request) {
     if (existing && existing.length > 0) {
       const row = existing[0] as { slug: string; author_id: string | null; author_email: string | null };
       const isOwner =
-        user.isLeadAuthor ||
+        user.isOwner ||
         (row.author_id && row.author_id === user.id) ||
         (row.author_email && row.author_email.toLowerCase() === user.email.toLowerCase());
 
@@ -216,7 +209,7 @@ export async function POST(req: Request) {
 
     // Stamp identity
     const authorName = post.author || user.name;
-    const authorUrl = post.authorUrl || (user.isLeadAuthor ? AUTHOR_PORTFOLIO : undefined);
+    const authorUrl = post.authorUrl;
     const dateStr = post.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const readingTime = post.readingTime || '12 min read';
     const tag = post.tag || 'Process Control';
@@ -305,9 +298,9 @@ export async function DELETE(req: Request) {
     const { user } = authCheck;
 
     // 1. Guard core masterclasses
-    if (CORE_MASTERCLASS_SLUGS.has(slug) && !user.isLeadAuthor) {
+    if (CORE_MASTERCLASS_SLUGS.has(slug) && !user.isOwner) {
       return NextResponse.json(
-        { ok: false, error: 'Permission denied: The 10 core masterclasses cannot be deleted.' },
+        { ok: false, error: 'Permission denied: core masterclasses cannot be deleted.' },
         { status: 403 }
       );
     }
@@ -323,7 +316,7 @@ export async function DELETE(req: Request) {
     if (existing && existing.length > 0) {
       const row = existing[0] as { slug: string; author_id: string | null; author_email: string | null };
       const isOwner =
-        user.isLeadAuthor ||
+        user.isOwner ||
         (row.author_id && row.author_id === user.id) ||
         (row.author_email && row.author_email.toLowerCase() === user.email.toLowerCase());
 

@@ -16,7 +16,7 @@ import {
   Zap,
   CheckCircle2,
 } from 'lucide-react';
-import { BLOG_POSTS, AUTHOR_PORTFOLIO, type BlogPost } from '@/lib/mockPosts';
+import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
 import { getAllPosts, syncArticlesFromCloud } from '@/lib/blogStorage';
 
 type CategoryFilter =
@@ -190,16 +190,8 @@ export default function BlogsPage() {
               <div className="pt-6 border-t border-[#f5f5f7] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-[#86868b] font-medium">
-                    Authored by{' '}
-                    <a
-                      href={featuredPost.authorUrl || AUTHOR_PORTFOLIO}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#1d1d1f] hover:text-[#0071e3] font-semibold underline decoration-dotted"
-                      title="View Author Portfolio"
-                    >
-                      Alazar Wake Kore (HCT Senior) ↗
-                    </a>
+                    By{' '}
+                    <span className="text-[#1d1d1f] font-semibold">{featuredPost.author}</span>
                   </span>
                   <span className="text-[#d2d2d7]">•</span>
                   <span className="text-xs font-mono text-[#86868b]">{featuredPost.date}</span>
@@ -323,16 +315,8 @@ export default function BlogsPage() {
                   </div>
 
                   <div className="pt-4 border-t border-[#f5f5f7] flex items-center justify-between text-xs text-[#86868b]">
-                    <span
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(post.authorUrl || AUTHOR_PORTFOLIO, '_blank');
-                      }}
-                      className="hover:text-[#0071e3] transition truncate max-w-[280px] font-medium"
-                      title={post.author || 'Alazar Wake Kore'}
-                    >
-                      Alazar Wake Kore (HCT Senior)
+                    <span className="truncate max-w-[280px] font-medium" title={post.author}>
+                      {post.author}
                     </span>
                     <span className="font-mono text-[#1d1d1f] group-hover:text-[#0071e3] flex items-center gap-1 font-medium transition-colors">
                       <span>{post.readingTime.split('+')[0]}</span>

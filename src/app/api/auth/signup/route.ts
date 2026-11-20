@@ -91,6 +91,7 @@ export async function POST(req: Request) {
       stationId: assignedStation,
       avatar,
       bio: bio || '',
+      isOwner: false,
       joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
     };
 

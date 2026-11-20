@@ -41,13 +41,13 @@ import {
   deleteCustomPost,
   renderSectionsToReact,
   CORE_MASTERCLASS_SLUGS,
-  isAuthorUser,
+  isSiteOwner,
   canEditPost,
   type ExternalBlogPost,
   type ExternalSection,
 } from '@/lib/blogStorage';
 import { checkSessionWithNeon, getCurrentUser, type User as AuthUser } from '@/lib/auth';
-import { AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
+import { AUTHOR_NAME } from '@/lib/mockPosts';
 import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 import InlineLab from '@/components/lab/InlineLab';
 import { stringifyCircuitDSL, parseCircuitDSL } from '@/lib/automation/dsl';
@@ -110,7 +110,7 @@ function WriteContent() {
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const isAuthor = useMemo(() => isAuthorUser(currentUser), [currentUser]);
+  const isAuthor = useMemo(() => isSiteOwner(currentUser), [currentUser]);
   const [activeTab, setActiveTab] = useState<'publications' | 'editor' | 'upload'>('publications');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,13 +166,12 @@ function WriteContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.ok && Array.isArray(data.articles)) {
-          const isLead = isAuthorUser(userToUse);
-          if (isLead) {
+          if (isSiteOwner(userToUse)) {
             const cloudSlugs = new Set(data.articles.map((a: ExternalBlogPost) => a.slug));
             const defaults = DEFAULT_MASTERCLASSES.filter((p) => !cloudSlugs.has(p.slug));
             setPublications([...data.articles, ...defaults]);
           } else {
-            // For community authors: ONLY their articles! Alazar's articles are never mixed in.
+            // Community authors only see their own articles.
             setPublications(data.articles);
           }
         }
@@ -201,8 +200,8 @@ function WriteContent() {
           // If navigated with ?edit=slug, open that post directly
           if (editSlugParam) {
             // Guard: non-authors cannot edit core masterclasses
-            if (CORE_MASTERCLASS_SLUGS.has(editSlugParam) && !isAuthorUser(active)) {
-              alert('Access Restricted: Core masterclasses are reserved and can only be edited by Alazar Wake Kore.');
+            if (CORE_MASTERCLASS_SLUGS.has(editSlugParam) && !isSiteOwner(active)) {
+              alert('Access restricted: core masterclasses can only be edited by the site owner.');
               router.replace('/write');
               return;
             }
@@ -313,9 +312,9 @@ function WriteContent() {
       return;
     }
 
-    // Security check: Only author Alazar Wake Kore can modify core masterclasses
+    // Only the site owner can modify core masterclasses (the server enforces this too)
     if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(postToSave.slug)) {
-      alert('Access Restricted: The 10 core masterclasses are protected and can only be modified by author Alazar Wake Kore.');
+      alert('Access restricted: core masterclasses can only be modified by the site owner.');
       return;
     }
 
@@ -365,7 +364,7 @@ function WriteContent() {
 
   const handleRevertCustom = (slug: string) => {
     if (!isAuthor) {
-      alert('Access Restricted: Only author Alazar Wake Kore can revert or modify masterclasses.');
+      alert('Access restricted: only the site owner can revert core masterclasses.');
       return;
     }
     if (confirm('Revert all custom edits to the original default masterclass?')) {
@@ -543,7 +542,7 @@ function WriteContent() {
   const handlePublishUploaded = () => {
     if (!parsedPost) return;
     if (!isAuthor && CORE_MASTERCLASS_SLUGS.has(parsedPost.slug)) {
-      alert('Access Restricted: Core masterclasses can only be modified by author Alazar Wake Kore.');
+      alert('Access restricted: core masterclasses can only be modified by the site owner.');
       return;
     }
     const postWithAuthor: ExternalBlogPost = {
@@ -626,7 +625,7 @@ function WriteContent() {
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
               <span className="w-2 h-2 rounded-full bg-[#059669] animate-pulse" />
-              <span>AUTHOR STATION // {currentUser?.name || 'ALAZAR WAKE KORE'}</span>
+              <span>STUDIO // {currentUser?.name || 'GUEST'}</span>
             </span>
 
             {/* Navigation Tabs */}
@@ -712,26 +711,10 @@ function WriteContent() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e5e5ea]">
               <div>
                 <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight">
-                  {isAuthor ? 'Lead Author Publications & Works' : `${currentUser.name}’s Masterclasses`}
+                  {`${currentUser.name}’s articles`}
                 </h2>
                 <p className="text-xs sm:text-sm text-[#86868b] mt-1">
-                  {isAuthor ? (
-                    <>
-                      Manage, modify, and proof-test core masterclasses authored by{' '}
-                      <a
-                        href={AUTHOR_PORTFOLIO}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#0071e3] hover:underline font-bold inline-flex items-center gap-1"
-                      >
-                        Alazar Wake Kore
-                        <ExternalLink size={12} />
-                      </a>
-                      . Changes save instantly to your live platform.
-                    </>
-                  ) : (
-                    'Manage, edit, and proof-test your technical masterclasses. Changes sync to the cloud and execute live circuits in the browser.'
-                  )}
+                  Manage, edit, and proof-test your articles. Changes sync to the cloud and run live circuits in the browser.
                 </p>
               </div>
               <div className="text-xs font-mono text-[#1d1d1f] bg-white border border-[#e5e5ea] px-3.5 py-2 rounded-xl shadow-xs">
@@ -963,7 +946,7 @@ function WriteContent() {
                 {/* Metadata Fields Card */}
                 <div className="p-6 rounded-2xl bg-white border border-[#e5e5ea] shadow-xs space-y-4">
                   <h3 className="text-xs font-mono uppercase tracking-widest text-[#86868b] font-bold">
-                    Publication Metadata {!isPostEditable && '(Locked: Core Masterclass authored by Alazar Wake Kore)'}
+                    Publication Metadata {!isPostEditable && '(Locked: core masterclass)'}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1437,13 +1420,13 @@ function WriteContent() {
                       className="px-4 py-2 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-medium font-mono text-xs transition shadow-xs flex items-center gap-1.5"
                     >
                       <Lock size={12} className="text-amber-400" />
-                      <span>Sign in as Alazar to Publish</span>
+                      <span>Sign in to Publish</span>
                     </Link>
                   )}
                 </div>
                 <p className="text-xs text-[#424245]">{parsedPost.excerpt}</p>
                 <div className="text-[11px] font-mono text-[#86868b]">
-                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: Alazar Wake Kore
+                  Sections: {parsedPost.sections.length} · Tag: {parsedPost.tag} · Author: {parsedPost.author || currentUser?.name || AUTHOR_NAME}
                 </div>
               </div>
             )}

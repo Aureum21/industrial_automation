@@ -12,7 +12,10 @@ export const CORE_MASTERCLASS_SLUGS = new Set([
   'steam-boiler-drum-level',
 ]);
 
-export function isAuthorUser(user?: { name?: string; email?: string } | null): boolean {
+type PermissionUser = { id?: string; name?: string; email?: string; isOwner?: boolean };
+
+/** True for the site owner account. The flag comes from the server (users.is_owner); the server re-checks it on every write. */
+export function isSiteOwner(user?: PermissionUser | null): boolean {
   if (!user) {
     if (typeof window === 'undefined') return false;
     try {
@@ -23,24 +26,17 @@ export function isAuthorUser(user?: { name?: string; email?: string } | null): b
       return false;
     }
   }
-  if (!user) return false;
-  const email = (user.email || '').toLowerCase();
-  const name = (user.name || '').toLowerCase();
-  return (
-    email === 'alazar@industrialautomation.website' ||
-    email.startsWith('alazar') ||
-    name.includes('alazar')
-  );
+  return user?.isOwner === true;
 }
 
 /**
  * Checks whether the current user has permission to edit or delete a specific post.
- * Core masterclasses are restricted strictly to lead author Alazar Wake Kore.
+ * Core masterclasses can only be edited by the site owner.
  * Community masterclasses belong to their respective creators.
  */
 export function canEditPost(
   post: { slug: string; author?: string; authorId?: string; authorEmail?: string },
-  user?: { id?: string; name?: string; email?: string } | null
+  user?: PermissionUser | null
 ): boolean {
   if (!user) {
     if (typeof window === 'undefined') return false;
@@ -54,12 +50,12 @@ export function canEditPost(
   }
   if (!user) return false;
 
-  const isLead = isAuthorUser(user);
+  const isOwner = isSiteOwner(user);
   const isCore = CORE_MASTERCLASS_SLUGS.has(post.slug);
 
-  // Core masterclasses can ONLY be edited by lead author Alazar
+  // Core masterclasses can ONLY be edited by the site owner
   if (isCore) {
-    return isLead;
+    return isOwner;
   }
 
   // If article has explicit authorId or authorEmail, check exact match
@@ -77,8 +73,8 @@ export function canEditPost(
     return true;
   }
 
-  // Lead author can manage all articles
-  if (isLead) return true;
+  // The site owner can manage all articles
+  if (isOwner) return true;
 
   return false;
 }

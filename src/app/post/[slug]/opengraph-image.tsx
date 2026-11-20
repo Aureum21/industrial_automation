@@ -167,14 +167,11 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
                 boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
               }}
             >
-              AW
+              {(post?.author || AUTHOR_NAME).slice(0, 2).toUpperCase()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: '#1d1d1f' }}>
-                Authored by Alazar Wake Kore
-              </span>
-              <span style={{ fontSize: 13, color: '#86868b' }}>
-                Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)
+                By {post?.author || AUTHOR_NAME}
               </span>
             </div>
           </div>

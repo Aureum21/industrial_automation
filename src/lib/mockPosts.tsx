@@ -1,11 +1,7 @@
 import React from 'react';
 import InlineLab from '@/components/lab/InlineLab';
 
-export const AUTHOR_NAME =
-  'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
-export const AUTHOR_PORTFOLIO = 'https://www.alazarwakekore.online/';
-export const AUTHOR_WEBSITE = 'https://www.alazarwakekore.online/';
-export const AUTHOR_LINKEDIN = 'https://www.alazarwakekore.online/';
+export const AUTHOR_NAME = 'alex_eng_aut';
 
 export interface BlogPost {
   slug: string;
@@ -3807,7 +3803,6 @@ export const BLOG_POSTS: BlogPost[] = [
     title: 'Steam Boiler Drum Level Control: 3-Element Architecture, Shrink & Swell Physics & LLWL Safeguards',
     excerpt: 'A premier process control masterclass: resolving the deceptive shrink and swell phenomenon during sudden steam draws, designing feedforward mass-balance feedwater regulation, and engineering fail-safe NFPA 85 burner safety interlocks.',
     author: AUTHOR_NAME,
-    authorUrl: AUTHOR_PORTFOLIO,
     date: 'Nov 9',
     readingTime: '24 min read + 25 min labs',
     tag: 'Thermal & Process Control',

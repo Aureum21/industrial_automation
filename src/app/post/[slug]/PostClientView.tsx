@@ -2,14 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Edit, ExternalLink, CheckCircle2, Award, ArrowLeft, Share2, Sparkles } from 'lucide-react';
+import { Edit, CheckCircle2, Award, ArrowLeft, Share2, Sparkles } from 'lucide-react';
 import LabWorkspace from '@/components/lab/LabWorkspace';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import { getCurrentUser, type User } from '@/lib/auth';
-import { type BlogPost, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
-import { getPostBySlug, isAuthorUser, canEditPost } from '@/lib/blogStorage';
+import { type BlogPost } from '@/lib/mockPosts';
+import { getPostBySlug, canEditPost } from '@/lib/blogStorage';
 
 interface PostClientViewProps {
   slug: string;
@@ -228,19 +228,12 @@ export default function PostClientView({ slug, initialPost }: PostClientViewProp
         <div className="flex items-center justify-between gap-4 py-6 border-y border-[#e5e5ea] mb-12">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[#1d1d1f] text-white flex items-center justify-center text-sm font-bold font-mono shrink-0 shadow-sm">
-              AW
+              {(post.author || '?').slice(0, 2).toUpperCase()}
             </div>
             <div>
-              <a
-                href={post.authorUrl || AUTHOR_PORTFOLIO}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-[#1d1d1f] hover:text-[#0071e3] transition inline-flex items-center gap-1.5 group text-sm sm:text-base leading-snug"
-                title="View Author Portfolio Website"
-              >
-                <span>{post.author}</span>
-                <ExternalLink size={13} className="text-[#86868b] group-hover:text-[#0071e3] shrink-0" />
-              </a>
+              <span className="font-semibold text-[#1d1d1f] text-sm sm:text-base leading-snug">
+                {post.author}
+              </span>
               <div className="text-xs text-[#86868b] flex flex-wrap items-center gap-2 mt-1.5 font-mono">
                 <span>{post.readingTime}</span>
                 <span>·</span>

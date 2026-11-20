@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BLOG_POSTS, AUTHOR_NAME, AUTHOR_PORTFOLIO } from '@/lib/mockPosts';
+import { BLOG_POSTS, AUTHOR_NAME } from '@/lib/mockPosts';
 import PostClientView from './PostClientView';
 
 interface PageProps {
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    authors: [{ name: post.author || 'Alazar Wake Kore', url: post.authorUrl || AUTHOR_PORTFOLIO }],
+    authors: [{ name: post.author || AUTHOR_NAME }],
     openGraph: {
       title,
       description,
@@ -31,14 +31,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: `https://www.industrialautomation.website/post/${slug}`,
       siteName: 'AutomationHub',
       publishedTime: '2026-10-15T00:00:00.000Z',
-      authors: [AUTHOR_NAME],
+      authors: [post.author || AUTHOR_NAME],
       tags: [post.tag, 'Industrial Automation', 'PLC', 'SCADA', 'Control Systems'],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      creator: '@AlazarWake',
     },
   };
 }

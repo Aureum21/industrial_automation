@@ -3,7 +3,7 @@
 > **Version:** 2.4.0 (Production Master)  
 > **Repository:** `https://github.com/Aureum21/industrial_automation.git`  
 > **Production URL:** `https://www.industrialautomation.website/`  
-> **Lead Author & Platform Architect:** Alazar Wake Kore ([Portfolio](https://www.alazarwakekore.online/))  
+> **Author:** alex_eng_aut  
 > **Last Updated:** November 2026  
 > **Verification Status:** 83/83 Unit Tests Passing · Zero TypeScript Errors · Production Build Verified  
 
@@ -85,7 +85,7 @@ automation-hub/
 │   │   │   ├── InlineLab.tsx     # Embedded interactive simulation card for articles
 │   │   │   └── LabWorkspace.tsx  # Primary React Flow canvas & toolbar
 │   │   ├── Sidebar.tsx           # Component drawer for canvas
-│   │   └── SiteHeader.tsx        # Global navigation with active pills & portfolio link
+│   │   └── SiteHeader.tsx        # Global navigation with active pills
 │   └── lib/
 │       ├── automation/           # Industrial automation domain logic
 │       │   ├── catalog.ts        # Specifications for all 74 blocks
@@ -219,7 +219,7 @@ AutomationHub features a complete multi-author publishing platform (`/write`) de
 
 ### Security & Permission Rules ([`src/lib/blogPermissions.ts`](file:///c:/Users/wakek/Desktop/engineering/automation-hub/src/lib/blogPermissions.ts)):
 1. **Core Masterclass Protection (`CORE_MASTERCLASS_SLUGS`):**
-   * The 11 core masterclasses are permanently locked and can **only** be modified or updated by Lead Author **Alazar Wake Kore** (`isAuthorUser`).
+   * The 11 core masterclasses are permanently locked and can **only** be modified by the site owner account (`users.is_owner`, checked by `isSiteOwner` in the UI and re-checked by the API).
    * For all other logged-in users, core masterclass editors are read-only, preventing unauthorized edits, overrides, or deletions.
 2. **Community Author Workspace Isolation:**
    * When community engineers sign in (e.g. `marcus_chen`, `elena_r`), their `/write` Studio displays exclusively their own articles.
@@ -334,7 +334,7 @@ node --experimental-strip-types --test tests/*.test.ts
    * Asserts non-blocking `millis()` execution (zero `delay()` calls allowed).
    * Validates 12-bit ADC scaling (`4095.0f`) on ESP32/Pico sketches.
 2. **`tests/author_isolation.test.ts` (5 tests):**
-   * Validates lead author identification (`isAuthorUser`).
+   * Validates site owner identification (`isSiteOwner`).
    * Asserts `CORE_MASTERCLASS_SLUGS` contains all 11 protected masterclasses.
    * Tests strict write-protection of core masterclasses against non-lead accounts.
    * Verifies community author workspace isolation and storage key separation.
@@ -408,4 +408,4 @@ npm run build
 
 ---
 
-*Handover documentation prepared and certified by Antigravity for Alazar Wake Kore and the AutomationHub engineering team.*
+*Handover documentation for the AutomationHub project.*

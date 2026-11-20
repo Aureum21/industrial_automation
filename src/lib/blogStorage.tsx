@@ -315,7 +315,7 @@ export function convertExternalToBlogPost(external: ExternalBlogPost): BlogPost 
     excerpt: external.excerpt,
     author:
       external.author ||
-      'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)',
+      'alex_eng_aut',
     authorUrl: external.authorUrl,
     authorId: external.authorId,
     authorEmail: external.authorEmail,
@@ -378,7 +378,7 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
   const excerpt = meta.excerpt || 'An interactive industrial automation article.';
   const author =
     meta.author ||
-    'Authored by Alazar Wake Kore: Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)';
+    'alex_eng_aut';
   const date = meta.date || 'Oct 15';
   const readingTime = meta.readingTime || '10 min read';
   const tag = meta.tag || 'Automation';
@@ -446,14 +446,14 @@ export function parseUploadedFileContent(raw: string): ExternalBlogPost {
 
 export {
   CORE_MASTERCLASS_SLUGS,
-  isAuthorUser,
+  isSiteOwner,
   canEditPost,
   getUserStorageKey,
 } from './blogPermissions';
 
 import {
   CORE_MASTERCLASS_SLUGS,
-  isAuthorUser,
+  isSiteOwner,
   canEditPost,
   getUserStorageKey,
 } from './blogPermissions';
@@ -529,10 +529,10 @@ export async function syncArticlesFromCloud(
 
         // If user is logged in, also sync their authored articles to their isolated storage
         if (user) {
-          const isLead = isAuthorUser(user);
+          const isOwner = isSiteOwner(user);
           const userKey = getUserStorageKey(user.id);
           const myArticles = data.articles.filter((a: ExternalBlogPost) => {
-            if (isLead) return true;
+            if (isOwner) return true;
             return (
               (a.authorId && a.authorId === user.id) ||
               (a.authorEmail && user.email && a.authorEmail.toLowerCase() === user.email.toLowerCase())
@@ -581,7 +581,7 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
 
 /**
  * Returns editable posts scoped to the specific authenticated author.
- * - Alazar (Lead Author): Sees his 10 core masterclasses + any articles he created.
+ * - Site owner: sees the core masterclasses + any articles they created.
  * - Other Authors: See ONLY their own created articles. Core masterclasses are COMPLETELY excluded.
  * - Unauthenticated: Returns empty array.
  */
@@ -597,7 +597,7 @@ export function getEditablePosts(
   }
   if (!user) return [];
 
-  const isLead = isAuthorUser(user);
+  const isOwner = isSiteOwner(user);
   const userKey = getUserStorageKey(user.id);
 
   let userArticles: ExternalBlogPost[] = [];
@@ -606,8 +606,8 @@ export function getEditablePosts(
     userArticles = raw ? JSON.parse(raw) : [];
   } catch {}
 
-  // If Alazar (Lead Author): Include the 10 core masterclasses
-  if (isLead) {
+  // Site owner: include the core masterclasses
+  if (isOwner) {
     const customSlugs = new Set(userArticles.map(p => p.slug));
     const defaults = DEFAULT_MASTERCLASSES.filter(p => !customSlugs.has(p.slug));
     return [...userArticles, ...defaults];

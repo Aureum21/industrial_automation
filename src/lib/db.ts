@@ -2,6 +2,10 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { hashPassword } from './authCrypto';
 
 let sqlClient: NeonQueryFunction<false, false> | null = null;
+
+const OWNER_HANDLE = 'alex_eng_aut';
+const OWNER_EMAIL = 'alex_eng_aut@industrialautomation.website';
+const LEGACY_OWNER_ID = 'usr-alazar-lead';
 let initialized = false;
 
 /**
@@ -30,7 +34,7 @@ export function getDb() {
 
 /**
  * Initializes database tables (users, sessions, custom articles) in Neon PostgreSQL
- * and seeds the lead author account if not yet present.
+ * and seeds the site owner account if OWNER_INITIAL_PASSWORD is set.
  */
 export async function initDb() {
   const sql = getDb();
@@ -52,7 +56,7 @@ export async function initDb() {
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(255) DEFAULT 'Engineer',
         station_id VARCHAR(128) DEFAULT 'TERMINAL-LOCAL-01',
-        avatar VARCHAR(16) DEFAULT 'AW',
+        avatar VARCHAR(16) DEFAULT 'OP',
         bio TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -124,27 +128,35 @@ export async function initDb() {
       `;
     }
 
-    // 5. Seed Default Author User if not exists
-    const authorEmail = 'alazar@industrialautomation.website';
-    const existing = await sql`
-      SELECT id FROM users WHERE LOWER(email) = LOWER(${authorEmail}) OR LOWER(name) = 'alazar' LIMIT 1;
+    // 5. Site owner flag (replaces the old name-based "lead author" check)
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner BOOLEAN DEFAULT FALSE;
     `;
 
-    if (!existing || existing.length === 0) {
-      // Default initial password: 'alazar-industrial' (can be updated immediately via change password / settings)
-      const defaultPasswordHash = await hashPassword('alazar-industrial');
+    // One-time migration: the original owner account (id kept as-is, it is an internal key)
+    // is renamed to the public handle and flagged as owner.
+    await sql`
+      UPDATE users
+      SET name = ${OWNER_HANDLE},
+          email = ${OWNER_EMAIL},
+          role = 'Author',
+          station_id = 'TERMINAL-LOCAL-01',
+          avatar = 'AL',
+          bio = ''
+      WHERE id = ${LEGACY_OWNER_ID} AND name <> ${OWNER_HANDLE};
+    `;
+    await sql`
+      UPDATE users SET is_owner = TRUE WHERE id = ${LEGACY_OWNER_ID} AND is_owner IS NOT TRUE;
+    `;
+
+    // 6. Fresh databases: seed an owner account only when an initial password is provided.
+    const owners = await sql`SELECT id FROM users WHERE is_owner = TRUE LIMIT 1;`;
+    const initialPassword = process.env.OWNER_INITIAL_PASSWORD?.trim();
+    if ((!owners || owners.length === 0) && initialPassword) {
+      const passwordHash = await hashPassword(initialPassword);
       await sql`
-        INSERT INTO users (id, name, email, password_hash, role, station_id, avatar, bio)
-        VALUES (
-          'usr-alazar-lead',
-          'Alazar Wake Kore',
-          ${authorEmail},
-          ${defaultPasswordHash},
-          'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)',
-          'PLC-STATION-ALPHA',
-          'AW',
-          'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE) specializing in deterministic PLC logic, SCADA safety interlocks, and closed-loop process control.'
-        )
+        INSERT INTO users (id, name, email, password_hash, role, avatar, bio, is_owner)
+        VALUES ('usr-owner', ${OWNER_HANDLE}, ${OWNER_EMAIL}, ${passwordHash}, 'Author', 'AL', '', TRUE)
         ON CONFLICT (email) DO NOTHING;
       `;
     }

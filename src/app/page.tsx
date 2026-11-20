@@ -15,7 +15,7 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
-import { BLOG_POSTS, AUTHOR_NAME, AUTHOR_PORTFOLIO, type BlogPost } from '@/lib/mockPosts';
+import { BLOG_POSTS, type BlogPost } from '@/lib/mockPosts';
 import { getAllPosts, syncArticlesFromCloud } from '@/lib/blogStorage';
 import InlineLab from '@/components/lab/InlineLab';
 
@@ -244,16 +244,8 @@ export default function Home() {
                 </div>
 
                 <div className="pt-4 border-t border-[#f5f5f7] flex items-center justify-between text-xs text-[#86868b]">
-                  <span
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      window.open(AUTHOR_PORTFOLIO, '_blank');
-                    }}
-                    className="hover:text-[#0071e3] transition truncate max-w-[280px] font-medium"
-                    title={post.author}
-                  >
-                    Alazar Wake Kore (HCT Senior)
+                  <span className="truncate max-w-[280px] font-medium" title={post.author}>
+                    {post.author}
                   </span>
                   <span className="font-mono text-[#1d1d1f] group-hover:text-[#0071e3] flex items-center gap-1 font-medium transition-colors">
                     <span>{post.readingTime.split('+')[0]}</span>
@@ -266,43 +258,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. AUTHOR SPOTLIGHT (Personal Brand / Portfolio) */}
-      <section className="py-20 px-5 sm:px-8 bg-white border-b border-[#e5e5ea]">
-        <div className="max-w-4xl mx-auto p-8 sm:p-12 rounded-3xl bg-[#f5f5f7] border border-[#e5e5ea] flex flex-col sm:flex-row items-center gap-8 shadow-xs">
-          <div className="w-24 h-24 rounded-full bg-[#1d1d1f] text-white flex items-center justify-center font-bold text-2xl font-mono shrink-0 shadow-md">
-            AW
-          </div>
-          <div className="flex-1 text-center sm:text-left">
-            <div className="text-xs font-mono uppercase tracking-widest text-[#059669] font-bold mb-1.5">
-              LEAD AUTHOR &amp; RESEARCHER
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f] mb-2">
-              Alazar Wake Kore
-            </h3>
-            <p className="text-sm text-[#515154] leading-relaxed mb-4">
-              Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE) specializing in deterministic PLC logic, SCADA safety interlocks, and closed-loop process control.
-            </p>
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
-              <a
-                href={AUTHOR_PORTFOLIO}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-xs font-medium transition shadow-xs"
-              >
-                <span>Visit Portfolio</span>
-                <ExternalLink size={13} />
-              </a>
-              <Link
-                href="/blogs"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-[#e5e5ea] border border-[#d2d2d7] text-[#1d1d1f] text-xs font-medium transition shadow-2xs"
-              >
-                <span>Read Masterclasses</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* 5. MINIMALIST APPLE FOOTER */}
       <footer className="py-12 px-5 sm:px-8 text-xs text-[#86868b] font-sans">
@@ -316,10 +271,6 @@ export default function Home() {
             <span>Industrial Control Systems Education</span>
           </div>
           <div className="flex items-center gap-4 font-mono text-[11px]">
-            <a href={AUTHOR_PORTFOLIO} target="_blank" rel="noopener noreferrer" className="hover:text-[#1d1d1f]">
-              Portfolio Website
-            </a>
-            <span>•</span>
             <Link href="/blogs" className="hover:text-[#1d1d1f]">
               Archive
             </Link>

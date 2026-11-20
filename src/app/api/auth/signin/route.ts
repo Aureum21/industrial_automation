@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
     // Query user by email, full name, or username/first name (case-insensitive)
     const rows = await sql`
-      SELECT id, name, email, password_hash, role, station_id, avatar, bio, created_at
+      SELECT id, name, email, password_hash, role, station_id, avatar, bio, created_at, is_owner
       FROM users
       WHERE LOWER(email) = LOWER(${identifier}) 
          OR LOWER(name) = LOWER(${identifier})
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       avatar: string;
       bio: string;
       created_at: string;
+      is_owner: boolean | null;
     };
 
     const isMatch = await verifyPassword(cleanPassword, userRow.password_hash);
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
       stationId: userRow.station_id,
       avatar: userRow.avatar,
       bio: userRow.bio,
+      isOwner: userRow.is_owner === true,
       joinedDate: new Date(userRow.created_at).toLocaleDateString('en-US', {
         month: 'short',
         year: 'numeric',

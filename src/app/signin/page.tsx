@@ -141,17 +141,13 @@ function SignInContent() {
       // If database is not configured yet, fallback gracefully to local session
       if (result.error && (result.error.includes('DATABASE_URL') || result.error.includes('not connected'))) {
         const usernameInput = email.trim();
-        const isAlazar = usernameInput.toLowerCase().includes('alazar');
-
         const fallbackUser: User = {
           id: `usr-${Date.now().toString(36)}`,
-          name: isAlazar ? 'Alazar Wake Kore' : usernameInput,
+          name: usernameInput,
           email: usernameInput.includes('@') ? usernameInput : `${usernameInput.toLowerCase()}@automationhub.io`,
-          role: isAlazar
-            ? 'Electrical Engineering Technology Senior at Higher Colleges of Technology (UAE)'
-            : 'Certified Controls Engineer',
+          role: 'Certified Controls Engineer',
           stationId: stationId.trim() || 'TERMINAL-LOCAL-01',
-          avatar: isAlazar ? 'AW' : usernameInput.slice(0, 2).toUpperCase(),
+          avatar: usernameInput.slice(0, 2).toUpperCase(),
           joinedDate: 'Oct 2026',
         };
 
@@ -273,7 +269,7 @@ function SignInContent() {
       const result = await changePasswordWithNeon({
         currentPassword: changePassCurrent,
         newPassword: changePassNew,
-        emailOrUsername: changePassIdentifier.trim() || currentUser?.email || email.trim() || 'alazar',
+        emailOrUsername: changePassIdentifier.trim() || currentUser?.email || email.trim(),
       });
 
       setChangePassLoading(false);
@@ -842,7 +838,7 @@ function SignInContent() {
                   type="text"
                   value={changePassIdentifier}
                   onChange={(e) => setChangePassIdentifier(e.target.value)}
-                  placeholder="alazar or alazar@industrialautomation.website"
+                  placeholder="username or email"
                   required
                   className="w-full px-3.5 py-2.5 bg-[#f5f5f7] border border-[#e5e5ea] focus:border-[#0071e3] focus:bg-white rounded-xl text-sm text-[#1d1d1f] placeholder-[#86868b] outline-none transition font-mono"
                 />
