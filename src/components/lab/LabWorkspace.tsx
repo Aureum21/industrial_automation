@@ -8,6 +8,7 @@ import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
 import { createBlock, parseCircuitDocument, STORAGE_KEY } from '@/lib/automation/documents';
 import { parseCircuitDSL, stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { applyLayout } from '@/lib/automation/layout';
+import { buildShareUrl, decodeCircuitFragment } from '@/lib/automation/share';
 import { EXAMPLES, getExample } from '@/lib/automation/examples';
 import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal, HmiWidget } from '@/lib/automation/types';
 import Sidebar from '@/components/Sidebar';
@@ -19,6 +20,30 @@ import ArduinoExportModal from './ArduinoExportModal';
 
 const nodeTypes = { circuit: CircuitNode };
 const toWire = (connection: Connection, id: string): CircuitConnection => ({ id, fromBlockId: connection.source, fromPin: connection.sourceHandle ?? '', toBlockId: connection.target, toPin: connection.targetHandle ?? '' });
+
+/**
+ * Opens the circuit carried in a share link (#c=...), if the URL has one. The fragment is
+ * removed afterwards so a reload shows the visitor's own work. Returns true when it handled a link.
+ */
+async function openSharedFromUrl(handlers: {
+  load: (doc: CircuitDocument, message: string) => void;
+  isDirty: () => boolean;
+  setPending: (pending: { document: CircuitDocument; label: string }) => void;
+  setNotice: (message: string) => void;
+}): Promise<boolean> {
+  if (!window.location.hash.startsWith('#c=')) return false;
+  try {
+    const shared = await decodeCircuitFragment(window.location.hash);
+    if (!shared) return false;
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (handlers.isDirty()) handlers.setPending({ document: shared, label: `Opened shared circuit "${shared.name}".` });
+    else handlers.load(shared, `Opened shared circuit "${shared.name}". Press Save to keep your own copy.`);
+    return true;
+  } catch (error) {
+    handlers.setNotice(error instanceof Error ? error.message : 'This share link could not be opened.');
+    return false;
+  }
+}
 
 function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boolean; initialDocument?: CircuitDocument; isFullscreen?: boolean }) {
   const [engine] = useState(() => new LogicEngine());
@@ -79,6 +104,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
   const [syncKey, setSyncKey] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showArduinoModal, setShowArduinoModal] = useState(false);
+  const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const flowWrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow<CircuitFlowNode>();
@@ -175,8 +201,27 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load this circuit.'); }
   }, [engine, makeNode, centerView, sync]);
 
+
+  const shareCircuit = async () => {
+    try {
+      const url = await buildShareUrl(window.location.origin, engine.toDocument(name, widgets));
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(url);
+        copied = true;
+      } catch {
+        // Clipboard can be blocked; the dialog lets the user copy manually.
+      }
+      setShare({ url, copied });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not create a share link.');
+    }
+  };
+
   const loadRef = useRef(load);
   useLayoutEffect(() => { loadRef.current = load; }, [load]);
+  const dirtyRef = useRef(dirty);
+  useLayoutEffect(() => { dirtyRef.current = dirty; }, [dirty]);
   const loadedCircuitKeyRef = useRef<string | null>(null);
 
   // Auto-center whenever nodes are initialized or change
@@ -235,7 +280,8 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
       return;
     }
     // Deferring initialization keeps browser storage out of server rendering.
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      if (await openSharedFromUrl({ load: (doc, message) => loadRef.current(doc, message), isDirty: () => dirtyRef.current, setPending, setNotice })) return;
       const example = new URLSearchParams(window.location.search).get('example');
       if (example) { loadRef.current(getExample(example), 'Example loaded. Press Run or Step to simulate.'); return; }
       try {
@@ -246,6 +292,13 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
     }, 0);
     return () => clearTimeout(timer);
   }, [initialDocument]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const onHashChange = () => void openSharedFromUrl({ load: (doc, message) => loadRef.current(doc, message), isDirty: () => dirtyRef.current, setPending, setNotice });
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [readOnly]);
 
   useEffect(() => {
     if (!running) return;
@@ -364,6 +417,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'code' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
           </div>
           <button className="lab-button" onClick={save}>Save</button>
+          <button className="lab-button primary" onClick={() => void shareCircuit()} title="Copy a link that opens a copy of this circuit">Share link</button>
           <button className="lab-button" onClick={exportFile}>Export</button>
           <button
             className="lab-button flex items-center gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 font-medium"
@@ -437,6 +491,30 @@ function Workspace({ readOnly, initialDocument, isFullscreen }: { readOnly?: boo
             >
               Create New Circuit
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {share && (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6" role="dialog" aria-modal="true" aria-labelledby="share-title">
+        <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+          <h2 id="share-title" className="text-lg font-semibold">{share.copied ? 'Link copied' : 'Share this circuit'}</h2>
+          <p className="mt-2 text-sm text-gray-500">Anyone with the link opens their own copy of this circuit, including the HMI. Nothing is uploaded: the circuit is stored inside the link.</p>
+          <input
+            readOnly
+            value={share.url}
+            onFocus={(event) => event.currentTarget.select()}
+            aria-label="Share link"
+            className="mt-4 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-700"
+          />
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              className="lab-button"
+              onClick={() => void navigator.clipboard?.writeText(share.url).then(() => setShare({ ...share, copied: true }))}
+            >
+              Copy again
+            </button>
+            <button autoFocus className="lab-button primary" onClick={() => setShare(null)}>Done</button>
           </div>
         </div>
       </div>

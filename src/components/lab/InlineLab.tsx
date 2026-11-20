@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Check, CheckCircle2, Maximize2, Minimize2, Cpu, Zap } from 'lucide-react';
+import { Check, CheckCircle2, ExternalLink, Maximize2, Minimize2, Cpu, Zap } from 'lucide-react';
 import LabWorkspace from './LabWorkspace';
 import ArduinoExportModal from './ArduinoExportModal';
 import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 import { applyLayout } from '@/lib/automation/layout';
 import { useStoredString } from '@/lib/useStoredValue';
+import { buildShareUrl } from '@/lib/automation/share';
 
 interface InlineLabProps {
   dsl: string;
@@ -84,6 +85,28 @@ export default function InlineLab({ dsl, title, step, height = 500 }: InlineLabP
         </div>
 
         <div className="flex items-center gap-2.5">
+          {document && (
+            <button
+              type="button"
+              onClick={() => {
+                // Open the tab synchronously (popup blockers), then point it at the link once built.
+                const tab = window.open('about:blank', '_blank');
+                void buildShareUrl(window.location.origin, document).then((url) => {
+                  if (tab) {
+                    tab.opener = null;
+                    tab.location.href = url;
+                  } else {
+                    window.location.href = url;
+                  }
+                });
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-all bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#e5e5ea]"
+              title="Open a copy of this circuit in the full Logic Lab to modify it"
+            >
+              <ExternalLink size={13} />
+              <span className="hidden sm:inline">Open in Lab</span>
+            </button>
+          )}
           {/* Arduino Export Button */}
           {document && (
             <button
