@@ -1,10 +1,16 @@
 /**
  * Arduino C++ Code Generator for AutomationHub
  * Generates standalone, non-blocking, library-free .ino sketches from visual circuits.
+ *
+ * The sketch reproduces the browser simulator scan for scan: blocks run in the same order
+ * (LogicEngine graph rules), every signal is a global that keeps its value between scans,
+ * and each block is a direct port of its LogicEngine implementation. tests/arduino_parity.test.ts
+ * compiles generated sketches with a host C++ compiler and compares them with the engine.
  */
 
-import type { CircuitBlock, CircuitConnection, CircuitDocument, SignalKind } from '../automation/types.ts';
+import type { BlockType, CircuitBlock, CircuitDocument } from '../automation/types.ts';
 import { BLOCK_CATALOG } from '../automation/catalog.ts';
+import { parseExpression, type ExpressionNode } from '../automation/expression.ts';
 
 export type ArduinoBoardId = 'uno' | 'nano' | 'mega' | 'esp32' | 'pico';
 
@@ -104,14 +110,19 @@ export const BOARD_PRESETS: Record<ArduinoBoardId, BoardPreset> = {
   },
 };
 
+
 export type PinElectricalMode = 'INPUT_PULLUP' | 'INPUT' | 'OUTPUT' | 'ANALOG_INPUT' | 'PWM_OUTPUT';
 
 export interface PinAssignment {
   blockId: string;
   pinNumber: string;
   mode: PinElectricalMode;
+  /** Digital: pin level is inverted (INPUT_PULLUP buttons, active-low relay modules). */
   invertLogic: boolean;
   comment?: string;
+  /** Analog only: engineering range that maps to the ADC range (inputs) or PWM 0..255 (outputs). Default 0..100. */
+  scaleMin?: number;
+  scaleMax?: number;
 }
 
 export interface ArduinoExportConfig {
@@ -122,1210 +133,795 @@ export interface ArduinoExportConfig {
   pinAssignments: Record<string, PinAssignment>;
 }
 
-/**
- * Auto-allocates available physical pins for input and output blocks in the circuit.
- */
-export function autoAssignPins(doc: CircuitDocument, boardId: ArduinoBoardId): Record<string, PinAssignment> {
-  const preset = BOARD_PRESETS[boardId] ?? BOARD_PRESETS.uno;
-  const assignments: Record<string, PinAssignment> = {};
+export interface ArduinoExportIssue {
+  blockId: string;
+  message: string;
+}
 
-  const usedPins = new Set<string>();
-  const digitalPool = [...preset.availableDigitalPins];
-  const analogInPool = [...preset.availableAnalogInPins];
-  const pwmPool = [...preset.availablePwmPins];
+const isReader = (type: BlockType) => type === 'INPUT' || type === 'NC_INPUT' || type === 'ANALOG_INPUT';
+const isWriter = (type: BlockType) => type === 'OUTPUT' || type === 'FLAG' || type === 'ANALOG_OUTPUT' || type === 'ANALOG_FLAG';
+/** Engine rule: inputs of these blocks do not create same-scan dependencies. */
+const isDelayedInput = (type: BlockType) =>
+  type === 'SCAN_DELAY' || type === 'ANALOG_SCAN_DELAY' || type === 'TRANSFER_FUNCTION' || type === 'ANALOG_RAMP';
 
-  // Helper to pick next unused pin
-  const pick = (pool: string[], fallbackPrefix: string, counter: { val: number }): string => {
-    while (pool.length > 0) {
-      const p = pool.shift()!;
-      if (!usedPins.has(p)) {
-        usedPins.add(p);
-        return p;
-      }
-    }
-    const synthetic = `${fallbackPrefix}${counter.val++}`;
-    usedPins.add(synthetic);
-    return synthetic;
-  };
+const tagKey = (block: CircuitBlock) => `${BLOCK_CATALOG[block.type].outputs[0]?.kind}:${block.tag}`;
 
-  const digCounter = { val: 2 };
-  const anaCounter = { val: 0 };
+/** Readers with a tag that some writer publishes are internal signals, not physical pins. */
+function tagWriterFor(doc: CircuitDocument, block: CircuitBlock): CircuitBlock | undefined {
+  if (!block.tag || !isReader(block.type)) return undefined;
+  return doc.blocks.find((other) => other.id !== block.id && other.tag === block.tag && isWriter(other.type) && tagKey(other) === tagKey(block));
+}
 
-  for (const block of doc.blocks) {
-    if (block.type === 'INPUT') {
-      const pin = pick(digitalPool, 'D', digCounter);
-      assignments[block.id] = {
-        blockId: block.id,
-        pinNumber: pin,
-        mode: 'INPUT_PULLUP',
-        invertLogic: true, // Pressed to GND = true (standard momentary switch)
-        comment: block.label || `Digital Input (${block.id})`,
-      };
-    } else if (block.type === 'NC_INPUT') {
-      const pin = pick(digitalPool, 'D', digCounter);
-      assignments[block.id] = {
-        blockId: block.id,
-        pinNumber: pin,
-        mode: 'INPUT_PULLUP',
-        invertLogic: false, // Closed to GND = normal, open = tripped
-        comment: block.label || `Normally Closed Input (${block.id})`,
-      };
-    } else if (block.type === 'OUTPUT') {
-      const pin = pick(digitalPool, 'D', digCounter);
-      assignments[block.id] = {
-        blockId: block.id,
-        pinNumber: pin,
-        mode: 'OUTPUT',
-        invertLogic: false,
-        comment: block.label || `Digital Output (${block.id})`,
-      };
-    } else if (block.type === 'ANALOG_INPUT') {
-      const pin = pick(analogInPool, 'A', anaCounter);
-      assignments[block.id] = {
-        blockId: block.id,
-        pinNumber: pin,
-        mode: 'ANALOG_INPUT',
-        invertLogic: false,
-        comment: block.label || `Analog Input (${block.id})`,
-      };
-    } else if (block.type === 'ANALOG_OUTPUT') {
-      const pin = pick(pwmPool, 'PWM', digCounter);
-      assignments[block.id] = {
-        blockId: block.id,
-        pinNumber: pin,
-        mode: 'PWM_OUTPUT',
-        invertLogic: false,
-        comment: block.label || `PWM Output (${block.id})`,
-      };
-    }
-  }
-
-  return assignments;
+/** Blocks that need a physical pin: untagged-reader inputs and all outputs. */
+export function needsPhysicalPin(doc: CircuitDocument, block: CircuitBlock): boolean {
+  if (isReader(block.type)) return !tagWriterFor(doc, block);
+  return block.type === 'OUTPUT' || block.type === 'ANALOG_OUTPUT';
 }
 
 /**
- * Sanitizes an ID to a valid C++ identifier name
+ * Auto-allocates pins. Analog outputs are placed first so PWM-capable pins are not used up by
+ * plain digital I/O, and digital I/O prefers pins without PWM. Blocks that cannot get a pin are
+ * left unassigned and reported by analyzeArduinoExport.
  */
+export function autoAssignPins(doc: CircuitDocument, boardId: ArduinoBoardId): Record<string, PinAssignment> {
+  const preset = BOARD_PRESETS[boardId] ?? BOARD_PRESETS.uno;
+  const used = new Set<string>();
+  const take = (pool: string[]) => {
+    const pin = pool.find((candidate) => !used.has(candidate));
+    if (pin) used.add(pin);
+    return pin;
+  };
+  const pwm = new Set(preset.availablePwmPins);
+  const digitalPool = [...preset.availableDigitalPins.filter((pin) => !pwm.has(pin)), ...preset.availableDigitalPins.filter((pin) => pwm.has(pin))];
+  const assignments: Record<string, PinAssignment> = {};
+  const physical = doc.blocks.filter((block) => needsPhysicalPin(doc, block));
+  const ordered = [...physical.filter((b) => b.type === 'ANALOG_OUTPUT'), ...physical.filter((b) => b.type !== 'ANALOG_OUTPUT')];
+
+  for (const block of ordered) {
+    const comment = block.label || block.id;
+    let pin: string | undefined;
+    let mode: PinElectricalMode;
+    let invertLogic = false;
+    switch (block.type) {
+      case 'INPUT':
+      case 'NC_INPUT':
+        pin = take(digitalPool);
+        mode = 'INPUT_PULLUP';
+        invertLogic = true; // pushbutton to GND: pressed reads LOW
+        break;
+      case 'OUTPUT':
+        pin = take(digitalPool);
+        mode = 'OUTPUT';
+        break;
+      case 'ANALOG_INPUT':
+        pin = take(preset.availableAnalogInPins);
+        mode = 'ANALOG_INPUT';
+        break;
+      default:
+        pin = take(preset.availablePwmPins);
+        mode = 'PWM_OUTPUT';
+    }
+    if (!pin) continue;
+    assignments[block.id] = {
+      blockId: block.id,
+      pinNumber: pin,
+      mode,
+      invertLogic,
+      comment,
+      ...(mode === 'ANALOG_INPUT' || mode === 'PWM_OUTPUT' ? { scaleMin: 0, scaleMax: 100 } : {}),
+    };
+  }
+  return assignments;
+}
+
+/** Name of the global variable holding `pin` of `blockId` in the generated sketch (used by tests). */
+export function arduinoSignalName(doc: CircuitDocument, blockId: string, pin: string): string {
+  return `sig_${buildIdentifiers(doc).get(blockId)}_${pin}`;
+}
+
+/** C++ identifiers for block IDs, unique within the document. */
+function buildIdentifiers(doc: CircuitDocument): Map<string, string> {
+  const result = new Map<string, string>();
+  const taken = new Set<string>();
+  for (const block of doc.blocks) {
+    const base = sanitizeCppIdent(block.id);
+    let ident = base;
+    for (let n = 2; taken.has(ident); n++) ident = `${base}_${n}`;
+    taken.add(ident);
+    result.set(block.id, ident);
+  }
+  return result;
+}
+
 export function sanitizeCppIdent(id: string): string {
   const clean = id.replace(/[^a-zA-Z0-9_]/g, '_');
   return /^[a-zA-Z_]/.test(clean) ? clean : `b_${clean}`;
 }
 
-/**
- * Performs topological sort on circuit blocks.
- * SCAN_DELAY and ANALOG_SCAN_DELAY do NOT create forward dependencies in the current cycle,
- * exactly like PLC scan memory.
- */
+/** Execution order, using exactly the LogicEngine graph rules (Kahn's algorithm, same tie-breaking). */
 export function sortBlocksTopologically(doc: CircuitDocument): CircuitBlock[] {
-  const blockMap = new Map<string, CircuitBlock>();
-  const inDegree = new Map<string, number>();
-  const adj = new Map<string, Set<string>>();
-
+  const byId = new Map(doc.blocks.map((block) => [block.id, block]));
+  const outgoing = new Map<string, Set<string>>();
+  const counts = new Map<string, number>();
   for (const block of doc.blocks) {
-    blockMap.set(block.id, block);
-    inDegree.set(block.id, 0);
-    adj.set(block.id, new Set());
+    outgoing.set(block.id, new Set());
+    counts.set(block.id, 0);
   }
-
-  // Tag writers mapping
-  const tagWriters = new Map<string, CircuitBlock>();
+  const depend = (from: string, to: string) => {
+    const target = byId.get(to);
+    if (!target || isDelayedInput(target.type)) return;
+    const next = outgoing.get(from);
+    if (next && !next.has(to)) {
+      next.add(to);
+      counts.set(to, (counts.get(to) ?? 0) + 1);
+    }
+  };
+  for (const connection of doc.connections) {
+    if (byId.has(connection.fromBlockId)) depend(connection.fromBlockId, connection.toBlockId);
+  }
   for (const block of doc.blocks) {
-    if (block.tag && (block.type === 'OUTPUT' || block.type === 'FLAG' || block.type === 'ANALOG_FLAG' || block.type === 'ANALOG_OUTPUT')) {
-      tagWriters.set(block.tag, block);
+    const writer = tagWriterFor(doc, block);
+    if (writer) depend(writer.id, block.id);
+  }
+  const order = [...counts].filter(([, count]) => count === 0).map(([id]) => id);
+  for (let index = 0; index < order.length; index++) {
+    for (const next of outgoing.get(order[index]) ?? []) {
+      const count = (counts.get(next) ?? 0) - 1;
+      counts.set(next, count);
+      if (count === 0) order.push(next);
     }
   }
-
-  // Add edges
-  for (const conn of doc.connections) {
-    const fromBlock = blockMap.get(conn.fromBlockId);
-    const toBlock = blockMap.get(conn.toBlockId);
-    if (!fromBlock || !toBlock) continue;
-
-    // Scan delay blocks break dependency cycles by taking input from previous scan
-    if (toBlock.type === 'SCAN_DELAY' || toBlock.type === 'ANALOG_SCAN_DELAY') {
-      continue;
-    }
-
-    const set = adj.get(conn.fromBlockId)!;
-    if (!set.has(conn.toBlockId)) {
-      set.add(conn.toBlockId);
-      inDegree.set(conn.toBlockId, (inDegree.get(conn.toBlockId) ?? 0) + 1);
-    }
+  if (order.length !== doc.blocks.length) {
+    throw new Error('The circuit contains a feedback loop without a scan delay; it cannot be exported.');
   }
-
-  // Tag reader dependencies
-  for (const block of doc.blocks) {
-    if (block.tag && (block.type === 'INPUT' || block.type === 'FLAG' || block.type === 'ANALOG_FLAG')) {
-      const writer = tagWriters.get(block.tag);
-      if (writer && writer.id !== block.id) {
-        const set = adj.get(writer.id)!;
-        if (!set.has(block.id)) {
-          set.add(block.id);
-          inDegree.set(block.id, (inDegree.get(block.id) ?? 0) + 1);
-        }
-      }
-    }
-  }
-
-  // Kahn's algorithm
-  const queue: string[] = [];
-  for (const [id, deg] of inDegree.entries()) {
-    if (deg === 0) queue.push(id);
-  }
-
-  const sorted: CircuitBlock[] = [];
-  while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    const block = blockMap.get(currentId);
-    if (block) sorted.push(block);
-
-    for (const neighborId of adj.get(currentId) ?? []) {
-      const newDeg = (inDegree.get(neighborId) ?? 1) - 1;
-      inDegree.set(neighborId, newDeg);
-      if (newDeg === 0) {
-        queue.push(neighborId);
-      }
-    }
-  }
-
-  // Fallback: If there are unvisited nodes (e.g. unbroken circular dependency), append them
-  if (sorted.length < doc.blocks.length) {
-    const visited = new Set(sorted.map(b => b.id));
-    for (const block of doc.blocks) {
-      if (!visited.has(block.id)) {
-        sorted.push(block);
-      }
-    }
-  }
-
-  return sorted;
+  return order.map((id) => byId.get(id)!);
 }
 
-/**
- * Formats a pin identifier for Arduino C++ code (e.g. A0 -> A0, 2 -> 2)
- */
-function formatPinRef(pinStr: string): string {
-  const trimmed = pinStr.trim();
-  if (/^A\d+$/i.test(trimmed)) return trimmed.toUpperCase();
-  if (/^\d+$/.test(trimmed)) return trimmed;
-  // ESP32 or Pico GPIO string
-  return trimmed;
+// ---------------------------------------------------------------------------
+// Support matrix
+// ---------------------------------------------------------------------------
+
+const SIMULATION_ONLY = new Set<BlockType>(['SERVO_AXIS', 'DC_MOTOR', 'KINEMATICS_2D', 'INV_KINEMATICS_2D']);
+const NOT_YET_EXPORTABLE = new Set<BlockType>([
+  'RANDOM', 'STAIRWAY_SWITCH', 'MULTIFUNCTION_SWITCH', 'WEEKLY_TIMER', 'YEARLY_TIMER', 'ASTRONOMICAL_CLOCK',
+  'FREQUENCY_TRIGGER', 'SHIFT_REGISTER_BIT', 'MESSAGE_TEXT', 'SOFTKEY',
+  'CURSOR_KEY', 'TD_FUNCTION_KEY', 'MATH_ERROR', 'UDF', 'NETWORK_INPUT', 'NETWORK_ANALOG_INPUT',
+  'NETWORK_OUTPUT', 'NETWORK_ANALOG_OUTPUT',
+]);
+const MAX_AVERAGE_SAMPLES = 256;
+
+/** Problems that would make the exported sketch wrong. Each one becomes a #error in the sketch. */
+export function analyzeArduinoExport(doc: CircuitDocument, config?: Pick<ArduinoExportConfig, 'pinAssignments'>): ArduinoExportIssue[] {
+  const issues: ArduinoExportIssue[] = [];
+  for (const block of doc.blocks) {
+    const name = `${block.label || block.id} (${block.type})`;
+    if (SIMULATION_ONLY.has(block.type)) {
+      issues.push({ blockId: block.id, message: `${name} models a physical machine for simulation; it has no hardware equivalent. Remove it before exporting.` });
+    } else if (NOT_YET_EXPORTABLE.has(block.type)) {
+      issues.push({ blockId: block.id, message: `${name} is not supported by the Arduino exporter yet.` });
+    } else if (block.type === 'AVERAGE' && Number(block.params.samples) > MAX_AVERAGE_SAMPLES) {
+      issues.push({ blockId: block.id, message: `${name} averages ${block.params.samples} samples; the Arduino export allows at most ${MAX_AVERAGE_SAMPLES} to fit in RAM.` });
+    } else if (block.type === 'MATH_EXPRESSION') {
+      try {
+        parseExpression(String(block.params.expr || 'A + B'));
+      } catch (error) {
+        issues.push({ blockId: block.id, message: `${name} has an invalid formula: ${(error as Error).message}` });
+      }
+    }
+    if (config && needsPhysicalPin(doc, block) && !config.pinAssignments[block.id]?.pinNumber) {
+      issues.push({ blockId: block.id, message: `${name} has no pin assigned (the board may be out of suitable pins).` });
+    }
+  }
+  try {
+    sortBlocksTopologically(doc);
+  } catch (error) {
+    issues.push({ blockId: '', message: (error as Error).message });
+  }
+  return issues;
 }
 
-/**
- * Main Arduino Sketch Generator
- */
+// ---------------------------------------------------------------------------
+// C++ emission helpers
+// ---------------------------------------------------------------------------
+
+/** A finite C++ float literal. */
+function f(value: unknown): string {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0.0f';
+  const text = String(number);
+  return /[.eE]/.test(text) ? `${text}f` : `${text}.0f`;
+}
+
+function ul(value: unknown): string {
+  return `${Math.max(0, Math.round(Number(value) || 0))}UL`;
+}
+
+/** Text safe inside a C string literal. */
+function cString(text: string): string {
+  return text.replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/** Text safe inside a C block comment. */
+function cComment(text: string): string {
+  return text.replace(/[\r\n]+/g, ' ').replace(/\*\//g, '* /');
+}
+
+const MATH_FUNCTIONS: Record<string, (args: string[]) => string> = {
+  abs: ([x]) => `fabs(${x})`,
+  sqrt: ([x]) => `sqrt(${x})`,
+  cbrt: ([x]) => `cbrt(${x})`,
+  exp: ([x]) => `exp(${x})`,
+  log: ([x]) => `log(${x})`,
+  log10: ([x]) => `log10(${x})`,
+  log2: ([x]) => `(log(${x}) / log(2.0))`,
+  sin: ([x]) => `sin(${x})`,
+  cos: ([x]) => `cos(${x})`,
+  tan: ([x]) => `tan(${x})`,
+  asin: ([x]) => `asin(${x})`,
+  acos: ([x]) => `acos(${x})`,
+  atan: ([x]) => `atan(${x})`,
+  atan2: ([y, x]) => `atan2(${y}, ${x})`,
+  round: ([x]) => `ah_round(${x})`,
+  floor: ([x]) => `floor(${x})`,
+  ceil: ([x]) => `ceil(${x})`,
+  sign: ([x]) => `ah_sign(${x})`,
+  pow: ([a, b]) => `pow(${a}, ${b})`,
+  min: (args) => args.reduce((acc, arg) => `ah_min(${acc}, ${arg})`),
+  max: (args) => args.reduce((acc, arg) => `ah_max(${acc}, ${arg})`),
+  hypot: (args) => `sqrt(${args.map((arg) => `ah_sq(${arg})`).join(' + ')})`,
+  clamp: ([x, lo, hi]) => `ah_min(ah_max(${x}, ${lo}), ${hi})`,
+};
+
+/** Translates a parsed MATH_EXPRESSION into a C++ float expression. */
+function expressionToCpp(node: ExpressionNode, vars: { A: string; B: string; C: string }): string {
+  const go = (n: ExpressionNode) => expressionToCpp(n, vars);
+  switch (node.kind) {
+    case 'number':
+      return f(node.value);
+    case 'variable':
+      return `(${vars[node.name]})`;
+    case 'unary':
+      return node.op === '!' ? `((${go(node.operand)}) == 0.0f ? 1.0f : 0.0f)` : `(${node.op}${go(node.operand)})`;
+    case 'conditional':
+      return `((${go(node.test)}) != 0.0f ? (${go(node.then)}) : (${go(node.otherwise)}))`;
+    case 'call':
+      return MATH_FUNCTIONS[node.name](node.args.map(go));
+    case 'binary': {
+      const a = go(node.left);
+      const b = go(node.right);
+      switch (node.op) {
+        case '^': return `pow(${a}, ${b})`;
+        case '%': return `fmod(${a}, ${b})`;
+        case '&&': return `(((${a}) != 0.0f && (${b}) != 0.0f) ? 1.0f : 0.0f)`;
+        case '||': return `(((${a}) != 0.0f || (${b}) != 0.0f) ? 1.0f : 0.0f)`;
+        case '<': case '<=': case '>': case '>=': case '==': case '!=':
+          return `((${a}) ${node.op} (${b}) ? 1.0f : 0.0f)`;
+        default:
+          return `(${a} ${node.op} ${b})`;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sketch generation
+// ---------------------------------------------------------------------------
+
 export function generateArduinoSketch(doc: CircuitDocument, config: ArduinoExportConfig): string {
   const preset = BOARD_PRESETS[config.board] ?? BOARD_PRESETS.uno;
-  const sortedBlocks = sortBlocksTopologically(doc);
+  const issues = analyzeArduinoExport(doc, config);
+  const idents = buildIdentifiers(doc);
+  const id = (blockId: string) => idents.get(blockId)!;
+  const sig = (blockId: string, pin: string) => `sig_${id(blockId)}_${pin}`;
+  const blocks = issues.some((issue) => issue.message.includes('feedback loop')) ? doc.blocks : sortBlocksTopologically(doc);
 
-  // Index connections by target block and target pin: toBlockId -> { toPin -> { fromBlockId, fromPin } }
-  const incomingMap = new Map<string, Map<string, { fromBlockId: string; fromPin: string }>>();
-  for (const conn of doc.connections) {
-    if (!incomingMap.has(conn.toBlockId)) {
-      incomingMap.set(conn.toBlockId, new Map());
-    }
-    incomingMap.get(conn.toBlockId)!.set(conn.toPin, {
-      fromBlockId: conn.fromBlockId,
-      fromPin: conn.fromPin,
-    });
+  const incoming = new Map<string, Map<string, { fromBlockId: string; fromPin: string }>>();
+  for (const connection of doc.connections) {
+    if (!incoming.has(connection.toBlockId)) incoming.set(connection.toBlockId, new Map());
+    incoming.get(connection.toBlockId)!.set(connection.toPin, connection);
   }
-
-  // Tag writers
-  const tagWriters = new Map<string, { blockId: string; outputPin: string; kind: SignalKind }>();
-  for (const b of doc.blocks) {
-    if (b.tag && (b.type === 'OUTPUT' || b.type === 'FLAG' || b.type === 'ANALOG_FLAG' || b.type === 'ANALOG_OUTPUT')) {
-      const kind: SignalKind = b.type.startsWith('ANALOG') ? 'analog' : 'digital';
-      tagWriters.set(b.tag, { blockId: b.id, outputPin: 'Q', kind });
-    }
-  }
-
-  // Helper to resolve an input signal expression
-  const resolveInput = (
-    block: CircuitBlock,
-    pinId: string,
-    defaultVal: string = 'false',
-    kind: 'digital' | 'analog' = 'digital'
-  ): string => {
-    const inConn = incomingMap.get(block.id)?.get(pinId);
-    if (inConn) {
-      const srcIdent = sanitizeCppIdent(inConn.fromBlockId);
-      return `sig_${srcIdent}_${inConn.fromPin}`;
-    }
-
-    // Check if block has tag reader
-    if (block.tag && tagWriters.has(block.tag)) {
-      const writer = tagWriters.get(block.tag)!;
-      const srcIdent = sanitizeCppIdent(writer.blockId);
-      return `sig_${srcIdent}_${writer.outputPin}`;
-    }
-
-    return defaultVal;
+  const connected = (block: CircuitBlock, pin: string) => incoming.get(block.id)?.has(pin) ?? false;
+  /** Current value of an input pin: the driving signal, or the engine default for an unwired pin. */
+  const input = (block: CircuitBlock, pin: string): string => {
+    const source = incoming.get(block.id)?.get(pin);
+    if (source) return sig(source.fromBlockId, source.fromPin);
+    const kind = BLOCK_CATALOG[block.type].inputs.find((candidate) => candidate.id === pin)?.kind;
+    return kind === 'analog' ? '0.0f' : 'false';
+  };
+  const num = (block: CircuitBlock, key: string) => {
+    const definition = BLOCK_CATALOG[block.type].parameters.find((parameter) => parameter.key === key);
+    return Number(block.params[key] ?? definition?.defaultValue ?? 0);
   };
 
-  // State instances to declare
-  const statefulDeclarations: string[] = [];
-  const scanDelayBlocks: CircuitBlock[] = [];
-
-  for (const block of sortedBlocks) {
-    const ident = sanitizeCppIdent(block.id);
-    switch (block.type) {
-      case 'TON':
-        statefulDeclarations.push(`TON_Timer timer_${ident};`);
-        break;
-      case 'TOF':
-        statefulDeclarations.push(`TOF_Timer timer_${ident};`);
-        break;
-      case 'PULSE_TIMER':
-      case 'EDGE_PULSE_TIMER':
-        statefulDeclarations.push(`TP_Timer timer_${ident};`);
-        break;
-      case 'ON_OFF_DELAY':
-        statefulDeclarations.push(`ON_OFF_Delay delay_${ident};`);
-        break;
-      case 'RETENTIVE_TON':
-        statefulDeclarations.push(`RetentiveTON rton_${ident};`);
-        break;
-      case 'CLOCK':
-        statefulDeclarations.push(`ClockGen clock_${ident};`);
-        break;
-      case 'R_TRIG':
-        statefulDeclarations.push(`R_Trig rtrig_${ident};`);
-        break;
-      case 'F_TRIG':
-        statefulDeclarations.push(`F_Trig ftrig_${ident};`);
-        break;
-      case 'AND_EDGE':
-      case 'NAND_EDGE':
-        statefulDeclarations.push(`R_Trig edge_${ident};`);
-        break;
-      case 'RS_LATCH':
-        statefulDeclarations.push(`RS_Latch latch_${ident};`);
-        break;
-      case 'PULSE_RELAY':
-        statefulDeclarations.push(`PulseRelay relay_${ident};`);
-        break;
-      case 'COUNTER':
-        statefulDeclarations.push(`UpDownCounter counter_${ident};`);
-        break;
-      case 'ANALOG_DIFFERENTIAL':
-        statefulDeclarations.push(`HysteresisTrigger hyst_${ident};`);
-        break;
-      case 'ANALOG_RAMP':
-        statefulDeclarations.push(`AnalogRamp ramp_${ident};`);
-        break;
-      case 'PI_CONTROLLER':
-      case 'PID_CONTROLLER':
-        statefulDeclarations.push(`PIController pi_${ident};`);
-        break;
-      case 'ANALOG_FILTER':
-        statefulDeclarations.push(`AnalogFilter filter_${ident};`);
-        break;
-      case 'AVERAGE':
-        statefulDeclarations.push(`MovingAverage avg_${ident};`);
-        break;
-      case 'MIN_MAX':
-        statefulDeclarations.push(`MinMaxTracker minmax_${ident};`);
-        break;
-      case 'HOURS_COUNTER':
-        statefulDeclarations.push(`HoursCounter hours_${ident};`);
-        break;
-      case 'SCAN_DELAY':
-        statefulDeclarations.push(`bool scan_delay_${ident} = false;`);
-        scanDelayBlocks.push(block);
-        break;
-      case 'ANALOG_SCAN_DELAY':
-        statefulDeclarations.push(`float scan_delay_${ident} = 0.0f;`);
-        scanDelayBlocks.push(block);
-        break;
-      default:
-        break;
-    }
-  }
-
-  // Pin assignments and constant definitions
+  const globals: string[] = [];
+  const state: string[] = [];
+  const logic: string[] = [];
+  const scanStart: string[] = [];
+  const scanEnd: string[] = [];
   const pinConstants: string[] = [];
-  const pinModeStatements: string[] = [];
-  const telemetryPrintStatements: string[] = [];
+  const pinSetup: string[] = [];
+  const telemetry: string[] = [];
 
-  for (const block of sortedBlocks) {
-    const assignment = config.pinAssignments[block.id];
-    if (!assignment) continue;
-
-    const ident = sanitizeCppIdent(block.id);
-    const constPinName = `PIN_${ident.toUpperCase()}`;
-    const pinRef = formatPinRef(assignment.pinNumber);
-
-    pinConstants.push(`const int ${constPinName} = ${pinRef}; // ${assignment.comment ?? block.label ?? block.type}`);
-
-    if (assignment.mode === 'INPUT_PULLUP') {
-      pinModeStatements.push(`  pinMode(${constPinName}, INPUT_PULLUP);`);
-    } else if (assignment.mode === 'INPUT') {
-      pinModeStatements.push(`  pinMode(${constPinName}, INPUT);`);
-    } else if (assignment.mode === 'OUTPUT') {
-      pinModeStatements.push(`  pinMode(${constPinName}, OUTPUT);`);
-      pinModeStatements.push(`  digitalWrite(${constPinName}, ${assignment.invertLogic ? 'HIGH' : 'LOW'});`);
-    } else if (assignment.mode === 'PWM_OUTPUT') {
-      pinModeStatements.push(`  pinMode(${constPinName}, OUTPUT);`);
+  // Signal globals with the engine's initial values.
+  for (const block of doc.blocks) {
+    const definition = BLOCK_CATALOG[block.type];
+    for (const pin of definition.outputs) {
+      if (pin.kind === 'text') continue;
+      let initial = pin.kind === 'analog' ? '0.0f' : 'false';
+      if (block.type === 'COUNTER' && pin.id === 'Q') initial = num(block, 'limit') <= 0 ? 'true' : 'false';
+      globals.push(`${pin.kind === 'analog' ? 'float' : 'bool '} ${sig(block.id, pin.id)} = ${initial};`);
     }
   }
 
-  // Build the code lines for step 2 (logic evaluation)
-  const logicLines: string[] = [];
-
-  for (const block of sortedBlocks) {
-    const ident = sanitizeCppIdent(block.id);
+  for (const block of blocks) {
+    const ident = id(block.id);
+    const Q = sig(block.id, 'Q');
+    const A = () => input(block, 'A');
+    const B = () => input(block, 'B');
     const assignment = config.pinAssignments[block.id];
-    const def = BLOCK_CATALOG[block.type];
-
-    logicLines.push(`    // [${block.type}] ${block.label ? `"${block.label}"` : block.id}`);
+    const pinConst = `PIN_${ident.toUpperCase()}`;
+    const emitPin = () => {
+      if (!assignment?.pinNumber) return false;
+      pinConstants.push(`const int ${pinConst} = ${assignment.pinNumber}; // ${cComment(assignment.comment || block.label || block.id)}`);
+      return true;
+    };
+    logic.push(`  // ${block.type} ${cComment(block.label ? `"${block.label}"` : block.id)}`);
 
     switch (block.type) {
-      case 'INPUT': {
-        const pinConst = `PIN_${ident.toUpperCase()}`;
-        if (assignment) {
-          const inv = assignment.invertLogic;
-          // Invert logic: reading LOW when pressed with INPUT_PULLUP yields true!
-          logicLines.push(`    bool sig_${ident}_Q = (digitalRead(${pinConst}) == ${inv ? 'LOW' : 'HIGH'});`);
-        } else {
-          // Unassigned fallback: defaults to static value or false
-          const val = block.value ? 'true' : 'false';
-          logicLines.push(`    bool sig_${ident}_Q = ${val}; // Pin unassigned, default value`);
-        }
-        break;
-      }
-
-      case 'NC_INPUT': {
-        const pinConst = `PIN_${ident.toUpperCase()}`;
-        if (assignment) {
-          const inv = assignment.invertLogic;
-          logicLines.push(`    bool sig_${ident}_Q = (digitalRead(${pinConst}) == ${inv ? 'LOW' : 'HIGH'});`);
-        } else {
-          logicLines.push(`    bool sig_${ident}_Q = ${block.value ? 'true' : 'false'};`);
-        }
-        break;
-      }
-
-      case 'HIGH':
-        logicLines.push(`    bool sig_${ident}_Q = true;`);
-        break;
-
-      case 'LOW':
-        logicLines.push(`    bool sig_${ident}_Q = false;`);
-        break;
-
-      case 'FLAG': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = ${inA};`);
-        break;
-      }
-
-      case 'OUTPUT': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = ${inA};`);
-        if (assignment) {
-          const pinConst = `PIN_${ident.toUpperCase()}`;
-          const inv = assignment.invertLogic;
-          logicLines.push(`    digitalWrite(${pinConst}, sig_${ident}_Q ? ${inv ? 'LOW' : 'HIGH'} : ${inv ? 'HIGH' : 'LOW'});`);
-        }
-        break;
-      }
-
+      case 'INPUT':
+      case 'NC_INPUT':
       case 'ANALOG_INPUT': {
-        if (assignment) {
-          const pinConst = `PIN_${ident.toUpperCase()}`;
-          const minVal = Number(block.params.min ?? 0);
-          const maxVal = Number(block.params.max ?? 100);
-          const adcMax = preset.adcMaxRaw;
-          logicLines.push(`    int raw_${ident} = analogRead(${pinConst});`);
-          logicLines.push(`    float sig_${ident}_Q = ((float)raw_${ident} / ${adcMax}.0f) * (${maxVal.toFixed(2)}f - ${minVal.toFixed(2)}f) + ${minVal.toFixed(2)}f;`);
+        const writer = tagWriterFor(doc, block);
+        const invert = block.type === 'NC_INPUT' ? '!' : '';
+        if (writer) {
+          logic.push(`  ${Q} = ${invert}${sig(writer.id, 'Q')}; // tag "${cComment(block.tag ?? '')}"`);
+        } else if (block.type === 'ANALOG_INPUT') {
+          if (emitPin()) {
+            const lo = assignment!.scaleMin ?? 0;
+            const hi = assignment!.scaleMax ?? 100;
+            pinSetup.push(`  pinMode(${pinConst}, INPUT);`);
+            logic.push(`  ${Q} = (float)analogRead(${pinConst}) / ${f(preset.adcMaxRaw)} * (${f(hi)} - ${f(lo)}) + ${f(lo)};`);
+          } else {
+            logic.push(`  ${Q} = ${f(block.value ?? block.params.value ?? 0)}; // no pin: fixed value`);
+          }
+        } else if (emitPin()) {
+          pinSetup.push(`  pinMode(${pinConst}, ${assignment!.mode === 'INPUT' ? 'INPUT' : 'INPUT_PULLUP'});`);
+          logic.push(`  ${Q} = ${invert}(digitalRead(${pinConst}) == ${assignment!.invertLogic ? 'LOW' : 'HIGH'}); // pressed = ${assignment!.invertLogic ? 'LOW' : 'HIGH'}`);
         } else {
-          const defaultVal = Number(block.value ?? block.params.value ?? 0);
-          logicLines.push(`    float sig_${ident}_Q = ${defaultVal.toFixed(2)}f; // Pin unassigned`);
+          logic.push(`  ${Q} = ${invert}${block.value === true ? 'true' : 'false'}; // no pin: fixed value`);
         }
+        if (isReader(block.type)) telemetry.push(`  Serial.print(F(" ${cString(block.label || block.id)}=")); Serial.print(${block.type === 'ANALOG_INPUT' ? `${Q}, 2` : `${Q} ? F("ON") : F("OFF")`});`);
         break;
       }
-
+      case 'OUTPUT':
       case 'ANALOG_OUTPUT': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const minVal = Number(block.params.min ?? 0);
-        const maxVal = Number(block.params.max ?? 100);
-        logicLines.push(`    float sig_${ident}_Q = ${inA};`);
-        if (assignment) {
-          const pinConst = `PIN_${ident.toUpperCase()}`;
-          logicLines.push(`    int pwm_${ident} = (int)constrain(((sig_${ident}_Q - ${minVal.toFixed(2)}f) / (${maxVal.toFixed(2)}f - ${minVal.toFixed(2)}f)) * 255.0f, 0, 255);`);
-          logicLines.push(`    analogWrite(${pinConst}, pwm_${ident});`);
-        }
-        break;
-      }
-
-      case 'ANALOG_FLAG': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        logicLines.push(`    float sig_${ident}_Q = ${inA};`);
-        break;
-      }
-
-      case 'ANALOG_CONSTANT': {
-        const val = Number(block.params.value ?? 0);
-        logicLines.push(`    float sig_${ident}_Q = ${val.toFixed(2)}f;`);
-        break;
-      }
-
-      case 'AND': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        const inC = incomingMap.get(block.id)?.has('C') ? resolveInput(block, 'C', 'true', 'digital') : null;
-        const inD = incomingMap.get(block.id)?.has('D') ? resolveInput(block, 'D', 'true', 'digital') : null;
-        let expr = `(${inA} && ${inB})`;
-        if (inC) expr += ` && ${inC}`;
-        if (inD) expr += ` && ${inD}`;
-        logicLines.push(`    bool sig_${ident}_Q = ${expr};`);
-        break;
-      }
-
-      case 'OR': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        const inC = incomingMap.get(block.id)?.has('C') ? resolveInput(block, 'C', 'false', 'digital') : null;
-        const inD = incomingMap.get(block.id)?.has('D') ? resolveInput(block, 'D', 'false', 'digital') : null;
-        let expr = `(${inA} || ${inB})`;
-        if (inC) expr += ` || ${inC}`;
-        if (inD) expr += ` || ${inD}`;
-        logicLines.push(`    bool sig_${ident}_Q = ${expr};`);
-        break;
-      }
-
-      case 'NOT': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = !(${inA});`);
-        break;
-      }
-
-      case 'XOR': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = ((${inA}) != (${inB}));`);
-        break;
-      }
-
-      case 'NAND': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = !(${inA} && ${inB});`);
-        break;
-      }
-
-      case 'NOR': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = !(${inA} || ${inB});`);
-        break;
-      }
-
-      case 'XNOR': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    bool sig_${ident}_Q = ((${inA}) == (${inB}));`);
-        break;
-      }
-
-      case 'AND_EDGE': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    edge_${ident}.update(${inA} && ${inB});`);
-        logicLines.push(`    bool sig_${ident}_Q = edge_${ident}.Q;`);
-        break;
-      }
-
-      case 'NAND_EDGE': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inB = resolveInput(block, 'B', 'false', 'digital');
-        logicLines.push(`    edge_${ident}.update(!(${inA} && ${inB}));`);
-        logicLines.push(`    bool sig_${ident}_Q = edge_${ident}.Q;`);
-        break;
-      }
-
-      case 'RS_LATCH': {
-        const inS = resolveInput(block, 'S', 'false', 'digital');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        logicLines.push(`    latch_${ident}.update(${inS}, ${inR});`);
-        logicLines.push(`    bool sig_${ident}_Q = latch_${ident}.Q;`);
-        logicLines.push(`    bool sig_${ident}_nQ = !latch_${ident}.Q;`);
-        break;
-      }
-
-      case 'PULSE_RELAY': {
-        const inTrig = resolveInput(block, 'Trig', 'false', 'digital');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        logicLines.push(`    relay_${ident}.update(${inTrig}, ${inR});`);
-        logicLines.push(`    bool sig_${ident}_Q = relay_${ident}.Q;`);
-        break;
-      }
-
-      case 'R_TRIG': {
-        const inClk = resolveInput(block, 'CLK', 'false', 'digital');
-        logicLines.push(`    rtrig_${ident}.update(${inClk});`);
-        logicLines.push(`    bool sig_${ident}_Q = rtrig_${ident}.Q;`);
-        break;
-      }
-
-      case 'F_TRIG': {
-        const inClk = resolveInput(block, 'CLK', 'false', 'digital');
-        logicLines.push(`    ftrig_${ident}.update(${inClk});`);
-        logicLines.push(`    bool sig_${ident}_Q = ftrig_${ident}.Q;`);
-        break;
-      }
-
-      case 'TON': {
-        const inIN = incomingMap.get(block.id)?.has('A')
-          ? resolveInput(block, 'A', 'false', 'digital')
-          : resolveInput(block, 'IN', 'false', 'digital');
-        const ptMs = Number(block.params.duration ?? block.params.PT ?? 1000);
-        logicLines.push(`    timer_${ident}.update(${inIN}, ${ptMs}UL, now);`);
-        logicLines.push(`    bool sig_${ident}_Q = timer_${ident}.Q;`);
-        logicLines.push(`    unsigned long sig_${ident}_ET = timer_${ident}.ET;`);
-        break;
-      }
-
-      case 'TOF': {
-        const inIN = incomingMap.get(block.id)?.has('A')
-          ? resolveInput(block, 'A', 'false', 'digital')
-          : resolveInput(block, 'IN', 'false', 'digital');
-        const ptMs = Number(block.params.duration ?? block.params.PT ?? 1000);
-        logicLines.push(`    timer_${ident}.update(${inIN}, ${ptMs}UL, now);`);
-        logicLines.push(`    bool sig_${ident}_Q = timer_${ident}.Q;`);
-        logicLines.push(`    unsigned long sig_${ident}_ET = timer_${ident}.ET;`);
-        break;
-      }
-
-      case 'PULSE_TIMER':
-      case 'EDGE_PULSE_TIMER': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const ptMs = Number(block.params.duration ?? 1000);
-        logicLines.push(`    timer_${ident}.update(${inA}, ${ptMs}UL, now);`);
-        logicLines.push(`    bool sig_${ident}_Q = timer_${ident}.Q;`);
-        logicLines.push(`    unsigned long sig_${ident}_ET = timer_${ident}.ET;`);
-        break;
-      }
-
-      case 'ON_OFF_DELAY': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const onMs = Number(block.params.onDelay ?? 1000);
-        const offMs = Number(block.params.offDelay ?? 1000);
-        logicLines.push(`    delay_${ident}.update(${inA}, ${onMs}UL, ${offMs}UL, now);`);
-        logicLines.push(`    bool sig_${ident}_Q = delay_${ident}.Q;`);
-        break;
-      }
-
-      case 'RETENTIVE_TON': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        const ptMs = Number(block.params.duration ?? 1000);
-        logicLines.push(`    rton_${ident}.update(${inA}, ${inR}, ${ptMs}UL, dt);`);
-        logicLines.push(`    bool sig_${ident}_Q = rton_${ident}.Q;`);
-        logicLines.push(`    unsigned long sig_${ident}_ET = rton_${ident}.ET;`);
-        break;
-      }
-
-      case 'CLOCK': {
-        const periodMs = Number(block.params.period ?? 1000);
-        logicLines.push(`    clock_${ident}.update(${periodMs}UL, now);`);
-        logicLines.push(`    bool sig_${ident}_Q = clock_${ident}.state;`);
-        break;
-      }
-
-      case 'COUNTER': {
-        const inCU = resolveInput(block, 'CU', 'false', 'digital');
-        const inCD = resolveInput(block, 'CD', 'false', 'digital');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        const inLD = resolveInput(block, 'LD', 'false', 'digital');
-        const limitVal = Number(block.params.limit ?? 10);
-        logicLines.push(`    counter_${ident}.update(${inCU}, ${inCD}, ${inR}, ${inLD}, ${limitVal}L);`);
-        logicLines.push(`    bool sig_${ident}_Q = counter_${ident}.Q;`);
-        logicLines.push(`    long sig_${ident}_CV = counter_${ident}.CV;`);
-        break;
-      }
-
-      case 'MATH': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const inB = resolveInput(block, 'B', '0.0f', 'analog');
-        const op = String(block.params.operation ?? 'ADD');
-        let expr = `(${inA} + ${inB})`;
-        if (op === 'SUB') expr = `(${inA} - ${inB})`;
-        else if (op === 'MUL') expr = `(${inA} * ${inB})`;
-        else if (op === 'DIV') expr = `(${inB} != 0.0f ? (${inA} / ${inB}) : 0.0f)`;
-        else if (op === 'MOD') expr = `((long)${inB} != 0 ? ((long)${inA} % (long)${inB}) : 0)`;
-        else if (op === 'MIN') expr = `min(${inA}, ${inB})`;
-        else if (op === 'MAX') expr = `max(${inA}, ${inB})`;
-        else if (op === 'ABS') expr = `abs(${inA})`;
-        logicLines.push(`    float sig_${ident}_Q = (float)(${expr});`);
-        break;
-      }
-
-      case 'ANALOG_COMPARATOR': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const inB = resolveInput(block, 'B', '0.0f', 'analog');
-        const op = String(block.params.operator ?? 'GT');
-        let cond = `${inA} > ${inB}`;
-        if (op === 'GE') cond = `${inA} >= ${inB}`;
-        else if (op === 'EQ') cond = `abs(${inA} - ${inB}) < 0.0001f`;
-        else if (op === 'LE') cond = `${inA} <= ${inB}`;
-        else if (op === 'LT') cond = `${inA} < ${inB}`;
-        else if (op === 'NE') cond = `abs(${inA} - ${inB}) >= 0.0001f`;
-        logicLines.push(`    bool sig_${ident}_Q = (${cond});`);
-        break;
-      }
-
-      case 'ANALOG_THRESHOLD': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const low = Number(block.params.lowThreshold ?? 0);
-        const high = Number(block.params.highThreshold ?? 100);
-        logicLines.push(`    bool sig_${ident}_Q = (${inA} >= ${low.toFixed(2)}f && ${inA} <= ${high.toFixed(2)}f);`);
-        break;
-      }
-
-      case 'ANALOG_AMPLIFIER': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const gain = Number(block.params.gain ?? 1.0);
-        const offset = Number(block.params.offset ?? 0.0);
-        logicLines.push(`    float sig_${ident}_Q = (${inA}) * ${gain.toFixed(4)}f + ${offset.toFixed(4)}f;`);
-        break;
-      }
-
-      case 'ANALOG_MUX': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const inB = resolveInput(block, 'B', '0.0f', 'analog');
-        const inS = resolveInput(block, 'S', 'false', 'digital');
-        logicLines.push(`    float sig_${ident}_Q = (${inS}) ? (${inB}) : (${inA});`);
-        break;
-      }
-
-      case 'ANALOG_DIFFERENTIAL': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const onThresh = Number(block.params.onThreshold ?? 50);
-        const offThresh = Number(block.params.offThreshold ?? 20);
-        logicLines.push(`    hyst_${ident}.update(${inA}, ${onThresh.toFixed(2)}f, ${offThresh.toFixed(2)}f);`);
-        logicLines.push(`    bool sig_${ident}_Q = hyst_${ident}.Q;`);
-        break;
-      }
-
-      case 'ANALOG_RAMP': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const rise = Number(block.params.riseRate ?? 10.0);
-        const fall = Number(block.params.fallRate ?? 10.0);
-        logicLines.push(`    ramp_${ident}.update(${inA}, ${rise.toFixed(2)}f, ${fall.toFixed(2)}f, (float)dt / 1000.0f);`);
-        logicLines.push(`    float sig_${ident}_Q = ramp_${ident}.current;`);
-        break;
-      }
-
-      case 'PI_CONTROLLER':
-      case 'PID_CONTROLLER': {
-        const inSP = resolveInput(block, 'SP', '0.0f', 'analog');
-        const inPV = resolveInput(block, 'PV', '0.0f', 'analog');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        const kp = Number(block.params.kp ?? 1.0);
-        const ki = Number(block.params.ki ?? 0.1);
-        const minOut = Number(block.params.min ?? 0.0);
-        const maxOut = Number(block.params.max ?? 100.0);
-        logicLines.push(`    float sig_${ident}_Q = pi_${ident}.update(${inSP}, ${inPV}, ${kp.toFixed(4)}f, ${ki.toFixed(4)}f, ${minOut.toFixed(2)}f, ${maxOut.toFixed(2)}f, (float)dt / 1000.0f, ${inR});`);
-        break;
-      }
-
-      case 'ANALOG_FILTER': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const tc = Number(block.params.timeConstant ?? 500);
-        logicLines.push(`    filter_${ident}.update(${inA}, ${tc.toFixed(2)}f, (float)dt);`);
-        logicLines.push(`    float sig_${ident}_Q = filter_${ident}.filtered;`);
-        break;
-      }
-
-      case 'AVERAGE': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        logicLines.push(`    avg_${ident}.update(${inA});`);
-        logicLines.push(`    float sig_${ident}_Q = avg_${ident}.average;`);
-        break;
-      }
-
-      case 'MIN_MAX': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        logicLines.push(`    minmax_${ident}.update(${inA}, ${inR});`);
-        logicLines.push(`    float sig_${ident}_MIN = minmax_${ident}.minVal;`);
-        logicLines.push(`    float sig_${ident}_MAX = minmax_${ident}.maxVal;`);
-        break;
-      }
-
-      case 'FLOAT_TO_INT': {
-        const inA = resolveInput(block, 'A', '0.0f', 'analog');
-        logicLines.push(`    long sig_${ident}_Q = (long)round(${inA});`);
-        break;
-      }
-
-      case 'INT_TO_FLOAT': {
-        const inA = resolveInput(block, 'A', '0', 'analog');
-        logicLines.push(`    float sig_${ident}_Q = (float)(${inA});`);
-        break;
-      }
-
-      case 'SCAN_DELAY': {
-        // Output is the previous scan cycle's value!
-        logicLines.push(`    bool sig_${ident}_Q = scan_delay_${ident};`);
-        break;
-      }
-
-      case 'ANALOG_SCAN_DELAY': {
-        logicLines.push(`    float sig_${ident}_Q = scan_delay_${ident};`);
-        break;
-      }
-
-      case 'HOURS_COUNTER': {
-        const inA = resolveInput(block, 'A', 'false', 'digital');
-        const inR = resolveInput(block, 'R', 'false', 'digital');
-        const limitVal = Number(block.params.limit ?? 100);
-        logicLines.push(`    hours_${ident}.update(${inA}, ${inR}, dt, ${limitVal}.0f);`);
-        logicLines.push(`    bool sig_${ident}_Q = hours_${ident}.Q;`);
-        logicLines.push(`    float sig_${ident}_CV = hours_${ident}.hours;`);
-        break;
-      }
-
-      case 'OPEN_CONNECTOR':
-        // No-op
-        break;
-
-      default: {
-        // Safe generic fallback for any other block
-        const kind = def?.outputs[0]?.kind ?? 'digital';
-        if (kind === 'analog') {
-          logicLines.push(`    float sig_${ident}_Q = 0.0f; // Unsupported block fallback`);
-        } else {
-          logicLines.push(`    bool sig_${ident}_Q = false; // Unsupported block fallback`);
-        }
-        break;
-      }
-    }
-
-    // Telemetry print item
-    const isOut = block.type === 'OUTPUT' || block.type === 'ANALOG_OUTPUT';
-    const isIn = block.type === 'INPUT' || block.type === 'NC_INPUT' || block.type === 'ANALOG_INPUT';
-    if (isOut || isIn) {
-      const label = block.label || block.id;
-      const isAnalog = block.type.includes('ANALOG');
-      telemetryPrintStatements.push(`    Serial.print(F(" ${label}="));`);
-      if (isAnalog) {
-        telemetryPrintStatements.push(`    Serial.print(sig_${ident}_Q, 2);`);
-      } else {
-        telemetryPrintStatements.push(`    Serial.print(sig_${ident}_Q ? F("ON") : F("OFF"));`);
-      }
-    }
-  }
-
-  // Update scan delay values for the subsequent scan
-  const scanDelayUpdates: string[] = [];
-  for (const block of scanDelayBlocks) {
-    const ident = sanitizeCppIdent(block.id);
-    const inA = resolveInput(block, 'A', block.type === 'SCAN_DELAY' ? 'false' : '0.0f', block.type === 'SCAN_DELAY' ? 'digital' : 'analog');
-    scanDelayUpdates.push(`    scan_delay_${ident} = ${inA};`);
-  }
-
-  // Generate complete sketch text
-  return `/*
- * =====================================================================
- *  AutomationHub - Standalone PLC Sketch for Arduino
- * =====================================================================
- *  Circuit Name: ${doc.name || 'Untitled Circuit'}
- *  Target Board: ${preset.name}
- *  Scan Cycle:   ${config.scanCycleMs} ms (deterministic non-blocking timing)
- *  Telemetry:    ${config.enableSerialTelemetry ? `Enabled @ ${preset.defaultBaudRate} baud` : 'Disabled'}
- *  Generated by: AutomationHub Studio
- *
- *  HARDWARE WIRING DIRECTORY:
-${Object.entries(config.pinAssignments)
-  .map(([bId, a]) => {
-    const b = doc.blocks.find(item => item.id === bId);
-    return ` *    Pin ${a.pinNumber.padEnd(5)} -> [${b?.type ?? 'IO'}] "${a.comment || b?.label || bId}" (${a.mode}${a.invertLogic ? ', inverted' : ''})`;
-  })
-  .join('\n')}
- * =====================================================================
- */
-
-#define ENABLE_SERIAL_TELEMETRY ${config.enableSerialTelemetry ? '1' : '0'}
-#define SCAN_CYCLE_MS           ${config.scanCycleMs}UL
-#define TELEMETRY_INTERVAL_MS   ${config.telemetryIntervalMs}UL
-
-// ---------------------------------------------------------------------
-// HARDWARE PIN ASSIGNMENTS
-// ---------------------------------------------------------------------
-${pinConstants.length > 0 ? pinConstants.join('\n') : '// No physical I/O blocks assigned.'}
-
-// ---------------------------------------------------------------------
-// ZERO-DEPENDENCY INDUSTRIAL PLC RUNTIME STRUCTS
-// ---------------------------------------------------------------------
-
-// On-Delay Timer (TON)
-struct TON_Timer {
-  unsigned long startTime = 0;
-  bool running = false;
-  bool Q = false;
-  unsigned long ET = 0;
-  void update(bool IN, unsigned long PT, unsigned long now) {
-    if (IN) {
-      if (!running) {
-        running = true;
-        startTime = now;
-        ET = 0;
-      } else {
-        ET = now - startTime;
-        if (ET >= PT) {
-          ET = PT;
-          Q = true;
-        }
-      }
-    } else {
-      running = false;
-      Q = false;
-      ET = 0;
-    }
-  }
-};
-
-// Off-Delay Timer (TOF)
-struct TOF_Timer {
-  unsigned long startTime = 0;
-  bool running = false;
-  bool Q = false;
-  unsigned long ET = 0;
-  void update(bool IN, unsigned long PT, unsigned long now) {
-    if (IN) {
-      Q = true;
-      running = false;
-      ET = 0;
-    } else {
-      if (Q) {
-        if (!running) {
-          running = true;
-          startTime = now;
-          ET = 0;
-        } else {
-          ET = now - startTime;
-          if (ET >= PT) {
-            ET = PT;
-            Q = false;
-            running = false;
+        const analog = block.type === 'ANALOG_OUTPUT';
+        logic.push(`  ${Q} = ${A()};`);
+        if (emitPin()) {
+          pinSetup.push(`  pinMode(${pinConst}, OUTPUT);`);
+          if (analog) {
+            const lo = assignment!.scaleMin ?? 0;
+            const hi = assignment!.scaleMax ?? 100;
+            logic.push(`  analogWrite(${pinConst}, (int)constrain((${Q} - ${f(lo)}) / (${f(hi)} - ${f(lo)}) * 255.0f, 0.0f, 255.0f));`);
+          } else {
+            const on = assignment!.invertLogic ? 'LOW' : 'HIGH';
+            const off = assignment!.invertLogic ? 'HIGH' : 'LOW';
+            pinSetup.push(`  digitalWrite(${pinConst}, ${off});`);
+            logic.push(`  digitalWrite(${pinConst}, ${Q} ? ${on} : ${off});`);
           }
         }
+        telemetry.push(`  Serial.print(F(" ${cString(block.label || block.id)}=")); Serial.print(${analog ? `${Q}, 2` : `${Q} ? F("ON") : F("OFF")`});`);
+        break;
       }
+      case 'FLAG':
+      case 'ANALOG_FLAG':
+        logic.push(`  ${Q} = ${A()};`);
+        break;
+      case 'HIGH':
+        logic.push(`  ${Q} = true;`);
+        break;
+      case 'LOW':
+        logic.push(`  ${Q} = false;`);
+        break;
+      case 'ANALOG_CONSTANT':
+        logic.push(`  ${Q} = ${f(block.value ?? block.params.value ?? 0)};`);
+        break;
+      case 'AND': logic.push(`  ${Q} = ${A()} && ${B()};`); break;
+      case 'OR': logic.push(`  ${Q} = ${A()} || ${B()};`); break;
+      case 'NOT': logic.push(`  ${Q} = !${A()};`); break;
+      case 'XOR': logic.push(`  ${Q} = ${A()} != ${B()};`); break;
+      case 'NAND': logic.push(`  ${Q} = !(${A()} && ${B()});`); break;
+      case 'NOR': logic.push(`  ${Q} = !(${A()} || ${B()});`); break;
+      case 'XNOR': logic.push(`  ${Q} = ${A()} == ${B()};`); break;
+      case 'AND_EDGE':
+      case 'NAND_EDGE': {
+        state.push(`bool last_${ident} = false;`);
+        const result = block.type === 'AND_EDGE' ? `(${A()} && ${B()})` : `!(${A()} && ${B()})`;
+        logic.push(`  { bool r = ${result}; ${Q} = r && !last_${ident}; last_${ident} = r; }`);
+        break;
+      }
+      case 'RS_LATCH':
+        logic.push(`  ${Q} = ${input(block, 'R')} ? false : (${input(block, 'S')} || ${Q});`);
+        break;
+      case 'PULSE_RELAY':
+        state.push(`bool last_${ident} = false;`);
+        logic.push(`  if (${A()} && !last_${ident}) ${Q} = !${Q};`, `  last_${ident} = ${A()};`);
+        break;
+      case 'R_TRIG':
+      case 'F_TRIG':
+        state.push(`bool last_${ident} = false;`);
+        logic.push(
+          block.type === 'R_TRIG' ? `  ${Q} = ${A()} && !last_${ident};` : `  ${Q} = !${A()} && last_${ident};`,
+          `  last_${ident} = ${A()};`,
+        );
+        break;
+      case 'TON':
+        state.push(`TON_Timer ton_${ident};`);
+        logic.push(`  ton_${ident}.update(${A()}, ${ul(num(block, 'duration'))}, dt);`, `  ${Q} = ton_${ident}.Q;`, `  ${sig(block.id, 'ET')} = (float)ton_${ident}.ET;`);
+        break;
+      case 'TOF':
+        state.push(`TOF_Timer tof_${ident};`);
+        logic.push(`  tof_${ident}.update(${A()}, ${ul(num(block, 'duration'))}, dt);`, `  ${Q} = tof_${ident}.Q;`, `  ${sig(block.id, 'ET')} = (float)tof_${ident}.ET;`);
+        break;
+      case 'ON_OFF_DELAY':
+        state.push(`OnOffDelay onoff_${ident};`);
+        logic.push(
+          `  onoff_${ident}.update(${A()}, ${ul(num(block, 'onDelay'))}, ${ul(num(block, 'offDelay'))}, dt);`,
+          `  ${Q} = onoff_${ident}.Q;`,
+          `  ${sig(block.id, 'ET')} = (float)onoff_${ident}.ET;`,
+        );
+        break;
+      case 'RETENTIVE_TON':
+        state.push(`RetentiveTON rton_${ident};`);
+        logic.push(`  rton_${ident}.update(${A()}, ${input(block, 'R')}, ${ul(num(block, 'duration'))}, dt);`, `  ${Q} = rton_${ident}.Q;`, `  ${sig(block.id, 'ET')} = (float)rton_${ident}.ET;`);
+        break;
+      case 'PULSE_TIMER':
+      case 'EDGE_PULSE_TIMER': {
+        const edge = block.type === 'EDGE_PULSE_TIMER';
+        state.push(`PulseTimer tp_${ident};`);
+        logic.push(`  tp_${ident}.update(${A()}, ${edge ? input(block, 'R') : 'false'}, ${edge ? 'true' : 'false'}, ${ul(num(block, 'duration'))}, dt);`, `  ${Q} = tp_${ident}.Q;`);
+        break;
+      }
+      case 'CLOCK':
+        state.push(`unsigned long phase_${ident} = 0;`);
+        logic.push(
+          `  phase_${ident} = (phase_${ident} + dt) % (${ul(num(block, 'onTime'))} + ${ul(num(block, 'offTime'))});`,
+          `  ${Q} = phase_${ident} >= ${ul(num(block, 'offTime'))};`,
+        );
+        break;
+      case 'STOPWATCH':
+        state.push(`unsigned long elapsed_${ident} = 0;`);
+        logic.push(`  if (${input(block, 'R')}) elapsed_${ident} = 0; else if (${A()}) elapsed_${ident} += dt;`, `  ${sig(block.id, 'ET')} = (float)elapsed_${ident};`);
+        break;
+      case 'COUNTER':
+        state.push(`long count_${ident} = 0;`, `bool lastCU_${ident} = false;`, `bool lastCD_${ident} = false;`);
+        logic.push(
+          `  { bool cu = ${input(block, 'CU')}; bool cd = ${input(block, 'CD')};`,
+          `    if (${input(block, 'R')}) count_${ident} = 0; else count_${ident} += (cu && !lastCU_${ident} ? 1 : 0) - (cd && !lastCD_${ident} ? 1 : 0);`,
+          `    lastCU_${ident} = cu; lastCD_${ident} = cd; }`,
+          `  ${sig(block.id, 'CV')} = (float)count_${ident};`,
+          `  ${Q} = count_${ident} >= ${Math.round(num(block, 'limit'))}L;`,
+        );
+        break;
+      case 'HOURS_COUNTER':
+        state.push(`unsigned long runMs_${ident} = 0;`);
+        logic.push(
+          `  if (${input(block, 'R')}) runMs_${ident} = 0; else if (${A()}) runMs_${ident} += dt;`,
+          `  ${sig(block.id, 'CV')} = (float)runMs_${ident} / 3600000.0f;`,
+          `  ${Q} = ${sig(block.id, 'CV')} >= ${f(num(block, 'limit'))};`,
+        );
+        break;
+      case 'MATH': {
+        const op = String(block.params.operation ?? 'add');
+        const a = input(block, 'A');
+        const b = input(block, 'B');
+        const expr =
+          op === 'subtract' ? `${a} - ${b}` : op === 'multiply' ? `${a} * ${b}` : op === 'divide' ? `(${b} == 0.0f ? 0.0f : ${a} / ${b})` : `${a} + ${b}`;
+        logic.push(`  ${Q} = ah_finite(${expr});`);
+        break;
+      }
+      case 'ANALOG_COMPARATOR': {
+        const ops: Record<string, string> = { gt: '>', gte: '>=', lt: '<', lte: '<=', eq: '==', ne: '!=' };
+        logic.push(`  ${Q} = ${input(block, 'A')} ${ops[String(block.params.operation)] ?? '>'} ${input(block, 'B')};`);
+        break;
+      }
+      case 'ANALOG_THRESHOLD':
+        logic.push(`  ${Q} = ${A()} >= ${f(num(block, 'threshold'))};`);
+        break;
+      case 'ANALOG_AMPLIFIER':
+        logic.push(`  ${Q} = ah_finite(${A()} * ${f(num(block, 'gain'))} + ${f(num(block, 'offset'))});`);
+        break;
+      case 'ANALOG_MUX':
+        logic.push(`  ${Q} = ${input(block, 'S')} ? ${input(block, 'B')} : ${input(block, 'A')};`);
+        break;
+      case 'FLOAT_TO_INT':
+        logic.push(`  ${Q} = trunc(${A()});`);
+        break;
+      case 'INT_TO_FLOAT':
+        logic.push(`  ${Q} = ${A()};`);
+        break;
+      case 'ANALOG_WATCHDOG':
+        state.push(`bool lastEN_${ident} = false;`, `float ref_${ident} = 0.0f;`, `bool hasRef_${ident} = false;`);
+        logic.push(
+          `  { bool en = ${input(block, 'EN')}; float a = ${A()};`,
+          `    if (en && !lastEN_${ident}) { ref_${ident} = a; hasRef_${ident} = true; }`,
+          `    lastEN_${ident} = en;`,
+          `    ${Q} = en && fabs(a - (hasRef_${ident} ? ref_${ident} : a)) > ${f(num(block, 'tolerance'))}; }`,
+        );
+        break;
+      case 'ANALOG_DIFFERENTIAL': {
+        const on = num(block, 'onThreshold');
+        const off = num(block, 'offThreshold');
+        logic.push(
+          on <= off
+            ? `  if (${A()} <= ${f(on)}) ${Q} = true; else if (${A()} >= ${f(off)}) ${Q} = false; // low trigger`
+            : `  if (${A()} >= ${f(on)}) ${Q} = true; else if (${A()} <= ${f(off)}) ${Q} = false; // high trigger`,
+        );
+        break;
+      }
+      case 'ANALOG_RAMP':
+        state.push(`bool init_${ident} = false;`);
+        logic.push(
+          `  { float target = ${A()}; if (!init_${ident}) { ${Q} = target; init_${ident} = true; }`,
+          `    if (target > ${Q}) ${Q} = ah_min(target, ${Q} + ${f(num(block, 'riseRate'))} * (float)dt / 1000.0f);`,
+          `    else if (target < ${Q}) ${Q} = ah_max(target, ${Q} - ${f(num(block, 'fallRate'))} * (float)dt / 1000.0f); }`,
+        );
+        break;
+      case 'PI_CONTROLLER':
+        state.push(`float integral_${ident} = 0.0f;`);
+        logic.push(
+          `  { float e = ${input(block, 'SP')} - ${input(block, 'PV')}; float p = ${f(num(block, 'kp'))} * e;`,
+          `    float i = ${input(block, 'R')} ? 0.0f : integral_${ident} + ${f(num(block, 'ki'))} * e * (float)dt / 1000.0f;`,
+          `    i = ah_max(${f(num(block, 'min'))} - p, ah_min(${f(num(block, 'max'))} - p, i));`,
+          `    integral_${ident} = i;`,
+          `    ${Q} = ah_finite(ah_max(${f(num(block, 'min'))}, ah_min(${f(num(block, 'max'))}, p + i))); }`,
+        );
+        break;
+      case 'PID_CONTROLLER': {
+        const CV = sig(block.id, 'CV');
+        state.push(`float integral_${ident} = 0.0f;`, `float lastError_${ident} = 0.0f;`);
+        logic.push(
+          `  if (!${connected(block, 'EN') ? input(block, 'EN') : 'true'}) { integral_${ident} = 0.0f; lastError_${ident} = 0.0f; ${CV} = 0.0f; }`,
+          `  else { float e = ${input(block, 'SP')} - ${input(block, 'PV')}; float dts = (float)dt / 1000.0f;`,
+          `    float cv = ${f(num(block, 'kp'))} * e + ${f(num(block, 'ki'))} * integral_${ident} + ${f(num(block, 'kd'))} * (dts > 0.0f ? (e - lastError_${ident}) / dts : 0.0f);`,
+          `    if (cv > ${f(num(block, 'max'))}) cv = ${f(num(block, 'max'))}; else if (cv < ${f(num(block, 'min'))}) cv = ${f(num(block, 'min'))}; else integral_${ident} += e * dts;`,
+          `    lastError_${ident} = e; ${CV} = ah_finite(cv); }`,
+        );
+        break;
+      }
+      case 'PWM':
+        if (num(block, 'period') <= 0) {
+          logic.push(`  ${Q} = false; // period 0: no pulses (same as the simulator)`);
+          break;
+        }
+        state.push(`unsigned long phase_${ident} = 0;`);
+        logic.push(
+          `  { float duty = ah_max(0.0f, ah_min(100.0f, ${A()})); phase_${ident} = (phase_${ident} + dt) % ${ul(num(block, 'period'))};`,
+          `    ${Q} = (float)phase_${ident} < duty / 100.0f * ${f(num(block, 'period'))}; }`,
+        );
+        break;
+      case 'ANALOG_FILTER':
+        state.push(`bool init_${ident} = false;`);
+        logic.push(
+          `  { float a = ${A()}; float alpha = ${f(num(block, 'timeConstant'))} + (float)dt > 0.0f ? (float)dt / (${f(num(block, 'timeConstant'))} + (float)dt) : 1.0f;`,
+          `    float prev = init_${ident} ? ${Q} : a; init_${ident} = true;`,
+          `    ${Q} = ah_finite(alpha * a + (1.0f - alpha) * prev); }`,
+        );
+        break;
+      case 'MIN_MAX': {
+        const MIN = sig(block.id, 'MIN');
+        const MAX = sig(block.id, 'MAX');
+        state.push(`bool init_${ident} = false;`);
+        logic.push(
+          `  { float a = ${A()};`,
+          `    if (${input(block, 'R')} || !init_${ident}) { ${MIN} = a; ${MAX} = a; init_${ident} = true; }`,
+          `    else { ${MIN} = ah_min(${MIN}, a); ${MAX} = ah_max(${MAX}, a); } }`,
+        );
+        break;
+      }
+      case 'AVERAGE': {
+        const n = Math.max(1, Math.min(MAX_AVERAGE_SAMPLES, Math.round(num(block, 'samples'))));
+        state.push(`MovingAverage<${n}> avg_${ident};`);
+        logic.push(`  ${Q} = avg_${ident}.update(${A()});`);
+        break;
+      }
+      case 'SCAN_DELAY':
+      case 'ANALOG_SCAN_DELAY': {
+        const analog = block.type === 'ANALOG_SCAN_DELAY';
+        state.push(`${analog ? 'float' : 'bool '} prev_${ident} = ${analog ? '0.0f' : 'false'};`);
+        scanStart.push(`  ${Q} = prev_${ident};`);
+        scanEnd.push(`  prev_${ident} = ${A()};`);
+        logic.push(`  // output was set at the start of the scan`);
+        break;
+      }
+      case 'TRANSFER_FUNCTION':
+        logic.push(
+          `  { float alpha = ${f(num(block, 'tau'))} + (float)dt > 0.0f ? (float)dt / (${f(num(block, 'tau'))} + (float)dt) : 1.0f;`,
+          `    ${Q} = ah_finite(alpha * (${A()} * ${f(num(block, 'gain'))}) + (1.0f - alpha) * ${Q}); }`,
+        );
+        break;
+      case 'SIGNAL_GENERATOR': {
+        const wave = String(block.params.type || 'sine');
+        state.push(`float phase_${ident} = 0.0f;`);
+        const shape =
+          wave === 'square' ? `(phase_${ident} < 0.5f ? 1.0f : -1.0f)` : wave === 'tri' ? `(phase_${ident} < 0.5f ? phase_${ident} * 4.0f - 1.0f : 3.0f - phase_${ident} * 4.0f)` : `sin(phase_${ident} * 2.0f * PI)`;
+        logic.push(
+          `  if (!${input(block, 'EN')}) ${Q} = 0.0f;`,
+          `  else { phase_${ident} = fmod(phase_${ident} + ${f(num(block, 'freq'))} * (float)dt / 1000.0f, 1.0f);`,
+          `    ${Q} = ${shape} * ${f(num(block, 'amp'))} + ${f(num(block, 'offset'))}; }`,
+        );
+        break;
+      }
+      case 'MATH_EXPRESSION': {
+        let tree: ExpressionNode | null = null;
+        try {
+          tree = parseExpression(String(block.params.expr || 'A + B'));
+        } catch {
+          tree = null; // reported by analyzeArduinoExport
+        }
+        logic.push(tree ? `  ${Q} = ah_finite(${expressionToCpp(tree, { A: input(block, 'A'), B: input(block, 'B'), C: input(block, 'C') })});` : `  ${Q} = 0.0f;`);
+        break;
+      }
+      case 'SHIFT_REGISTER': {
+        const length = Math.min(32, Math.max(1, Math.round(num(block, 'length')) || 8));
+        const mask = length >= 32 ? '0xFFFFFFFFUL' : `0x${(2 ** length - 1).toString(16).toUpperCase()}UL`;
+        const msb = `0x${(2 ** (length - 1)).toString(16).toUpperCase()}UL`;
+        state.push(`uint32_t bits_${ident} = 0;`, `bool lastClk_${ident} = false;`);
+        logic.push(
+          `  { bool clk = ${input(block, 'CLK')}; bool dir = ${input(block, 'DIR')};`,
+          `    if (clk && !lastClk_${ident}) bits_${ident} = dir ? (((bits_${ident} << 1) | (${input(block, 'D')} ? 1UL : 0UL)) & ${mask}) : ((bits_${ident} >> 1) | (${input(block, 'D')} ? ${msb} : 0UL));`,
+          `    lastClk_${ident} = clk;`,
+          `    if (${input(block, 'R')}) bits_${ident} = 0;`,
+          `    ${Q} = dir ? (bits_${ident} & ${msb}) != 0 : (bits_${ident} & 1UL) != 0; }`,
+        );
+        break;
+      }
+      case 'DATA_LOG': {
+        // On hardware the samples are printed to the serial port (CSV: block,time_ms,value).
+        const interval = Math.max(0, Math.round(num(block, 'interval')));
+        state.push(`bool logged_${ident} = false;`, `unsigned long lastLog_${ident} = 0;`);
+        logic.push(
+          `  ${Q} = ${input(block, 'EN')};`,
+          `  if (${Q} && (!logged_${ident} || now - lastLog_${ident} >= ${interval}UL)) {`,
+          `    logged_${ident} = true; lastLog_${ident} = now;`,
+          `#if ENABLE_SERIAL_TELEMETRY`,
+          `    Serial.print(F("LOG,${cString(block.label || block.id)},")); Serial.print(now); Serial.print(F(",")); Serial.println(${input(block, 'A')}, 3);`,
+          `#endif`,
+          `  }`,
+        );
+        break;
+      }
+      case 'OPEN_CONNECTOR':
+        break;
+      default:
+        logic.push(`  // not exported (see #error above)`);
     }
+  }
+
+  const issueLines = issues.map((issue) => `#error "${cString(issue.message)}"`);
+  const wiring = doc.blocks
+    .filter((block) => config.pinAssignments[block.id]?.pinNumber)
+    .map((block) => {
+      const a = config.pinAssignments[block.id];
+      return ` *   Pin ${a.pinNumber.padEnd(4)} ${cComment(block.label || block.id)} [${block.type}, ${a.mode}${a.invertLogic ? ', inverted' : ''}]`;
+    });
+
+  return `/*
+ * AutomationHub circuit: ${cComment(doc.name || 'Untitled circuit')}
+ * Board: ${preset.name}
+ * Scan cycle: ${config.scanCycleMs} ms (non-blocking, millis()-based)
+ *
+ * Wiring:
+${wiring.length ? wiring.join('\n') : ' *   (no physical I/O)'}
+ *
+ * Generated by AutomationHub. Behaves scan-for-scan like the browser simulator.
+ */
+${issueLines.length ? `\n// The circuit uses features this exporter cannot reproduce on hardware:\n${issueLines.join('\n')}\n` : ''}
+#include <math.h>
+
+#define ENABLE_SERIAL_TELEMETRY ${config.enableSerialTelemetry ? 1 : 0}
+#define SCAN_CYCLE_MS ${ul(config.scanCycleMs)}
+#define TELEMETRY_INTERVAL_MS ${ul(config.telemetryIntervalMs)}
+
+// ---- Pins ----
+${pinConstants.length ? pinConstants.join('\n') : '// No physical I/O.'}
+
+// ---- Runtime (ports of the simulator blocks; times in ms) ----
+static inline float ah_min(float a, float b) { return a < b ? a : b; }
+static inline float ah_max(float a, float b) { return a > b ? a : b; }
+static inline float ah_sq(float a) { return a * a; }
+static inline float ah_sign(float a) { return a > 0.0f ? 1.0f : (a < 0.0f ? -1.0f : 0.0f); }
+static inline float ah_round(float a) { return floor(a + 0.5f); }
+static inline float ah_finite(float a) { return isfinite(a) ? a : 0.0f; }
+
+struct TON_Timer {
+  unsigned long ET = 0; bool Q = false;
+  void update(bool in, unsigned long pt, unsigned long dt) {
+    ET = in ? (ET + dt > pt ? pt : ET + dt) : 0;
+    Q = in && ET >= pt;
   }
 };
 
-// Pulse Timer (TP)
-struct TP_Timer {
-  unsigned long startTime = 0;
-  bool running = false;
-  bool Q = false;
-  unsigned long ET = 0;
-  void update(bool IN, unsigned long PT, unsigned long now) {
-    if (IN && !running && !Q) {
-      running = true;
-      startTime = now;
-      Q = true;
-      ET = 0;
-    }
-    if (running) {
-      ET = now - startTime;
-      if (ET >= PT) {
-        ET = PT;
-        Q = false;
-      }
-    }
-    if (!IN && !Q) {
-      running = false;
-      ET = 0;
-    }
+struct TOF_Timer {
+  unsigned long ET = 0; bool Q = false; bool armed = false;
+  void update(bool in, unsigned long pt, unsigned long dt) {
+    if (in) { armed = true; ET = 0; Q = true; }
+    else if (armed) { ET = ET + dt > pt ? pt : ET + dt; Q = ET < pt; if (!Q) armed = false; }
+    else Q = false;
   }
 };
 
-// Dual On-Off Delay
-struct ON_OFF_Delay {
-  unsigned long onStart = 0;
-  unsigned long offStart = 0;
-  bool onRunning = false;
-  bool offRunning = false;
-  bool Q = false;
-  void update(bool IN, unsigned long onDelay, unsigned long offDelay, unsigned long now) {
-    if (IN) {
-      offRunning = false;
-      if (!Q) {
-        if (!onRunning) { onRunning = true; onStart = now; }
-        else if (now - onStart >= onDelay) { Q = true; onRunning = false; }
-      }
+struct OnOffDelay {
+  unsigned long onElapsed = 0, offElapsed = 0, ET = 0; bool Q = false;
+  void update(bool in, unsigned long onDelay, unsigned long offDelay, unsigned long dt) {
+    ET = 0;
+    if (in) {
+      offElapsed = 0;
+      if (!Q) { onElapsed = onElapsed + dt > onDelay ? onDelay : onElapsed + dt; ET = onElapsed; if (onElapsed >= onDelay) Q = true; }
     } else {
-      onRunning = false;
-      if (Q) {
-        if (!offRunning) { offRunning = true; offStart = now; }
-        else if (now - offStart >= offDelay) { Q = false; offRunning = false; }
-      }
+      onElapsed = 0;
+      if (Q) { offElapsed = offElapsed + dt > offDelay ? offDelay : offElapsed + dt; ET = offElapsed; if (offElapsed >= offDelay) Q = false; }
     }
   }
 };
 
-// Retentive Timer (RTO)
 struct RetentiveTON {
-  unsigned long ET = 0;
-  bool Q = false;
-  void update(bool IN, bool R, unsigned long PT, unsigned long dt) {
-    if (R) {
-      ET = 0;
-      Q = false;
-    } else if (IN && !Q) {
-      ET += dt;
-      if (ET >= PT) {
-        ET = PT;
-        Q = true;
-      }
-    }
+  unsigned long ET = 0; bool Q = false;
+  void update(bool in, bool reset, unsigned long pt, unsigned long dt) {
+    if (reset) ET = 0; else if (in) ET = ET + dt > pt ? pt : ET + dt;
+    Q = ET >= pt;
   }
 };
 
-// Edge Detectors (R_TRIG & F_TRIG)
-struct R_Trig {
-  bool lastClk = false;
-  bool Q = false;
-  void update(bool clk) {
-    Q = (clk && !lastClk);
-    lastClk = clk;
+struct PulseTimer {
+  unsigned long ET = 0; bool Q = false; bool lastIn = false;
+  void update(bool in, bool reset, bool retrigger, unsigned long pt, unsigned long dt) {
+    if (reset) Q = false;
+    else if (in && !lastIn && (retrigger || !Q)) { Q = true; ET = 0; }
+    if (Q) { ET = ET + dt > pt ? pt : ET + dt; if (ET >= pt) Q = false; }
+    lastIn = in;
   }
 };
 
-struct F_Trig {
-  bool lastClk = false;
-  bool Q = false;
-  void update(bool clk) {
-    Q = (!clk && lastClk);
-    lastClk = clk;
+template <int N> struct MovingAverage {
+  float buf[N]; int count = 0; int head = 0;
+  float update(float x) {
+    buf[head] = x; head = (head + 1) % N; if (count < N) count++;
+    float sum = 0.0f; for (int i = 0; i < count; i++) sum += buf[i];
+    return sum / (float)count;
   }
 };
 
-// Set-Reset Latch (Reset dominant)
-struct RS_Latch {
-  bool Q = false;
-  void update(bool S, bool R) {
-    if (R) Q = false;
-    else if (S) Q = true;
-  }
-};
+// ---- Signals (keep their value between scans, like the simulator) ----
+${globals.join('\n')}
 
-// Pulse Relay (Toggle Flip-Flop)
-struct PulseRelay {
-  bool lastTrig = false;
-  bool Q = false;
-  void update(bool trig, bool reset) {
-    if (reset) {
-      Q = false;
-    } else if (trig && !lastTrig) {
-      Q = !Q;
-    }
-    lastTrig = trig;
-  }
-};
+// ---- Block state ----
+${state.length ? state.join('\n') : '// (none)'}
 
-// Up-Down Counter
-struct UpDownCounter {
-  long CV = 0;
-  bool Q = false;
-  bool lastCU = false;
-  bool lastCD = false;
-  void update(bool CU, bool CD, bool R, bool LD, long PV) {
-    if (R) {
-      CV = 0;
-    } else if (LD) {
-      CV = PV;
-    } else {
-      if (CU && !lastCU) CV++;
-      if (CD && !lastCD) CV--;
-    }
-    lastCU = CU;
-    lastCD = CD;
-    Q = (CV >= PV);
-  }
-};
-
-// Square-Wave Clock Generator
-struct ClockGen {
-  unsigned long lastToggle = 0;
-  bool state = false;
-  void update(unsigned long periodMs, unsigned long now) {
-    if (periodMs == 0) periodMs = 100;
-    if (now - lastToggle >= (periodMs / 2)) {
-      lastToggle = now;
-      state = !state;
-    }
-  }
-};
-
-// Analog Schmitt Trigger / Hysteresis
-struct HysteresisTrigger {
-  bool Q = false;
-  void update(float input, float onThresh, float offThresh) {
-    if (input >= onThresh) Q = true;
-    else if (input <= offThresh) Q = false;
-  }
-};
-
-// Analog Slew Rate Limiter / Ramp
-struct AnalogRamp {
-  float current = 0.0f;
-  void update(float target, float riseRate, float fallRate, float dtSec) {
-    if (target > current) {
-      current += riseRate * dtSec;
-      if (current > target) current = target;
-    } else if (target < current) {
-      current -= fallRate * dtSec;
-      if (current < target) current = target;
-    }
-  }
-};
-
-// Proportional-Integral Controller (Anti-windup)
-struct PIController {
-  float integral = 0.0f;
-  float update(float SP, float PV, float Kp, float Ki, float minOut, float maxOut, float dtSec, bool reset) {
-    if (reset) {
-      integral = 0.0f;
-      return 0.0f;
-    }
-    float error = SP - PV;
-    float P = Kp * error;
-    integral += Ki * error * dtSec;
-    if (integral > maxOut) integral = maxOut;
-    if (integral < minOut) integral = minOut;
-    float out = P + integral;
-    if (out > maxOut) out = maxOut;
-    if (out < minOut) out = minOut;
-    return out;
-  }
-};
-
-// Low-Pass Filter (EMA)
-struct AnalogFilter {
-  float filtered = 0.0f;
-  bool initialized = false;
-  void update(float input, float timeConstantMs, float dtMs) {
-    if (!initialized) {
-      filtered = input;
-      initialized = true;
-      return;
-    }
-    float alpha = dtMs / (timeConstantMs + dtMs);
-    filtered = alpha * input + (1.0f - alpha) * filtered;
-  }
-};
-
-// Rolling Moving Average
-struct MovingAverage {
-  float buffer[16] = {0};
-  int head = 0;
-  int count = 0;
-  float average = 0.0f;
-  void update(float input) {
-    buffer[head] = input;
-    head = (head + 1) % 16;
-    if (count < 16) count++;
-    float sum = 0.0f;
-    for (int i = 0; i < count; i++) sum += buffer[i];
-    average = sum / (float)count;
-  }
-};
-
-// Min-Max Tracker
-struct MinMaxTracker {
-  float minVal = 999999.0f;
-  float maxVal = -999999.0f;
-  bool initialized = false;
-  void update(float input, bool reset) {
-    if (reset || !initialized) {
-      minVal = input;
-      maxVal = input;
-      initialized = true;
-    } else {
-      if (input < minVal) minVal = input;
-      if (input > maxVal) maxVal = input;
-    }
-  }
-};
-
-// Running Hours Counter
-struct HoursCounter {
-  float hours = 0.0f;
-  bool Q = false;
-  void update(bool run, bool reset, unsigned long dtMs, float limit) {
-    if (reset) {
-      hours = 0.0f;
-      Q = false;
-    } else if (run) {
-      hours += ((float)dtMs / 3600000.0f);
-      Q = (hours >= limit);
-    }
-  }
-};
-
-// ---------------------------------------------------------------------
-// STATEFUL INSTANCES
-// ---------------------------------------------------------------------
-${statefulDeclarations.length > 0 ? statefulDeclarations.join('\n') : '// No stateful timers or latches required.'}
-
-// ---------------------------------------------------------------------
-// SETUP
-// ---------------------------------------------------------------------
 void setup() {
 #if ENABLE_SERIAL_TELEMETRY
   Serial.begin(${preset.defaultBaudRate});
-  while (!Serial && millis() < 1000) { /* wait for USB Serial on 32u4 / Pico */ }
-  Serial.println(F("=================================================="));
-  Serial.println(F(" AutomationHub PLC Engine Starting..."));
-  Serial.println(F(" Circuit: ${doc.name.replace(/"/g, '\\"')}"));
-  Serial.println(F(" Board:   ${preset.name}"));
-  Serial.println(F("=================================================="));
+  Serial.println(F("AutomationHub: ${cString(doc.name || 'circuit')}"));
 #endif
-
-${pinModeStatements.length > 0 ? pinModeStatements.join('\n') : '  // No hardware pin modes to configure.'}
+${pinSetup.length ? pinSetup.join('\n') : '  // No pins to configure.'}
 }
 
-// ---------------------------------------------------------------------
-// DETERMINISTIC SCAN CYCLE LOOP
-// ---------------------------------------------------------------------
 void loop() {
-  unsigned long now = millis();
   static unsigned long lastScan = 0;
   static unsigned long lastTelemetry = 0;
-
-  // Scan cycle delta rate limiting
+  unsigned long now = millis();
   unsigned long dt = now - lastScan;
-  if (dt < SCAN_CYCLE_MS) {
-    return; // Yield CPU to maintain non-blocking determinism
-  }
+  if (dt < SCAN_CYCLE_MS) return; // non-blocking: come back on the next loop()
   lastScan = now;
 
-  // -------------------------------------------------------------------
-  // TOPOLOGICAL LOGIC EVALUATION
-  // -------------------------------------------------------------------
-${logicLines.join('\n')}
+${scanStart.length ? `  // Scan delays release last scan's value\n${scanStart.join('\n')}\n` : ''}${logic.join('\n')}
+${scanEnd.length ? `\n  // Scan delays sample their input for the next scan\n${scanEnd.join('\n')}` : ''}
 
-  // -------------------------------------------------------------------
-  // UPDATE SCAN-DELAY MEMORY (FOR PREVIOUS-SCAN FEEDBACK)
-  // -------------------------------------------------------------------
-${scanDelayUpdates.length > 0 ? scanDelayUpdates.join('\n') : '    // No scan delay feedback blocks.'}
-
-  // -------------------------------------------------------------------
-  // NON-BLOCKING SERIAL TELEMETRY MONITOR
-  // -------------------------------------------------------------------
 #if ENABLE_SERIAL_TELEMETRY
   if (now - lastTelemetry >= TELEMETRY_INTERVAL_MS) {
     lastTelemetry = now;
-    Serial.print(F("[PLC SCAN] t="));
-    Serial.print(now);
-    Serial.print(F("ms |"));
-${telemetryPrintStatements.length > 0 ? telemetryPrintStatements.join('\n') : '    Serial.print(F(" Active"));'}
+    Serial.print(F("t=")); Serial.print(now);
+${telemetry.length ? telemetry.join('\n') : ''}
     Serial.println();
   }
 #endif

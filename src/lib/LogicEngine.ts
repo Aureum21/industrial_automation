@@ -11,6 +11,9 @@ export type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, Runti
 const readers = new Set(['INPUT', 'NC_INPUT', 'ANALOG_INPUT']);
 const writers = new Set(['OUTPUT', 'FLAG', 'ANALOG_OUTPUT', 'ANALOG_FLAG']);
 const defaultSignal = (kind: SignalKind): Signal => kind === 'analog' ? 0 : kind === 'text' ? '' : false;
+/** Copy of a block's memory; arrays (sample buffers, edge lists) are copied so in-place pushes can be undone. */
+const snapshotState = (state: RuntimeBlock['state']): RuntimeBlock['state'] =>
+  Object.fromEntries(Object.entries(state).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value])) as RuntimeBlock['state'];
 const isSignal = (value: Signal, kind: SignalKind) => kind === 'digital'
   ? typeof value === 'boolean'
   : kind === 'analog' ? typeof value === 'number' && Number.isFinite(value) : typeof value === 'string';
@@ -134,7 +137,9 @@ export class LogicEngine {
     } else {
       // Just update this specific block's outputs so the UI shows the new value
       this.readInputs(block);
+      const saved = snapshotState(block.state);
       this.evaluate(block, 0, false);
+      block.state = saved;
     }
   }
 
@@ -338,12 +343,19 @@ export class LogicEngine {
     }
   }
 
+  /**
+   * Re-evaluates outputs after an edit without advancing the simulation. Block memory (edge
+   * history, timers, counters, sample buffers) is restored afterwards, so only real scans change
+   * state; otherwise a UI click would consume a rising edge before the next scan could see it.
+   */
   private refresh(): void {
     this.diagnostics = [];
     for (const id of this.order) {
       const block = this.requireBlock(id);
       this.readInputs(block);
+      const saved = snapshotState(block.state);
       this.evaluate(block, 0, false);
+      block.state = saved;
     }
     // Delayed inputs may precede their drivers in the execution order.
     for (const block of this.blocks.values()) if (block.type === 'SCAN_DELAY' || block.type === 'ANALOG_SCAN_DELAY') this.readInputs(block);
@@ -809,26 +821,20 @@ export class LogicEngine {
         }
         break;
       case 'SHIFT_REGISTER': {
+        // Unsigned 32-bit register; `>>> 0` keeps JavaScript bit operations unsigned.
         const clk = digital('CLK');
-        let bits = (block.state.bits as number) ?? 0;
-        const length = parameter('length') || 8;
+        const length = Math.min(32, Math.max(1, parameter('length') || 8));
+        const mask = length >= 32 ? 0xffffffff : 2 ** length - 1;
+        const msb = 2 ** (length - 1);
+        let bits = Number(block.state.bits ?? 0);
         if (clk && !block.state.lastClk) {
-          const dir = digital('DIR');
           const d = digital('D');
-          if (dir) {
-            bits = ((bits << 1) | (d ? 1 : 0)) & ((1 << length) - 1);
-          } else {
-            bits = (bits >>> 1) | (d ? (1 << (length - 1)) : 0);
-          }
+          bits = digital('DIR') ? (((bits << 1) | (d ? 1 : 0)) & mask) >>> 0 : ((bits >>> 1) | (d ? msb : 0)) >>> 0;
         }
         block.state.lastClk = clk;
-        if (digital('R')) {
-          bits = 0;
-        }
+        if (digital('R')) bits = 0;
         block.state.bits = bits;
-        
-        const dir = digital('DIR');
-        block.outputs.Q = dir ? ((bits & (1 << (length - 1))) !== 0) : ((bits & 1) !== 0);
+        block.outputs.Q = digital('DIR') ? (bits & msb) !== 0 : (bits & 1) !== 0;
         break;
       }
       case 'HOURS_COUNTER': {

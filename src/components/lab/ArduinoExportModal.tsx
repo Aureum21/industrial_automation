@@ -24,8 +24,10 @@ import {
   type ArduinoExportConfig,
   type PinAssignment,
   type PinElectricalMode,
+  analyzeArduinoExport,
   autoAssignPins,
   generateArduinoSketch,
+  needsPhysicalPin,
 } from '@/lib/codegen/arduinoGenerator';
 
 interface ArduinoExportModalProps {
@@ -71,12 +73,9 @@ export default function ArduinoExportModal({ isOpen, onClose, doc }: ArduinoExpo
     }
   }, [doc, config]);
 
-  // List of blocks that have or can have physical pins
-  const ioBlocks = useMemo(() => {
-    return doc.blocks.filter((b) =>
-      ['INPUT', 'NC_INPUT', 'OUTPUT', 'ANALOG_INPUT', 'ANALOG_OUTPUT'].includes(b.type)
-    );
-  }, [doc]);
+  // Blocks wired to physical pins (tag-linked inputs are internal signals)
+  const ioBlocks = useMemo(() => doc.blocks.filter((b) => needsPhysicalPin(doc, b)), [doc]);
+  const issues = useMemo(() => analyzeArduinoExport(doc, config), [doc, config]);
 
   // Copy code handler
   const handleCopyCode = async () => {
@@ -296,6 +295,16 @@ export default function ArduinoExportModal({ isOpen, onClose, doc }: ArduinoExpo
         <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-[#161618]">
           {activeTab === 'code' && (
             <div className="flex flex-col h-full">
+              {issues.length > 0 && (
+                <div role="alert" className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200">
+                  <p className="mb-1.5 font-semibold text-red-300">This sketch will not compile until these are fixed:</p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    {issues.map((issue, index) => (
+                      <li key={index}>{issue.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-2 font-mono">
                 <span>{currentPreset.name} · Standalone C++ Source</span>
                 <span>{sketchCode.split('\n').length} lines · Zero External Libraries</span>
@@ -422,12 +431,32 @@ export default function ArduinoExportModal({ isOpen, onClose, doc }: ArduinoExpo
                                   <option value="STANDARD">Active HIGH (Direct LED / Contactor)</option>
                                   <option value="INVERTED">Active LOW (Optocoupled Relay Module)</option>
                                 </select>
-                              ) : isAnalogIn ? (
-                                <span className="text-[#aeaeb2] font-mono text-[11px]">
-                                  ADC ({currentPreset.adcResolutionBits}-bit, 0..{currentPreset.adcMaxRaw})
-                                </span>
                               ) : (
-                                <span className="text-[#aeaeb2] font-mono text-[11px]">PWM (8-bit, 0..255)</span>
+                                <div className="flex flex-col gap-1.5 text-[11px] font-mono text-[#aeaeb2]">
+                                  <span>
+                                    {isAnalogIn
+                                      ? `ADC 0..${currentPreset.adcMaxRaw} maps to`
+                                      : 'PWM 0..255 maps from'}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      aria-label={`Range start for ${b.label || b.id}`}
+                                      value={assignment.scaleMin ?? 0}
+                                      onChange={(e) => updatePinAssignment(b.id, { scaleMin: e.target.valueAsNumber || 0 })}
+                                      className="w-16 bg-[#2c2c2e] text-white border border-[#3a3a3c] rounded px-1.5 py-0.5 outline-none focus:border-[#0071e3]"
+                                    />
+                                    <span>to</span>
+                                    <input
+                                      type="number"
+                                      aria-label={`Range end for ${b.label || b.id}`}
+                                      value={assignment.scaleMax ?? 100}
+                                      onChange={(e) => updatePinAssignment(b.id, { scaleMax: e.target.valueAsNumber || 0 })}
+                                      className="w-16 bg-[#2c2c2e] text-white border border-[#3a3a3c] rounded px-1.5 py-0.5 outline-none focus:border-[#0071e3]"
+                                    />
+                                    <span>units</span>
+                                  </span>
+                                </div>
                               )}
                             </td>
                             <td className="py-3 px-4 text-[#8e8e93]">
