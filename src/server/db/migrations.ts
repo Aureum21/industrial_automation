@@ -12,6 +12,7 @@ interface Migration {
 }
 
 const LEGACY_OWNER_ID = 'usr-alazar-lead';
+const LEGACY_OWNER_EMAIL = 'alazar@industrialautomation.website';
 const OWNER_HANDLE = 'alex_eng_aut';
 const OWNER_EMAIL = 'alex_eng_aut@industrialautomation.website';
 
@@ -69,11 +70,19 @@ export const MIGRATIONS: Migration[] = [
     id: '002_owner_flag',
     up: async (sql) => {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner BOOLEAN NOT NULL DEFAULT FALSE`;
+      // The owner was seeded with a fixed ID, but may have been created through sign-up instead,
+      // so also match the original owner email. Exactly one row is updated.
       await sql`
         UPDATE users
         SET name = ${OWNER_HANDLE}, email = ${OWNER_EMAIL}, role = 'Author',
             station_id = NULL, avatar = NULL, bio = '', is_owner = TRUE
-        WHERE id = ${LEGACY_OWNER_ID}`;
+        WHERE id = (
+          SELECT id FROM users
+          WHERE id = ${LEGACY_OWNER_ID} OR LOWER(email) = ${LEGACY_OWNER_EMAIL}
+          ORDER BY (id = ${LEGACY_OWNER_ID}) DESC, created_at ASC
+          LIMIT 1
+        )
+        AND NOT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = ${OWNER_EMAIL} AND id <> ${LEGACY_OWNER_ID})`;
     },
   },
   {

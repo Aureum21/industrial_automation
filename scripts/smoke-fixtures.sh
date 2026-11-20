@@ -6,7 +6,7 @@ set -euo pipefail
 PSQL=${PSQL:-psql -h localhost -U app}
 DB=${DB:-automationhub}
 hash() { node -e "const c=require('crypto');const s=c.randomBytes(16).toString('hex');console.log(s+':'+c.scryptSync(process.argv[1],s,64).toString('hex'))" "$1"; }
-$PSQL -d postgres -q -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB"
+$PSQL -d postgres -q -c "DROP DATABASE IF EXISTS $DB WITH (FORCE)" -c "CREATE DATABASE $DB"
 $PSQL -d $DB -q <<SQL
 CREATE TABLE users (id VARCHAR(64) PRIMARY KEY, name VARCHAR(255) NOT NULL, email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, role VARCHAR(255) DEFAULT 'Engineer', station_id VARCHAR(128) DEFAULT 'TERMINAL-LOCAL-01', avatar VARCHAR(16) DEFAULT 'AW', bio TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE sessions (id VARCHAR(128) PRIMARY KEY, user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());
