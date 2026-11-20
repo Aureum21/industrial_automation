@@ -8,6 +8,7 @@ import { BLOCK_CATALOG, getBlockDefinition } from '@/lib/automation/catalog';
 import { createBlock, parseCircuitDocument, STORAGE_KEY } from '@/lib/automation/documents';
 import { parseCircuitDSL, stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { applyLayout } from '@/lib/automation/layout';
+import LadderView from './LadderView';
 import { buildEmbedCode, buildShareUrl, decodeCircuitFragment } from '@/lib/automation/share';
 import { EXAMPLES, getExample } from '@/lib/automation/examples';
 import type { BlockType, CircuitBlock, CircuitConnection, CircuitDocument, ParameterValue, Signal, HmiWidget } from '@/lib/automation/types';
@@ -112,7 +113,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(!readOnly);
-  const [mode, setMode] = useState<'visual' | 'code' | 'hmi'>('visual');
+  const [mode, setMode] = useState<'visual' | 'ladder' | 'code' | 'hmi'>('visual');
   const [dslCode, setDslCode] = useState('');
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
@@ -434,7 +435,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
 
   const selectedCount = nodes.filter(node => node.selected).length + edges.filter(edge => edge.selected).length;
 
-  const changeMode = (newMode: 'visual' | 'code' | 'hmi') => {
+  const changeMode = (newMode: 'visual' | 'ladder' | 'code' | 'hmi') => {
     if (mode === newMode) return;
     if (mode === 'code') {
       if (readOnly) {
@@ -469,6 +470,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-[#f5f5f7] p-1 rounded-xl border border-[#e5e5ea] mr-2">
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'visual' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('visual')}>Visual (FBD)</button>
+            <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'ladder' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('ladder')}>Ladder</button>
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'hmi' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('hmi')}>HMI 🎛️</button>
             <button className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${mode === 'code' ? 'bg-white shadow-xs text-[#1d1d1f]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`} onClick={() => changeMode('code')}>Code {`{}`}</button>
           </div>
@@ -517,6 +519,8 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
             <Controls />
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
+        ) : mode === 'ladder' ? (
+          <LadderView engine={engine} syncKey={syncKey} />
         ) : mode === 'hmi' ? (
           <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} running={running} />
         ) : (
