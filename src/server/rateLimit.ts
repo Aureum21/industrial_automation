@@ -20,6 +20,7 @@ export const RATE_RULES = {
   passwordChangePerUser: { name: 'pwchange', limit: 5, windowSeconds: 15 * 60 },
   publishPerUser: { name: 'publish', limit: 60, windowSeconds: 60 * 60 },
   galleryPerUser: { name: 'gallery', limit: 30, windowSeconds: 60 * 60 },
+  progressPerUser: { name: 'progress', limit: 120, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateRule>;
 
 /** Client IP as reported by the hosting proxy (Vercel sets x-forwarded-for). */

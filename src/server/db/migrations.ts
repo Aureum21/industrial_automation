@@ -116,6 +116,19 @@ export const MIGRATIONS: Migration[] = [
         )`;
     },
   },
+  {
+    // Challenge progress follows the account across devices (local progress is merged on sign-in).
+    id: '006_challenge_progress',
+    up: async (sql) => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS challenge_progress (
+          user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          challenge_slug VARCHAR(64) NOT NULL,
+          solved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (user_id, challenge_slug)
+        )`;
+    },
+  },
 ];
 
 let pending: Promise<void> | null = null;

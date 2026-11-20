@@ -1,5 +1,6 @@
 import type { ArticleDocument } from '@/shared/articles';
 import type { ArticleInput } from '@/shared/validation';
+import type { ChallengeProgress } from '@/shared/progress';
 
 /**
  * The only place the browser talks to the API. Every call resolves to a result object
@@ -60,4 +61,8 @@ export const articlesApi = {
 
 export const viewsApi = {
   record: (slug: string) => post<{ slug: string; views: number }>('/api/views', { slug }),
+};
+
+export const progressApi = {
+  sync: (solved: { slug: string; solvedAt: string }[]) => post<{ progress: ChallengeProgress }>('/api/progress', { solved }),
 };

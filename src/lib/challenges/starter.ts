@@ -21,4 +21,4 @@ export function starterDocument(challenge: Challenge): CircuitDocument {
 export const PROGRESS_KEY = 'automationhub.challenges.progress.v1';
 export const workKey = (slug: string) => `automationhub.challenge.${slug}.v1`;
 
-export type ChallengeProgress = Record<string, { solvedAt: string }>;
+export type { ChallengeProgress } from '../../shared/progress.ts';

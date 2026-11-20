@@ -83,6 +83,14 @@ check "9th failed sign-in for one account is throttled" 429 $(req /tmp/j_x POST 
 check "throttle message says how long to wait" 1 $(grep -c "Please wait" /tmp/body)
 check "other accounts are unaffected" 401 $(req /tmp/j_x POST /api/auth/signin '{"identifier":"someone-else","password":"x"}')
 
+echo "== challenge progress"
+check "progress needs sign-in" 401 $(req /tmp/j_none POST /api/progress '{"solved":[]}')
+check "sync local progress" 200 $(req /tmp/j_owner POST /api/progress '{"solved":[{"slug":"light-switch","solvedAt":"2026-01-02T00:00:00Z"},{"slug":"made-up","solvedAt":"2026-01-02T00:00:00Z"}]}')
+check "unknown challenge dropped" null $(jq -r '.data.progress["made-up"]' /tmp/body)
+check "earlier solve from another device wins" "2026-01-01T00:00:00.000Z" $(req /tmp/j_owner POST /api/progress '{"solved":[{"slug":"light-switch","solvedAt":"2026-01-01T00:00:00Z"},{"slug":"start-stop","solvedAt":"2026-02-01T00:00:00Z"}]}' >/dev/null; jq -r '.data.progress["light-switch"].solvedAt' /tmp/body)
+check "later solve does not overwrite" "2026-01-01T00:00:00.000Z" $(req /tmp/j_owner POST /api/progress '{"solved":[{"slug":"light-switch","solvedAt":"2026-03-01T00:00:00Z"}]}' >/dev/null; jq -r '.data.progress["light-switch"].solvedAt' /tmp/body)
+check "GET returns both solves" 2 $(req /tmp/j_owner GET /api/progress >/dev/null; jq -r '.data.progress | length' /tmp/body)
+
 echo "== owner restores core masterclass"
 check "owner deletes override" 200 $(req /tmp/j_owner DELETE /api/articles/traffic-lights)
 

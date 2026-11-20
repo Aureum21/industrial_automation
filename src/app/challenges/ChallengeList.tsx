@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { PROGRESS_KEY, type ChallengeProgress } from '@/lib/challenges/starter';
+import { useChallengeProgress } from '@/lib/challenges/useProgress';
+import { useSession } from '@/lib/auth';
 import type { Challenge } from '@/lib/challenges/types';
-import { useStoredValue } from '@/lib/useStoredValue';
 
 type Item = Pick<Challenge, 'slug' | 'title' | 'summary' | 'level' | 'concepts'>;
 
-const NO_PROGRESS: ChallengeProgress = {};
 const LEVELS: { level: Challenge['level']; title: string; blurb: string }[] = [
   { level: 'beginner', title: 'Beginner', blurb: 'Wires, gates, memory and your first timers.' },
   { level: 'intermediate', title: 'Intermediate', blurb: 'Counters, analog signals, hysteresis and interlocks.' },
@@ -16,7 +15,8 @@ const LEVELS: { level: Challenge['level']; title: string; blurb: string }[] = [
 ];
 
 export default function ChallengeList({ items }: { items: Item[] }) {
-  const [progress] = useStoredValue<ChallengeProgress>(PROGRESS_KEY, NO_PROGRESS);
+  const [progress] = useChallengeProgress();
+  const { user } = useSession();
   const solved = items.filter((item) => progress[item.slug]).length;
   const nextUp = items.find((item) => !progress[item.slug]);
 
@@ -30,7 +30,15 @@ export default function ChallengeList({ items }: { items: Item[] }) {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#f5f5f7]">
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${(solved / items.length) * 100}%` }} />
           </div>
-          <p className="mt-2 text-xs text-[#86868b]">Progress is kept in this browser.</p>
+          <p className="mt-2 text-xs text-[#86868b]">
+            {user ? (
+              'Progress is saved to your account and syncs across devices.'
+            ) : (
+              <>
+                Progress is kept in this browser. <Link href="/signin?redirect=/challenges" className="text-[#0071e3] hover:underline">Sign in</Link> to keep it on every device.
+              </>
+            )}
+          </p>
         </div>
         {nextUp && (
           <Link href={`/challenges/${nextUp.slug}`} className="inline-flex items-center gap-2 rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0077ed]">

@@ -6,11 +6,10 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Lightbulb, Play, XCir
 import LabWorkspace, { type LabController } from '@/components/lab/LabWorkspace';
 import { MarkdownBlock } from '@/lib/content/render';
 import { gradeChallenge } from '@/lib/challenges/grader';
-import { PROGRESS_KEY, starterDocument, workKey, type ChallengeProgress } from '@/lib/challenges/starter';
+import { starterDocument, workKey } from '@/lib/challenges/starter';
+import { useChallengeProgress } from '@/lib/challenges/useProgress';
 import type { Challenge, GradeResult } from '@/lib/challenges/types';
-import { useStoredValue } from '@/lib/useStoredValue';
 
-const NO_PROGRESS: ChallengeProgress = {};
 const LEVEL_STYLE: Record<Challenge['level'], string> = {
   beginner: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   intermediate: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -28,7 +27,7 @@ export default function ChallengeView({ challenge, index, total, previous, next 
   const starter = useMemo(() => starterDocument(challenge), [challenge]);
   const [result, setResult] = useState<GradeResult | null>(null);
   const [hintsShown, setHintsShown] = useState(0);
-  const [progress, setProgress] = useStoredValue<ChallengeProgress>(PROGRESS_KEY, NO_PROGRESS);
+  const [progress, markSolved] = useChallengeProgress();
   const solved = Boolean(progress[challenge.slug]);
 
   const check = () => {
@@ -37,7 +36,7 @@ export default function ChallengeView({ challenge, index, total, previous, next 
     const graded = gradeChallenge(challenge, doc);
     setResult(graded);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
-    if (graded.passed && !solved) setProgress({ ...progress, [challenge.slug]: { solvedAt: new Date().toISOString() } });
+    if (graded.passed) markSolved(challenge.slug);
   };
 
   return (
