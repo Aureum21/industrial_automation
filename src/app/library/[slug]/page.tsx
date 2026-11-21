@@ -8,6 +8,7 @@ import { BLOCK_GUIDES } from '@/lib/automation/blockGuides';
 import { DOCUMENTED_BLOCKS, blockFromSlug, blockSlug, demoCircuit } from '@/lib/automation/blockPages';
 import { stringifyCircuitDSL } from '@/lib/automation/dsl';
 import { CHALLENGES } from '@/lib/challenges/catalog';
+import { HOW_TOS } from '@/lib/howto/catalog';
 import { arduinoSupport } from '@/lib/codegen/arduinoGenerator';
 import { MarkdownBlock } from '@/lib/content/render';
 import { SITE_NAME, SITE_URL } from '@/shared/site';
@@ -43,6 +44,7 @@ export default async function BlockPage({ params }: Props) {
   if (!block) notFound();
   const guide = BLOCK_GUIDES[block.type];
   const related = (guide?.challenges ?? []).map((slug) => CHALLENGES.find((challenge) => challenge.slug === slug)).filter(Boolean);
+  const usedIn = HOW_TOS.filter((guide) => guide.blocks.includes(block.type) || guide.circuit.includes(`: ${block.type}(`));
   const siblings = DOCUMENTED_BLOCKS.filter((other) => other.category === block.category && other.type !== block.type);
   const demo = stringifyCircuitDSL(demoCircuit(block.type));
   const url = `${SITE_URL}/library/${blockSlug(block.type)}`;
@@ -174,6 +176,19 @@ export default async function BlockPage({ params }: Props) {
                 </Link>
               ))}
             </div>
+          </section>
+        )}
+
+        {usedIn.length > 0 && (
+          <section className="mb-10">
+            <h2 className="mb-3 text-lg font-bold">Used in these PLC examples</h2>
+            <ul className="space-y-1.5">
+              {usedIn.map((guide) => (
+                <li key={guide.slug}>
+                  <Link href={`/how-to/${guide.slug}`} className="text-sm text-[#0071e3] hover:underline">{guide.title}</Link>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

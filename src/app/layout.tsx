@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import SiteHeader from '@/components/SiteHeader';
 import './globals.css';
+import { SITE_URL } from '@/shared/site';
 
 export const metadata: Metadata = {
+  // Absolute URLs for og:image, canonical and alternates.
+  metadataBase: new URL(SITE_URL),
   title: 'AutomationHub // Industrial Logic & Automation',
   description: 'Interactive industrial automation masterclasses, deterministic PLC logic simulations, and SCADA engineering controls.',
   icons: {

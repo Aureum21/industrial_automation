@@ -15,6 +15,7 @@ import InlineLab from '@/components/lab/InlineLab';
 import { getPostSummaries } from '@/server/services/content';
 import { DEFAULT_MASTERCLASSES } from '@/lib/defaultArticlesData';
 import { CHALLENGES } from '@/lib/challenges/catalog';
+import { HOW_TOS } from '@/lib/howto/catalog';
 
 export default async function Home() {
   const posts = await getPostSummaries();
@@ -117,6 +118,28 @@ export default async function Home() {
             step="INTERACTIVE DEMO"
             height={460}
           />
+        </div>
+      </section>
+
+      {/* HOW-TO GUIDES: the classic PLC programs, each runnable */}
+      <section className="py-16 px-5 sm:px-8 border-b border-[#e5e5ea] bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-bold tracking-tight text-[#1d1d1f]">PLC programming examples you can run</h2>
+              <p className="mt-2 text-[#86868b]">{HOW_TOS.length} classic programs with the ladder diagram, step-by-step instructions and Arduino code. Every circuit is tested.</p>
+            </div>
+            <Link href="/how-to" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0071e3] hover:underline">
+              All how-to guides <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <ul className="grid gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+            {HOW_TOS.slice(0, 12).map((guide) => (
+              <li key={guide.slug}>
+                <Link href={`/how-to/${guide.slug}`} className="text-sm text-[#1d1d1f] hover:text-[#0071e3] hover:underline">{guide.title}</Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
