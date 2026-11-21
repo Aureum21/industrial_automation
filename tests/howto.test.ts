@@ -51,6 +51,9 @@ const REDUNDANT_BY_DESIGN = new Set([
   'emergency-stop-reset-plc-program estop.Q->released.A', // reset-dominant latch already refuses it
   'conveyor-jam-detection-plc jam.Q->noJam.A', // the run latch drops one scan later anyway
   'egg-incubator-controller-arduino-plc overheat.Q->safe.A', // the cut-out backs up the thermostat
+  'plc-step-sequencer-counter c0.Q->s0.B', // an unwired analog input also reads 0; kept for readability
+  'plc-first-scan-bit-initialization firstScan.Q->stopOrInit.B', // matters for retentive memory after a real power cycle
+  'day-night-thermostat-setback comfort.Q->setback.A', // the night band is always below the day band
 ]);
 
 test('every wire in every how-to circuit is covered by a scenario', () => {

@@ -1,6 +1,11 @@
 /** Groups for the how-to index. tests/howto.test.ts checks that every guide is in exactly one. */
 export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] }[] = [
   {
+    title: 'PLC fundamentals',
+    blurb: 'Start here: how ladder logic, the scan cycle and contacts work.',
+    slugs: ['what-is-ladder-logic-basics', 'plc-scan-cycle-explained', 'normally-open-vs-normally-closed-plc-inputs', 'plc-first-scan-bit-initialization', 'plc-step-sequencer-counter'],
+  },
+  {
     title: 'Motor control',
     blurb: 'Start/stop, reversing, starters and selector switches.',
     slugs: ['start-stop-motor-control-seal-in', 'motor-forward-reverse-interlock', 'star-delta-starter-plc-program', 'jog-and-run-motor-control', 'hand-off-auto-hoa-switch-plc', 'motor-fail-to-start-feedback-alarm', 'emergency-stop-reset-plc-program', 'lube-oil-pump-permissive-motor', 'two-hand-control-anti-tie-down'],
@@ -8,7 +13,7 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Machines and sequences',
     blurb: 'The classic PLC exercises: timed and step sequences.',
-    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc', 'parking-boom-barrier-plc', 'rotary-indexing-table-plc'],
+    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc', 'parking-boom-barrier-plc', 'rotary-indexing-table-plc', 'plc-program-microwave-oven'],
   },
   {
     title: 'Conveyors and packaging',
@@ -28,11 +33,11 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Basic techniques',
     blurb: 'Small patterns you will use in every program.',
-    slugs: ['one-push-button-on-off-toggle', 'blinking-light-two-timers-plc', 'debounce-noisy-input-plc', 'motion-sensor-light-timer-plc', 'set-reset-latch-ladder-logic', 'ton-tof-tp-timer-difference'],
+    slugs: ['one-push-button-on-off-toggle', 'blinking-light-two-timers-plc', 'debounce-noisy-input-plc', 'motion-sensor-light-timer-plc', 'set-reset-latch-ladder-logic', 'ton-tof-tp-timer-difference', 'two-way-three-way-switching-xor', 'count-every-nth-item-plc'],
   },
   {
     title: 'Home, garden and building',
     blurb: 'Projects for Arduino and building automation.',
-    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer'],
+    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer', 'day-night-thermostat-setback'],
   },
 ];
