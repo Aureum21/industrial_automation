@@ -68,3 +68,19 @@ Not verified: the live site after the last push. The production URL was unreacha
 2. Run free for 1–2 months and measure. Add Vercel Analytics: in the Vercel dashboard turn on Analytics, then add `@vercel/analytics`.
 3. Then a "Pro" tier (about $5–8/month or $49/year): unlimited private saved circuits, certificate of completion for the challenge track, advanced challenges, Arduino export of more blocks. Keep the lab, the basic challenges and the gallery free. Building this needs your Stripe account.
 4. Later: B2B licences for schools and training centres (classroom progress dashboard), which pays more than individual subscriptions.
+
+## How-to guides (SEO content system)
+
+`/how-to` and `/how-to/<slug>`: currently 88 guides in `src/lib/howto/catalog.ts` + `batch2.ts` … `batch9.ts`, grouped in `src/lib/howto/categories.ts`.
+
+Each guide (`HowTo` in `src/lib/howto/types.ts`) has search-style title and description, a two-sentence answer, the solution circuit (DSL), an I/O table, explanation, steps, mistakes, FAQ (rendered + FAQPage JSON-LD), related blocks and challenges. The page also generates Arduino code from the circuit and an Open Graph image.
+
+**Every circuit is verified** in `tests/howto.test.ts`:
+1. it passes its scenarios with the challenge grader (expectations at time points, `during` share checks, `never` rules on every scan);
+2. it exports to an Arduino Uno with no issues;
+3. **wire coverage**: removing any single wire must fail a scenario. Deliberate defence-in-depth wires are listed in `REDUNDANT_BY_DESIGN` with a reason; wires into display-only outputs are skipped;
+4. every guide is in exactly one category.
+
+To add a guide: write it in a batch file, add its slug to a category, run `node --experimental-strip-types --test tests/howto.test.ts`. If coverage fails, either add a scenario step that tests the wire or simplify the circuit. Coverage has caught real bugs (conveyors restarting after a fault during their run-on, a PI controller with ki = 0 keeping a hidden integral).
+
+Search Console: property `https://www.industrialautomation.website/` verified by `public/google61c0b33a2443c7b1.html` (keep that file). Sitemap submitted; it includes all guides automatically.
