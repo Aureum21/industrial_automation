@@ -9,6 +9,7 @@ import { parseCircuitDSL } from '@/lib/automation/dsl';
 import { CHALLENGES } from '@/lib/challenges/catalog';
 import { autoAssignPins, generateArduinoSketch } from '@/lib/codegen/arduinoGenerator';
 import { HOW_TOS, getHowTo } from '@/lib/howto/catalog';
+import { HOW_TO_CATEGORIES } from '@/lib/howto/categories';
 import { MarkdownBlock } from '@/lib/content/render';
 import { SITE_NAME, SITE_URL } from '@/shared/site';
 
@@ -41,7 +42,11 @@ export default async function HowToPage({ params }: Props) {
   if (!guide) notFound();
   const url = `${SITE_URL}/how-to/${guide.slug}`;
   const related = (guide.challenges ?? []).map((slug) => CHALLENGES.find((challenge) => challenge.slug === slug)).filter((challenge) => challenge !== undefined);
-  const others = HOW_TOS.filter((other) => other.slug !== guide.slug).slice(0, 6);
+  // Same topic first, then guides that share blocks, so the links are relevant.
+  const category = HOW_TO_CATEGORIES.find((group) => group.slugs.includes(guide.slug));
+  const sameTopic = (category?.slugs ?? []).filter((slug) => slug !== guide.slug);
+  const sharesBlocks = HOW_TOS.filter((other) => other.slug !== guide.slug && !sameTopic.includes(other.slug) && other.blocks.some((type) => guide.blocks.includes(type))).map((other) => other.slug);
+  const others = [...sameTopic, ...sharesBlocks].slice(0, 8).map((slug) => getHowTo(slug)!);
   const sketch = arduinoSketch(guide.circuit);
   // Analog inputs are set with sliders, which only the function block view has.
   const analog = guide.inputs.some((pin) => pin.type === 'ANALOG_INPUT');
@@ -188,7 +193,7 @@ export default async function HowToPage({ params }: Props) {
         </section>
 
         <nav aria-label="More how-to guides" className="mt-12 border-t border-[#e5e5ea] pt-6">
-          <h2 className="mb-3 text-sm font-semibold text-[#86868b]">More PLC examples</h2>
+          <h2 className="mb-3 text-sm font-semibold text-[#86868b]">{category ? `More in ${category.title}` : 'More PLC examples'}</h2>
           <ul className="grid gap-2 sm:grid-cols-2">
             {others.map((other) => (
               <li key={other.slug}>
