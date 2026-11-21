@@ -47,6 +47,7 @@ const REDUNDANT_BY_DESIGN = new Set([
   'plc-program-two-floor-elevator floor2.Q->notAt2.A', // reset-dominant latch already ignores it
   'plc-program-two-floor-elevator floor1.Q->notAt1.A',
   'motor-fail-to-start-feedback-alarm fault.Q->healthy.A', // the run latch drops one scan later anyway
+  'plc-program-washing-machine spinTime.Q->notSpun.A', // the finished cycle also stops the spin
 ]);
 
 test('every wire in every how-to circuit is covered by a scenario', () => {
