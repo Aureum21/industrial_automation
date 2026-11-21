@@ -34,3 +34,31 @@ for (const guide of HOW_TOS) {
 test('how-to slugs are unique', () => {
   assert.equal(new Set(HOW_TOS.map((guide) => guide.slug)).size, HOW_TOS.length);
 });
+
+/**
+ * Mutation check: removing any single wire must make at least one scenario fail, so every wire
+ * corresponds to a tested requirement. The exceptions are deliberate defence-in-depth wiring
+ * whose effect is already guaranteed by another path.
+ */
+const REDUNDANT_BY_DESIGN = new Set([
+  'plc-program-car-wash t4.Q->n4.A', // the finished cycle also resets the latch
+  'tank-level-control-pump-hysteresis hh.Q->notHH.A', // high-high trip backs up the 80 % stop
+  'sequential-conveyor-start-stop fault3.Q->stopOrFault.B', // the trip latch already stops the line
+  'plc-program-two-floor-elevator floor2.Q->notAt2.A', // reset-dominant latch already ignores it
+  'plc-program-two-floor-elevator floor1.Q->notAt1.A',
+  'motor-fail-to-start-feedback-alarm fault.Q->healthy.A', // the run latch drops one scan later anyway
+]);
+
+test('every wire in every how-to circuit is covered by a scenario', () => {
+  const untested: string[] = [];
+  for (const guide of HOW_TOS) {
+    const doc = parseCircuitDSL(guide.circuit, BLOCK_CATALOG);
+    for (const wire of doc.connections) {
+      const key = `${guide.slug} ${wire.fromBlockId}.${wire.fromPin}->${wire.toBlockId}.${wire.toPin}`;
+      if (REDUNDANT_BY_DESIGN.has(key)) continue;
+      const result = gradeChallenge(asChallenge(guide), { ...doc, connections: doc.connections.filter((other) => other !== wire) });
+      if (result.passed) untested.push(key);
+    }
+  }
+  assert.deepEqual(untested, []);
+});

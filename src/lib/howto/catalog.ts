@@ -1,10 +1,11 @@
 import type { HowTo } from './types.ts';
+import { HOW_TOS_BATCH_2 } from './batch2.ts';
 
 /**
  * How-to guides for the classic PLC exercises. Every circuit is verified by tests/howto.test.ts
  * against its scenarios, so the text must describe what the circuit really does.
  */
-export const HOW_TOS: HowTo[] = [
+const BATCH_1: HowTo[] = [
   {
     slug: 'start-stop-motor-control-seal-in',
     title: 'How to make a start/stop motor control circuit (seal-in) in PLC ladder logic',
@@ -172,6 +173,7 @@ When T3 finishes, a one-scan delay turns the enable OFF for exactly one scan. Th
     never: [
       { when: { green: true, red: true }, message: 'Green and red were on together' },
       { when: { green: true, yellow: true }, message: 'Green and yellow were on together' },
+      { when: { green: false, yellow: false, red: false }, message: 'All lamps were dark' },
     ],
     scenarios: [
       {
@@ -318,6 +320,7 @@ T4 finishing resets the latch through a one-scan delay, so the cycle ends by its
           { action: 'Wait to 16 s', waitMs: 4000, expect: { rinse: false, dryer: true } },
           { action: 'Wait to 20 s', waitMs: 4000, expect: { soap: false, brushes: false, rinse: false, dryer: false } },
           { action: 'Wait longer', waitMs: 3000, expect: { soap: false, dryer: false } },
+          { action: 'Next car: press Start', set: { start: true }, waitMs: 200, expect: { soap: true } },
         ],
       },
       {
@@ -439,6 +442,8 @@ The **photo-eye** is checked against the *previous* scan's closing state (a one-
           { action: 'Release Close, reach the lower limit', set: { close: false, lower: true }, waitMs: 200, expect: { motorDown: false } },
           { action: 'Press Open', set: { open: true }, waitMs: 200, expect: { motorUp: true } },
           { action: 'Release Open, lower limit releases, press Stop', set: { open: false, lower: false, stop: true }, waitMs: 200, expect: { motorUp: false } },
+          { action: 'Release Stop, press Close', set: { stop: false, close: true }, waitMs: 200, expect: { motorDown: true } },
+          { action: 'Release Close, press Stop while closing', set: { close: false, stop: true }, waitMs: 200, expect: { motorDown: false } },
           { action: 'Release Stop, press both buttons', set: { stop: false, open: true, close: true }, waitMs: 300, expect: { motorUp: false, motorDown: false } },
           { action: 'Obstacle while opening has no effect', set: { close: false, eye: true }, waitMs: 300, expect: { motorUp: true, motorDown: false } },
         ],
@@ -625,6 +630,8 @@ When a bottle arrives, the conveyor stops and the valve opens. After 3 s the val
           { action: 'Tall box arrives', set: { box: true, tall: true }, waitMs: 300, expect: { pusher: true } },
           { action: 'Box held in front of the sensors', waitMs: 1200, expect: { pusher: false } },
           { action: 'Box gone', set: { box: false, tall: false }, waitMs: 300, expect: { binFull: false } },
+          { action: 'Press Stop', set: { stop: true }, waitMs: 200, expect: { conveyor: false } },
+          { action: 'Tall box while stopped is not pushed', set: { stop: false, box: true, tall: true }, waitMs: 300, expect: { pusher: false } },
         ],
       },
       {
@@ -1024,5 +1031,7 @@ Because the latch is set by an edge, a condition that comes back after it cleare
     ],
   },
 ];
+
+export const HOW_TOS: HowTo[] = [...BATCH_1, ...HOW_TOS_BATCH_2];
 
 export const getHowTo = (slug: string) => HOW_TOS.find((guide) => guide.slug === slug);
