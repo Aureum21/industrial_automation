@@ -8,17 +8,17 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Machines and sequences',
     blurb: 'The classic PLC exercises: timed and step sequences.',
-    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc', 'parking-boom-barrier-plc'],
+    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc', 'parking-boom-barrier-plc', 'rotary-indexing-table-plc'],
   },
   {
     title: 'Conveyors and packaging',
     blurb: 'Filling, sorting, counting and line control.',
-    slugs: ['plc-program-bottle-filling', 'plc-program-conveyor-sorting-boxes', 'plc-program-packaging-counter', 'sequential-conveyor-start-stop', 'conveyor-jam-detection-plc', 'parking-lot-counter-plc'],
+    slugs: ['plc-program-bottle-filling', 'plc-program-conveyor-sorting-boxes', 'plc-program-packaging-counter', 'sequential-conveyor-start-stop', 'conveyor-jam-detection-plc', 'parking-lot-counter-plc', 'shift-register-reject-conveyor', 'belt-slip-underspeed-detection', 'production-counter-reject-rate'],
   },
   {
     title: 'Tanks, pumps and process',
     blurb: 'Levels, pumps, compressors, heating and analog signals.',
-    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence'],
+    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence', 'fire-pump-jockey-pump-control', 'solar-water-heater-differential-controller', 'fan-staging-by-temperature'],
   },
   {
     title: 'Alarms, safety and indication',
@@ -29,5 +29,10 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
     title: 'Basic techniques',
     blurb: 'Small patterns you will use in every program.',
     slugs: ['one-push-button-on-off-toggle', 'blinking-light-two-timers-plc', 'debounce-noisy-input-plc', 'motion-sensor-light-timer-plc', 'set-reset-latch-ladder-logic', 'ton-tof-tp-timer-difference'],
+  },
+  {
+    title: 'Home, garden and building',
+    blurb: 'Projects for Arduino and building automation.',
+    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer'],
   },
 ];

@@ -50,6 +50,7 @@ const REDUNDANT_BY_DESIGN = new Set([
   'plc-program-washing-machine spinTime.Q->notSpun.A', // the finished cycle also stops the spin
   'emergency-stop-reset-plc-program estop.Q->released.A', // reset-dominant latch already refuses it
   'conveyor-jam-detection-plc jam.Q->noJam.A', // the run latch drops one scan later anyway
+  'egg-incubator-controller-arduino-plc overheat.Q->safe.A', // the cut-out backs up the thermostat
 ]);
 
 test('every wire in every how-to circuit is covered by a scenario', () => {
