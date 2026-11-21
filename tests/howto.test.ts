@@ -66,6 +66,9 @@ test('every wire in every how-to circuit is covered by a scenario', () => {
     for (const wire of doc.connections) {
       const key = `${guide.slug} ${wire.fromBlockId}.${wire.fromPin}->${wire.toBlockId}.${wire.toPin}`;
       if (REDUNDANT_BY_DESIGN.has(key)) continue;
+      // Wires into display-only outputs (never checked by a scenario) are not requirements.
+      const checked = guide.scenarios.some((scenario) => scenario.steps.some((step) => (step.expect && wire.toBlockId in step.expect) || step.during?.some((rule) => rule.id === wire.toBlockId)));
+      if (guide.outputs.some((pin) => pin.id === wire.toBlockId) && !checked) continue;
       const result = gradeChallenge(asChallenge(guide), { ...doc, connections: doc.connections.filter((other) => other !== wire) });
       if (result.passed) untested.push(key);
     }

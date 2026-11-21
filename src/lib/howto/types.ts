@@ -28,6 +28,8 @@ export interface HowTo extends Pick<Challenge, 'scenarios' | 'never'> {
   faq: { q: string; a: string }[];
   blocks: BlockType[];
   challenges?: string[];
+  /** Shown above the generated sketch, e.g. when the circuit contains a simulated process. */
+  arduinoNote?: string;
 }
 
 export interface IoPin extends InterfacePin {

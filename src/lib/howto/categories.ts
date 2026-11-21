@@ -26,6 +26,11 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
     slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence', 'fire-pump-jockey-pump-control', 'solar-water-heater-differential-controller', 'fan-staging-by-temperature', 'filter-backwash-sequence-plc', 'generator-load-shedding-plc', 'batch-reactor-heat-hold-cool'],
   },
   {
+    title: 'Control loops and analog signals',
+    blurb: 'PID control, ramps, scaling, filtering and calculations.',
+    slugs: ['pi-temperature-control-explained', 'p-vs-pi-control-steady-state-error', 'kiln-temperature-ramp-soak-controller', 'pump-pressure-control-pid-vfd', 'plc-analog-output-scaling-4-20ma', 'median-select-redundant-transmitters', 'horizontal-tank-volume-from-level', 'square-root-extraction-dp-flow', 'moving-average-vs-low-pass-filter'],
+  },
+  {
     title: 'Alarms, safety and indication',
     blurb: 'Alarm handling, voting, stack lights and monitoring.',
     slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn'],

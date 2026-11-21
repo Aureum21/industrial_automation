@@ -145,6 +145,7 @@ export default async function HowToPage({ params }: Props) {
           <p className="mb-3 text-sm text-[#515154]">
             The same logic as a non-blocking Arduino Uno sketch, generated from the circuit. Pin numbers are assigned automatically and listed at the top; open the circuit in the Logic Lab to change them.
           </p>
+          {guide.arduinoNote && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{guide.arduinoNote}</p>}
           <details className="rounded-xl border border-[#e5e5ea] bg-white">
             <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Show the sketch ({sketch.split('\n').length} lines)</summary>
             <pre className="max-h-[480px] overflow-auto border-t border-[#e5e5ea] bg-[#1d1d1f] p-4 text-[11px] leading-relaxed text-[#e5e5ea]"><code>{sketch}</code></pre>
