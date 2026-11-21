@@ -65,3 +65,10 @@ test('every wire in every how-to circuit is covered by a scenario', () => {
   }
   assert.deepEqual(untested, []);
 });
+
+test('every how-to guide is in exactly one index category', async () => {
+  const { HOW_TO_CATEGORIES } = await import('../src/lib/howto/categories.ts');
+  const listed = HOW_TO_CATEGORIES.flatMap((category) => category.slugs);
+  assert.equal(new Set(listed).size, listed.length, 'a guide is listed twice');
+  assert.deepEqual([...listed].sort(), HOW_TOS.map((guide) => guide.slug).sort());
+});
