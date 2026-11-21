@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { DOCUMENTED_BLOCKS, blockSlug } from '@/lib/automation/blockPages';
 import { CHALLENGES } from '@/lib/challenges/catalog';
+import { HOW_TOS } from '@/lib/howto/catalog';
 import { getPostSummaries } from '@/server/services/content';
 import { listGallery } from '@/server/services/gallery';
 import { SITE_URL } from '@/shared/site';
@@ -19,10 +20,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     page('/', 1),
     page('/challenges', 0.9),
+    page('/how-to', 0.9),
     page('/lab', 0.9),
     page('/blogs', 0.8),
     page('/library', 0.8),
     page('/gallery', 0.8),
+    ...HOW_TOS.map((guide) => page(`/how-to/${guide.slug}`, 0.8)),
     ...CHALLENGES.map((challenge) => page(`/challenges/${challenge.slug}`, 0.7)),
     ...DOCUMENTED_BLOCKS.map((block) => page(`/library/${blockSlug(block.type)}`, 0.6)),
     ...circuits.map((circuit) => page(`/gallery/${circuit.id}`, 0.5, new Date(circuit.createdAt))),

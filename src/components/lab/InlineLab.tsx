@@ -17,9 +17,10 @@ interface InlineLabProps {
   height?: number;
   /** Show the "Verify stage" progress button (articles). Default true. */
   verifiable?: boolean;
+  initialView?: 'visual' | 'ladder';
 }
 
-export default function InlineLab({ dsl, title, step, height = 500, verifiable = true }: InlineLabProps) {
+export default function InlineLab({ dsl, title, step, height = 500, verifiable = true, initialView }: InlineLabProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
   const [showArduinoModal, setShowArduinoModal] = useState(false);
@@ -174,7 +175,7 @@ export default function InlineLab({ dsl, title, step, height = 500, verifiable =
       {/* Simulation Workspace Canvas */}
       <div className="flex-1 min-h-0 bg-white relative w-full overflow-hidden">
         {document ? (
-          <LabWorkspace readOnly document={document} isFullscreen={isFullscreen} />
+          <LabWorkspace readOnly document={document} isFullscreen={isFullscreen} initialView={initialView} />
         ) : (
           <div className="flex items-center justify-center h-full text-[#86868b] font-mono text-xs">
             Compiling circuit schematic...

@@ -60,9 +60,11 @@ interface WorkspaceProps {
   /** Challenge mode: starts from `initialDocument`, auto-saves to this localStorage key. */
   persistKey?: string;
   controller?: Ref<LabController>;
+  /** View shown first. Large read-only circuits read better as ladder rungs. */
+  initialView?: 'visual' | 'ladder';
 }
 
-function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, controller }: WorkspaceProps) {
+function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, controller, initialView }: WorkspaceProps) {
   const challengeMode = Boolean(persistKey);
   const [engine] = useState(() => new LogicEngine());
   const [nodes, setNodes] = useState<CircuitFlowNode[]>(() => {
@@ -114,7 +116,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(!readOnly);
-  const [mode, setMode] = useState<'visual' | 'ladder' | 'code' | 'hmi'>('visual');
+  const [mode, setMode] = useState<'visual' | 'ladder' | 'code' | 'hmi'>(initialView ?? 'visual');
   const [dslCode, setDslCode] = useState('');
   const [widgets, setWidgets] = useState<HmiWidget[]>([]);
   const [pending, setPending] = useState<{ document: CircuitDocument; label: string } | null>(null);
@@ -502,7 +504,8 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
         <button className={`lab-button ${running ? '' : 'primary'}`} onClick={() => setRunning(value => !value)}>{running ? 'Ⅱ Pause' : '▶ Run'}</button>
         <button className="lab-button" disabled={running} onClick={() => { engine.tick(100); sync(); }}>Step +100 ms</button>
         <button className="lab-button" onClick={() => { setRunning(false); engine.reset(); sync(); setNotice('Simulation reset. All switches turned off.'); }}>Reset</button>
-        <button className="lab-button" onClick={() => centerView(200)} title="Center circuit in view">⛶ Center</button>
+        {mode !== 'ladder' && <button className="lab-button" onClick={() => centerView(200)} title="Center circuit in view">⛶ Center</button>}
+        {readOnly && <button className="lab-button" onClick={() => setMode(mode === 'ladder' ? 'visual' : 'ladder')} title="Switch between the function block diagram and the ladder diagram">{mode === 'ladder' ? 'Function blocks' : 'Ladder view'}</button>}
         <span className="ml-2 font-mono text-[11px] text-[#86868b]">{(timeMs / 1000).toFixed(1)} s</span>
       </div>
       <div className="flex items-center gap-2">
@@ -523,7 +526,7 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
             <MiniMap nodeColor="#d1d5db" maskColor="#f9fafbb0" pannable zoomable />
           </ReactFlow>
         ) : mode === 'ladder' ? (
-          <LadderView engine={engine} syncKey={syncKey} />
+          <LadderView engine={engine} syncKey={syncKey} onToggleInput={(id) => onInput(id, !engine.blocks.get(id)?.value)} />
         ) : mode === 'hmi' ? (
           <HmiCanvas widgets={widgets} setWidgets={setWidgets} engine={engine} sync={sync} running={running} />
         ) : (
@@ -609,6 +612,6 @@ function Workspace({ readOnly, initialDocument, isFullscreen, persistKey, contro
   </main>;
 }
 
-export default function LabWorkspace({ readOnly, document, isFullscreen, persistKey, ref }: { readOnly?: boolean; document?: CircuitDocument; isFullscreen?: boolean; persistKey?: string; ref?: Ref<LabController> }) {
-  return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} isFullscreen={isFullscreen} persistKey={persistKey} controller={ref} /></ReactFlowProvider>;
+export default function LabWorkspace({ readOnly, document, isFullscreen, persistKey, ref, initialView }: { readOnly?: boolean; document?: CircuitDocument; isFullscreen?: boolean; persistKey?: string; ref?: Ref<LabController>; initialView?: 'visual' | 'ladder' }) {
+  return <ReactFlowProvider><Workspace readOnly={readOnly} initialDocument={document} isFullscreen={isFullscreen} persistKey={persistKey} controller={ref} initialView={initialView} /></ReactFlowProvider>;
 }

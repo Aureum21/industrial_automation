@@ -1,12 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import type { LogicEngine } from '@/lib/LogicEngine';
 import { buildLadder, conducts, type LadderNode, type Rung, type SignalRef } from '@/lib/automation/ladder';
 import { sortBlocksTopologically } from '@/lib/codegen/arduinoGenerator';
 import { BLOCK_CATALOG } from '@/lib/automation/catalog';
 
 type Read = (ref: SignalRef) => unknown;
+
+/** Block IDs of push buttons/switches the reader may toggle by clicking their contact. */
+const ToggleContext = createContext<{ toggleable: Set<string>; toggle?: (blockId: string) => void }>({ toggleable: new Set() });
 
 const ON = '#16a34a';
 const OFF = '#9ca3af';
@@ -18,8 +21,26 @@ function Wire({ powered, grow = false }: { powered: boolean; grow?: boolean }) {
 function Contact({ node, read }: { node: Extract<LadderNode, { kind: 'contact' }>; read: Read }) {
   const closed = conducts(node, read);
   const color = closed ? ON : OFF;
+  const { toggleable, toggle } = useContext(ToggleContext);
+  const clickable = Boolean(toggle && node.ref.pin === 'Q' && toggleable.has(node.ref.blockId));
+  const title = `${node.negated ? 'Normally closed' : 'Normally open'} contact: ${node.label} (${closed ? 'closed' : 'open'})`;
+  if (clickable) {
+    return (
+      <button type="button" onClick={() => toggle!(node.ref.blockId)} className="flex shrink-0 cursor-pointer flex-col items-center rounded-md px-0.5 hover:bg-[#0071e3]/5" title={`${title}. Click to switch ${node.label} ${read(node.ref) ? 'OFF' : 'ON'}.`}>
+        <ContactBody node={node} color={color} />
+      </button>
+    );
+  }
   return (
-    <span className="flex shrink-0 flex-col items-center px-0.5" title={`${node.negated ? 'Normally closed' : 'Normally open'} contact: ${node.label} (${closed ? 'closed' : 'open'})`}>
+    <span className="flex shrink-0 flex-col items-center px-0.5" title={title}>
+      <ContactBody node={node} color={color} />
+    </span>
+  );
+}
+
+function ContactBody({ node, color }: { node: Extract<LadderNode, { kind: 'contact' }>; color: string }) {
+  return (
+    <>
       <span className="max-w-24 truncate font-mono text-[10px] leading-4 text-[#515154]">{node.label}</span>
       <svg width="40" height="24" viewBox="0 0 40 24" aria-hidden>
         <line x1="0" y1="12" x2="14" y2="12" stroke={color} strokeWidth="2" />
@@ -29,7 +50,7 @@ function Contact({ node, read }: { node: Extract<LadderNode, { kind: 'contact' }
         {node.negated && <line x1="11" y1="21" x2="29" y2="3" stroke={color} strokeWidth="2" />}
       </svg>
       <span className="h-4" />
-    </span>
+    </>
   );
 }
 
@@ -143,9 +164,9 @@ function RungNumber({ index }: { index: number }) {
   return <span className="w-10 shrink-0 pt-3 pr-2 text-right font-mono text-[10px] text-[#86868b]">{String(index + 1).padStart(3, '0')}</span>;
 }
 
-export default function LadderView({ engine, syncKey }: { engine: LogicEngine; syncKey: number }) {
+export default function LadderView({ engine, syncKey, onToggleInput }: { engine: LogicEngine; syncKey: number; onToggleInput?: (blockId: string) => void }) {
   // syncKey changes on every scan and every edit; rebuilding is cheap for lab-sized circuits.
-  const rungs = useMemo(() => {
+  const { rungs, toggleable } = useMemo(() => {
     void syncKey;
     const doc = engine.toDocument();
     let order = doc.blocks;
@@ -154,15 +175,16 @@ export default function LadderView({ engine, syncKey }: { engine: LogicEngine; s
     } catch {
       // Unbroken feedback loops are reported by the simulator; fall back to document order.
     }
-    return buildLadder(doc, order);
+    return { rungs: buildLadder(doc, order), toggleable: new Set(doc.blocks.filter((block) => block.type === 'INPUT' || block.type === 'NC_INPUT').map((block) => block.id)) };
   }, [engine, syncKey]);
   const read: Read = (ref) => engine.blocks.get(ref.blockId)?.outputs[ref.pin];
 
   return (
+    <ToggleContext.Provider value={{ toggleable, toggle: onToggleInput }}>
     <div className="h-full overflow-auto bg-white px-4 pb-48 pt-16">
       <div className="mx-auto max-w-5xl">
         <p className="mb-4 max-w-2xl text-xs leading-5 text-[#86868b]">
-          Ladder view (read-only), generated from the function blocks. Gates become contacts: AND in series, OR in parallel, NOT as a normally closed contact. Green means power flows. Edit the circuit in the Visual view.
+          Ladder view (read-only), generated from the function blocks. Gates become contacts: AND in series, OR in parallel, NOT as a normally closed contact. Green means power flows. Click a switch contact to operate it; edit the circuit in the function block view.
         </p>
         {rungs.length ? (
           <div className="space-y-1">
@@ -173,5 +195,6 @@ export default function LadderView({ engine, syncKey }: { engine: LogicEngine; s
         )}
       </div>
     </div>
+    </ToggleContext.Provider>
   );
 }
