@@ -18,12 +18,12 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Conveyors and packaging',
     blurb: 'Filling, sorting, counting and line control.',
-    slugs: ['plc-program-bottle-filling', 'plc-program-conveyor-sorting-boxes', 'plc-program-packaging-counter', 'sequential-conveyor-start-stop', 'conveyor-jam-detection-plc', 'parking-lot-counter-plc', 'shift-register-reject-conveyor', 'belt-slip-underspeed-detection', 'production-counter-reject-rate', 'conveyor-pre-start-warning-horn', 'flow-meter-pulse-totalizer-batch'],
+    slugs: ['plc-program-bottle-filling', 'plc-program-conveyor-sorting-boxes', 'plc-program-packaging-counter', 'sequential-conveyor-start-stop', 'conveyor-jam-detection-plc', 'parking-lot-counter-plc', 'shift-register-reject-conveyor', 'belt-slip-underspeed-detection', 'production-counter-reject-rate', 'conveyor-pre-start-warning-horn', 'flow-meter-pulse-totalizer-batch', 'zero-pressure-accumulation-conveyor-zones', 'crane-hoist-up-down-limits-overload'],
   },
   {
     title: 'Tanks, pumps and process',
     blurb: 'Levels, pumps, compressors, heating and analog signals.',
-    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence', 'fire-pump-jockey-pump-control', 'solar-water-heater-differential-controller', 'fan-staging-by-temperature', 'filter-backwash-sequence-plc', 'generator-load-shedding-plc', 'batch-reactor-heat-hold-cool'],
+    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence', 'fire-pump-jockey-pump-control', 'solar-water-heater-differential-controller', 'fan-staging-by-temperature', 'filter-backwash-sequence-plc', 'generator-load-shedding-plc', 'batch-reactor-heat-hold-cool', 'cip-clean-in-place-sequence', 'tanker-loading-permissives-interlock', 'pump-dry-run-protection-auto-retry'],
   },
   {
     title: 'Control loops and analog signals',
@@ -33,7 +33,7 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Alarms, safety and indication',
     blurb: 'Alarm handling, voting, stack lights and monitoring.',
-    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn'],
+    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn', 'burner-management-purge-ignition-sequence'],
   },
   {
     title: 'Basic techniques',
@@ -43,6 +43,6 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Home, garden and building',
     blurb: 'Projects for Arduino and building automation.',
-    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer', 'day-night-thermostat-setback', 'automatic-soap-dispenser-sensor', 'co2-demand-controlled-ventilation'],
+    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer', 'day-night-thermostat-setback', 'automatic-soap-dispenser-sensor', 'co2-demand-controlled-ventilation', 'awning-wind-sun-automation', 'swimming-pool-pump-chlorinator-control'],
   },
 ];

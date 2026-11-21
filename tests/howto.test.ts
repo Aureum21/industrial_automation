@@ -57,6 +57,7 @@ const REDUNDANT_BY_DESIGN = new Set([
   'plc-program-drilling-machine top.Q->notTop.A', // the finished cycle also stops the feed at the top
   'filter-backwash-sequence-plc rinseTime.Q->notRinseDone.A', // the finished sequence also closes the rinse valve
   'conveyor-pre-start-warning-horn tripped.Q->notTripped.A', // reset-dominant latch already refuses Start
+  'cip-clean-in-place-sequence finalRinse.Q->notRinsed.A', // the finished cycle also closes the water valve
 ]);
 
 test('every wire in every how-to circuit is covered by a scenario', () => {
