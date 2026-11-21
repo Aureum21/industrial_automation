@@ -518,7 +518,8 @@ export class LogicEngine {
         const reset = digital('R');
         const error = sp - pv;
         const p = parameter('kp') * error;
-        let integral = reset ? 0 : Number(block.state.integral ?? 0) + parameter('ki') * error * (deltaMs / 1000);
+        // ki = 0 means a pure P controller: the anti-windup clamp below must not give it a memory.
+        let integral = reset || parameter('ki') === 0 ? 0 : Number(block.state.integral ?? 0) + parameter('ki') * error * (deltaMs / 1000);
         const min = parameter('min');
         const max = parameter('max');
         integral = Math.max(min - p, Math.min(max - p, integral));

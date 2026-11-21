@@ -63,3 +63,18 @@ test('the preview still shows the immediate effect of an edit', () => {
   engine.setInput('s', true);
   assert.equal(engine.blocks.get('q')!.outputs.Q, true, 'shown before the next scan');
 });
+
+test('a PI controller with ki = 0 is a pure P controller with no memory', async () => {
+  const { parseCircuitDSL } = await import('../src/lib/automation/dsl.ts');
+  const { BLOCK_CATALOG } = await import('../src/lib/automation/catalog.ts');
+  const { LogicEngine } = await import('../src/lib/LogicEngine.ts');
+  const engine = new LogicEngine();
+  engine.load(parseCircuitDSL(`circuit "p" version 1 {
+    sp: ANALOG_INPUT(value=60)  pv: ANALOG_INPUT(value=0)  ctl: PI_CONTROLLER(kp=4, ki=0, min=0, max=100)
+    sp.Q -> ctl.SP  pv.Q -> ctl.PV
+  }`, BLOCK_CATALOG));
+  for (let i = 0; i < 10; i++) engine.tick(100); // saturated: error 60, p = 240
+  engine.setInput('pv', 55);
+  engine.tick(100);
+  assert.equal(engine.blocks.get('ctl')!.outputs.Q, 20); // 4 × 5, no leftover from saturation
+});

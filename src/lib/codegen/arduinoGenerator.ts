@@ -676,7 +676,10 @@ export function generateArduinoSketch(doc: CircuitDocument, config: ArduinoExpor
         state.push(`float integral_${ident} = 0.0f;`);
         logic.push(
           `  { float e = ${input(block, 'SP')} - ${input(block, 'PV')}; float p = ${f(num(block, 'kp'))} * e;`,
-          `    float i = ${input(block, 'R')} ? 0.0f : integral_${ident} + ${f(num(block, 'ki'))} * e * (float)dt / 1000.0f;`,
+          // ki = 0 is a pure P controller: no integral memory at all (matches the simulator).
+          num(block, 'ki') === 0
+            ? `    float i = 0.0f; (void)integral_${ident};`
+            : `    float i = ${input(block, 'R')} ? 0.0f : integral_${ident} + ${f(num(block, 'ki'))} * e * (float)dt / 1000.0f;`,
           `    i = ah_max(${f(num(block, 'min'))} - p, ah_min(${f(num(block, 'max'))} - p, i));`,
           `    integral_${ident} = i;`,
           `    ${Q} = ah_finite(ah_max(${f(num(block, 'min'))}, ah_min(${f(num(block, 'max'))}, p + i))); }`,

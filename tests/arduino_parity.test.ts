@@ -178,7 +178,7 @@ test('parity: analog processing and control', opts, () => {
     trunc: FLOAT_TO_INT()  real: INT_TO_FLOAT()
     filt: ANALOG_FILTER(timeConstant=400)  ramp: ANALOG_RAMP(riseRate=40, fallRate=25)  mm: MIN_MAX()  avg: AVERAGE(samples=4)
     wd: ANALOG_WATCHDOG(tolerance=5)  hyst: ANALOG_DIFFERENTIAL(onThreshold=70, offThreshold=40)  low: ANALOG_DIFFERENTIAL(onThreshold=20, offThreshold=35)
-    pi: PI_CONTROLLER(kp=0.8, ki=0.5, min=0, max=100)  pid: PID_CONTROLLER(kp=1.2, ki=0.3, kd=0.05, min=-50, max=50)
+    pi: PI_CONTROLLER(kp=0.8, ki=0.5, min=0, max=100)  ponly: PI_CONTROLLER(kp=3, ki=0, min=0, max=100)  pid: PID_CONTROLLER(kp=1.2, ki=0.3, kd=0.05, min=-50, max=50)
     tf: TRANSFER_FUNCTION(gain=2, tau=600)  sq: SIGNAL_GENERATOR(type="square", freq=0.7, amp=10, offset=1)  tri: SIGNAL_GENERATOR(type="tri", freq=0.3, amp=5)
     sine: SIGNAL_GENERATOR(freq=0.5, amp=3)
     expr: MATH_EXPRESSION(expr="A > 50 ? clamp(A * 2 - B, 0, 150) : max(A, B) % 7 + sqrt(abs(B - A)) + (A >= B && !(B == 0))")
@@ -186,7 +186,7 @@ test('parity: analog processing and control', opts, () => {
     x.Q -> gt.A  y.Q -> gt.B  x.Q -> lte.A  y.Q -> lte.B  x.Q -> eq.A  y.Q -> eq.B
     x.Q -> th.A  x.Q -> amp.A  x.Q -> mux.A  y.Q -> mux.B  sel.Q -> mux.S  div.Q -> trunc.A  trunc.Q -> real.A
     x.Q -> filt.A  x.Q -> ramp.A  x.Q -> mm.A  sel.Q -> mm.R  x.Q -> avg.A  x.Q -> wd.A  en.Q -> wd.EN  x.Q -> hyst.A  x.Q -> low.A
-    sp.Q -> pi.SP  x.Q -> pi.PV  en.Q -> pi.R  sp.Q -> pid.SP  y.Q -> pid.PV  en.Q -> pid.EN
+    sp.Q -> pi.SP  x.Q -> pi.PV  en.Q -> pi.R  sp.Q -> ponly.SP  x.Q -> ponly.PV  sp.Q -> pid.SP  y.Q -> pid.PV  en.Q -> pid.EN
     x.Q -> tf.A  en.Q -> sq.EN  en.Q -> tri.EN  en.Q -> sine.EN  x.Q -> expr.A  y.Q -> expr.B
   }`, [
     { set: { x: 10, y: 0 }, scans: 3 },
