@@ -54,6 +54,9 @@ const REDUNDANT_BY_DESIGN = new Set([
   'plc-step-sequencer-counter c0.Q->s0.B', // an unwired analog input also reads 0; kept for readability
   'plc-first-scan-bit-initialization firstScan.Q->stopOrInit.B', // matters for retentive memory after a real power cycle
   'day-night-thermostat-setback comfort.Q->setback.A', // the night band is always below the day band
+  'plc-program-drilling-machine top.Q->notTop.A', // the finished cycle also stops the feed at the top
+  'filter-backwash-sequence-plc rinseTime.Q->notRinseDone.A', // the finished sequence also closes the rinse valve
+  'conveyor-pre-start-warning-horn tripped.Q->notTripped.A', // reset-dominant latch already refuses Start
 ]);
 
 test('every wire in every how-to circuit is covered by a scenario', () => {
