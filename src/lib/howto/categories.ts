@@ -33,7 +33,7 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Alarms, safety and indication',
     blurb: 'Alarm handling, voting, stack lights and monitoring.',
-    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn', 'burner-management-purge-ignition-sequence'],
+    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn', 'burner-management-purge-ignition-sequence', 'first-out-alarm-trip-indication', 'lamp-test-indicator-lights-plc'],
   },
   {
     title: 'Basic techniques',
@@ -43,6 +43,6 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Home, garden and building',
     blurb: 'Projects for Arduino and building automation.',
-    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer', 'day-night-thermostat-setback', 'automatic-soap-dispenser-sensor', 'co2-demand-controlled-ventilation', 'awning-wind-sun-automation', 'swimming-pool-pump-chlorinator-control'],
+    slugs: ['egg-incubator-controller-arduino-plc', 'automatic-irrigation-soil-moisture', 'bathroom-exhaust-fan-humidity-timer', 'day-night-thermostat-setback', 'automatic-soap-dispenser-sensor', 'co2-demand-controlled-ventilation', 'awning-wind-sun-automation', 'swimming-pool-pump-chlorinator-control', 'quiz-buzzer-first-to-press-plc', 'people-counter-direction-two-sensors'],
   },
 ];

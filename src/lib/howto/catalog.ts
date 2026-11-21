@@ -8,6 +8,7 @@ import { HOW_TOS_BATCH_7 } from './batch7.ts';
 import { HOW_TOS_BATCH_8 } from './batch8.ts';
 import { HOW_TOS_BATCH_9 } from './batch9.ts';
 import { HOW_TOS_BATCH_10 } from './batch10.ts';
+import { HOW_TOS_BATCH_11 } from './batch11.ts';
 
 /**
  * How-to guides for the classic PLC exercises. Every circuit is verified by tests/howto.test.ts
@@ -1040,6 +1041,6 @@ Because the latch is set by an edge, a condition that comes back after it cleare
   },
 ];
 
-export const HOW_TOS: HowTo[] = [...BATCH_1, ...HOW_TOS_BATCH_2, ...HOW_TOS_BATCH_3, ...HOW_TOS_BATCH_4, ...HOW_TOS_BATCH_5, ...HOW_TOS_BATCH_6, ...HOW_TOS_BATCH_7, ...HOW_TOS_BATCH_8, ...HOW_TOS_BATCH_9, ...HOW_TOS_BATCH_10];
+export const HOW_TOS: HowTo[] = [...BATCH_1, ...HOW_TOS_BATCH_2, ...HOW_TOS_BATCH_3, ...HOW_TOS_BATCH_4, ...HOW_TOS_BATCH_5, ...HOW_TOS_BATCH_6, ...HOW_TOS_BATCH_7, ...HOW_TOS_BATCH_8, ...HOW_TOS_BATCH_9, ...HOW_TOS_BATCH_10, ...HOW_TOS_BATCH_11];
 
 export const getHowTo = (slug: string) => HOW_TOS.find((guide) => guide.slug === slug);

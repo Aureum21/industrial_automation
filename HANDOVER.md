@@ -71,7 +71,7 @@ Not verified: the live site after the last push. The production URL was unreacha
 
 ## How-to guides (SEO content system)
 
-`/how-to` and `/how-to/<slug>`: currently 88 guides in `src/lib/howto/catalog.ts` + `batch2.ts` … `batch9.ts`, grouped in `src/lib/howto/categories.ts`.
+`/how-to` and `/how-to/<slug>`: currently 100 guides in `src/lib/howto/catalog.ts` + `batch2.ts` … `batch11.ts`, grouped in `src/lib/howto/categories.ts`.
 
 Each guide (`HowTo` in `src/lib/howto/types.ts`) has search-style title and description, a two-sentence answer, the solution circuit (DSL), an I/O table, explanation, steps, mistakes, FAQ (rendered + FAQPage JSON-LD), related blocks and challenges. The page also generates Arduino code from the circuit and an Open Graph image.
 
