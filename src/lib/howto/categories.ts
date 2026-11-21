@@ -3,12 +3,12 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Motor control',
     blurb: 'Start/stop, reversing, starters and selector switches.',
-    slugs: ['start-stop-motor-control-seal-in', 'motor-forward-reverse-interlock', 'star-delta-starter-plc-program', 'jog-and-run-motor-control', 'hand-off-auto-hoa-switch-plc', 'motor-fail-to-start-feedback-alarm', 'emergency-stop-reset-plc-program'],
+    slugs: ['start-stop-motor-control-seal-in', 'motor-forward-reverse-interlock', 'star-delta-starter-plc-program', 'jog-and-run-motor-control', 'hand-off-auto-hoa-switch-plc', 'motor-fail-to-start-feedback-alarm', 'emergency-stop-reset-plc-program', 'lube-oil-pump-permissive-motor', 'two-hand-control-anti-tie-down'],
   },
   {
     title: 'Machines and sequences',
     blurb: 'The classic PLC exercises: timed and step sequences.',
-    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc'],
+    slugs: ['plc-program-traffic-light', 'plc-program-pedestrian-crossing', 'plc-program-car-wash', 'plc-program-washing-machine', 'plc-program-garage-door', 'automatic-sliding-door-plc', 'plc-program-two-floor-elevator', 'pneumatic-cylinder-extend-retract-plc', 'airlock-door-interlock-plc', 'parking-boom-barrier-plc'],
   },
   {
     title: 'Conveyors and packaging',
@@ -18,16 +18,16 @@ export const HOW_TO_CATEGORIES: { title: string; blurb: string; slugs: string[] 
   {
     title: 'Tanks, pumps and process',
     blurb: 'Levels, pumps, compressors, heating and analog signals.',
-    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc'],
+    slugs: ['tank-level-control-pump-hysteresis', 'pump-control-two-float-switches', 'water-level-indicator-plc', 'duty-standby-pump-alternation', 'sump-pump-lead-lag-high-level', 'plc-program-mixing-tank-batch', 'air-compressor-control-plc', 'heater-thermostat-high-limit-plc', '4-20ma-scaling-plc', 'automatic-transfer-switch-ats-plc', 'greenhouse-control-plc', 'two-speed-dosing-by-weight', 'valve-before-pump-start-sequence'],
   },
   {
     title: 'Alarms, safety and indication',
     blurb: 'Alarm handling, voting, stack lights and monitoring.',
-    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance'],
+    slugs: ['alarm-horn-acknowledge-flashing-light', 'machine-stack-light-tower-plc', '2oo3-voting-logic-plc', 'plc-run-hour-meter-maintenance', 'analog-alarm-delay-deadband', 'street-light-automatic-dusk-dawn'],
   },
   {
     title: 'Basic techniques',
     blurb: 'Small patterns you will use in every program.',
-    slugs: ['one-push-button-on-off-toggle', 'blinking-light-two-timers-plc', 'debounce-noisy-input-plc', 'motion-sensor-light-timer-plc'],
+    slugs: ['one-push-button-on-off-toggle', 'blinking-light-two-timers-plc', 'debounce-noisy-input-plc', 'motion-sensor-light-timer-plc', 'set-reset-latch-ladder-logic', 'ton-tof-tp-timer-difference'],
   },
 ];
